@@ -437,8 +437,10 @@ app.post('/api/decode-dl', authenticateToken, upload.single('dlImage'), async (r
     }
 
     // Preprocess: save a clean JPEG for the decode engines
+    // .flatten() composites alpha onto white — prevents PNGs with transparency from going black
     const preprocessedPath = tempPath + '_pre.jpg';
     await sharp(tempPath)
+      .flatten({ background: { r: 255, g: 255, b: 255 } })
       .resize(1600, null, { withoutEnlargement: true })
       .jpeg({ quality: 95 })
       .toFile(preprocessedPath);
