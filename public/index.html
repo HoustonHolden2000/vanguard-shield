@@ -252,6 +252,10 @@ label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); 
       <button class="btn btn-outline btn-full" id="rescan-btn">RE-SCAN</button>
       <button class="btn btn-primary btn-full" id="confirm-btn">CONFIRM &rarr;</button>
     </div>
+    <details id="decode-debug" style="margin-top:16px;display:none;">
+      <summary style="cursor:pointer;font-size:13px;color:var(--text2);font-weight:600;">Debug: Server Response</summary>
+      <pre id="decode-debug-json" style="margin-top:8px;background:#1a1a2e;color:#0f0;font-size:11px;padding:12px;border-radius:8px;overflow-x:auto;max-height:400px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;"></pre>
+    </details>
   </div>
 </div>
 
@@ -563,6 +567,13 @@ document.getElementById('dl-photo-input').addEventListener('change', async funct
       body: formData
     });
     var result = await res.json();
+
+    // Show raw JSON in debug box on confirm screen
+    var debugBox = document.getElementById('decode-debug');
+    var debugJson = document.getElementById('decode-debug-json');
+    debugBox.style.display = 'block';
+    debugBox.open = true;
+    debugJson.textContent = JSON.stringify(result, null, 2);
 
     if (result.success && result.data) {
       // Map server response fields → confirm screen fields
