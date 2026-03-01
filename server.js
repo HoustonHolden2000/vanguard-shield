@@ -266,8 +266,8 @@ app.use(helmet({
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "blob:"],
       mediaSrc: ["'self'", "blob:"],
-      connectSrc: ["'self'"],
-      workerSrc: ["'self'", "blob:"],
+      connectSrc: ["'self'", "https://cdn.jsdelivr.net"],
+      workerSrc: ["'self'", "blob:", "https://cdn.jsdelivr.net"],
     }
   }
 }));

@@ -102,7 +102,7 @@ label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); 
 .scanner-header button { background: rgba(255,255,255,0.15); border: none; color: white; padding: 8px 16px; border-radius: 20px; font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
 #scanner-region { width: 100%; height: 100vh; }
 #scanner-region video { object-fit: cover; }
-.scanner-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 300px; height: 180px; border: 2px solid var(--blue); border-radius: 12px; z-index: 5; pointer-events: none; }
+.scanner-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(90vw, 500px); height: min(54vw, 300px); border: 2px solid var(--blue); border-radius: 12px; z-index: 5; pointer-events: none; }
 .scanner-overlay::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--blue); animation: scan-line 2s linear infinite; box-shadow: 0 0 8px var(--blue); }
 @keyframes scan-line { 0% { top: 0; } 100% { top: 100%; } }
 .scanner-corner { position: absolute; width: 20px; height: 20px; border-color: var(--blue); border-style: solid; }
@@ -110,7 +110,22 @@ label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); 
 .scanner-corner.tr { top: -2px; right: -2px; border-width: 3px 3px 0 0; border-radius: 0 4px 0 0; }
 .scanner-corner.bl { bottom: -2px; left: -2px; border-width: 0 0 3px 3px; border-radius: 0 0 0 4px; }
 .scanner-corner.br { bottom: -2px; right: -2px; border-width: 0 3px 3px 0; border-radius: 0 0 4px 0; }
-.scanner-hint { position: absolute; bottom: 100px; left: 0; right: 0; text-align: center; color: white; font-size: 14px; font-weight: 600; z-index: 10; text-shadow: 0 1px 4px rgba(0,0,0,0.8); }
+.scanner-hint { position: absolute; bottom: 120px; left: 0; right: 0; text-align: center; color: white; font-size: 14px; font-weight: 600; z-index: 10; text-shadow: 0 1px 4px rgba(0,0,0,0.8); }
+
+/* ─── SCANNER TOOLBAR ─── */
+.scanner-toolbar { position: absolute; bottom: 0; left: 0; right: 0; z-index: 15; display: flex; align-items: center; justify-content: center; gap: 16px; padding: 16px 20px 28px; background: linear-gradient(to top, rgba(0,0,0,0.85), transparent); }
+.scanner-toolbar button { display: flex; flex-direction: column; align-items: center; gap: 4px; background: rgba(255,255,255,0.12); border: none; color: white; padding: 12px 20px; border-radius: 12px; font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; min-width: 72px; transition: background 0.2s; }
+.scanner-toolbar button:active { background: rgba(255,255,255,0.25); }
+.scanner-toolbar button svg { width: 24px; height: 24px; }
+.scanner-toolbar button.torch-on { background: rgba(255,214,0,0.3); color: var(--yellow); }
+
+/* ─── SCANNER STATUS ─── */
+.scanner-status { position: absolute; top: 56px; left: 0; right: 0; z-index: 10; text-align: center; padding: 6px 16px; }
+.scanner-status span { display: inline-block; padding: 4px 12px; background: rgba(0,86,160,0.7); border-radius: 12px; font-size: 12px; font-weight: 600; color: white; backdrop-filter: blur(4px); }
+
+/* ─── SUCCESS FLASH ─── */
+.scan-success-flash { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 50; background: var(--green); pointer-events: none; animation: successFlash 0.6s ease-out forwards; }
+@keyframes successFlash { 0% { opacity: 0.8; } 100% { opacity: 0; } }
 
 /* ─── CONFIRM ─── */
 .dl-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -265,8 +280,23 @@ label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); 
     <span style="color:white;font-weight:600;">Scanning...</span>
     <button onclick="stopScanner()">Cancel</button>
   </div>
+  <div class="scanner-status" id="scanner-status" style="display:none;"><span id="scanner-status-text">Enhanced scanner active</span></div>
   <div id="scanner-region"></div>
   <div class="scanner-hint">Position barcode on back of license in the frame</div>
+  <div class="scanner-toolbar" id="scanner-toolbar">
+    <button id="torch-btn" onclick="toggleTorch()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      Torch
+    </button>
+    <button id="photo-scan-btn" onclick="enterPhotoMode()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+      Photo
+    </button>
+    <button onclick="stopScanner()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      Cancel
+    </button>
+  </div>
 </div>
 
 <!-- ═══════════ SCREEN: CONFIRM DL DATA ═══════════ -->
@@ -454,6 +484,17 @@ let currentScanFilter = '';
 let cameraResolve = null;
 let cameraStream = null;
 
+// Scanner upgrade state
+let scannerTimeout = null;
+let dynamsoftReader = null;
+let dynamsoftLoaded = false;
+let dynamsoftFrameLoop = null;
+let torchOn = false;
+let scannerVideoTrack = null;
+let scannerStream = null;
+let isPhotoScanMode = false;
+let activeEngine = 'html5-qrcode';
+
 // ═══════════════════════════════════════════════════════════
 // HELPERS
 // ═══════════════════════════════════════════════════════════
@@ -592,43 +633,91 @@ async function loadHomeStats() {
 }
 
 // ═══════════════════════════════════════════════════════════
-// BARCODE SCANNER
+// DYNAMSOFT SDK LOADER
+// ═══════════════════════════════════════════════════════════
+function loadDynamsoftSDK() {
+  return new Promise((resolve, reject) => {
+    if (dynamsoftLoaded && window.Dynamsoft) { resolve(); return; }
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/dynamsoft-javascript-barcode@9.6.42/dist/dbr.js';
+    script.onload = () => { dynamsoftLoaded = true; resolve(); };
+    script.onerror = () => reject(new Error('Failed to load Dynamsoft SDK'));
+    document.head.appendChild(script);
+  });
+}
+
+async function getDynamsoftReader() {
+  if (dynamsoftReader) return dynamsoftReader;
+  await loadDynamsoftSDK();
+  Dynamsoft.DBR.BarcodeReader.license = 'DLS2eyJvcmdhbml6YXRpb25JRCI6IjIwMDAwMSJ9';
+  dynamsoftReader = await Dynamsoft.DBR.BarcodeReader.createInstance();
+  const settings = await dynamsoftReader.getRuntimeSettings();
+  settings.barcodeFormatIds = Dynamsoft.DBR.EnumBarcodeFormat.BF_PDF417;
+  settings.deblurLevel = 5;
+  await dynamsoftReader.updateRuntimeSettings(settings);
+  return dynamsoftReader;
+}
+
+// ═══════════════════════════════════════════════════════════
+// BARCODE SCANNER (UPGRADED)
 // ═══════════════════════════════════════════════════════════
 async function startScanner() {
   currentScanData = {};
   capturedPhotos = { dl: null, bol: null, truck: null };
+  isPhotoScanMode = false;
+  activeEngine = 'html5-qrcode';
+  torchOn = false;
   showScreen('scanner-screen');
-  
+
+  // Reset UI
+  const statusEl = document.getElementById('scanner-status');
+  statusEl.style.display = 'none';
+  const torchBtn = document.getElementById('torch-btn');
+  if (torchBtn) torchBtn.classList.remove('torch-on');
+
+  // Responsive qrbox
+  const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+  const qrW = Math.min(Math.floor(vw * 0.85), 480);
+  const qrH = Math.floor(qrW * 0.6);
+
   try {
-    // Check if Html5QrcodeScanner is available and supports PDF417
     html5Qr = new Html5Qrcode("scanner-region");
-    
+
     const config = {
       fps: 10,
-      qrbox: { width: 280, height: 160 },
+      qrbox: { width: qrW, height: qrH },
       aspectRatio: 1.777,
     };
-    
-    // Try with PDF417 format support
-    let formats = undefined;
+
     if (typeof Html5QrcodeSupportedFormats !== 'undefined' && Html5QrcodeSupportedFormats.PDF_417 !== undefined) {
-      formats = [Html5QrcodeSupportedFormats.PDF_417];
-      config.formatsToSupport = formats;
+      config.formatsToSupport = [Html5QrcodeSupportedFormats.PDF_417];
     }
-    
+
     await html5Qr.start(
       { facingMode: "environment" },
       config,
       (decoded) => {
-        console.log('[SCAN] Raw data:', decoded.substring(0, 100));
-        if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-        stopScanner();
-        const parsed = parsePDF417(decoded);
-        currentScanData = parsed;
-        showConfirmScreen(parsed);
+        console.log('[SCAN] html5-qrcode decoded:', decoded.substring(0, 80));
+        onScanSuccess(decoded);
       },
       (err) => { /* scanning... */ }
     );
+
+    // Grab video track reference for torch
+    try {
+      const videoEl = document.querySelector('#scanner-region video');
+      if (videoEl && videoEl.srcObject) {
+        scannerStream = videoEl.srcObject;
+        const tracks = scannerStream.getVideoTracks();
+        if (tracks.length > 0) scannerVideoTrack = tracks[0];
+      }
+    } catch (e) { /* no track access */ }
+
+    // 10-second timer: auto-switch to Dynamsoft if no read
+    scannerTimeout = setTimeout(() => {
+      switchToDynamsoft();
+    }, 10000);
+
   } catch (e) {
     console.error('[SCANNER ERROR]', e);
     showToast('Camera error: ' + (e.message || e), 'error');
@@ -636,13 +725,266 @@ async function startScanner() {
   }
 }
 
-function stopScanner() {
+// ═══════════════════════════════════════════════════════════
+// DYNAMSOFT AUTO-SWITCH (10-second fallback)
+// ═══════════════════════════════════════════════════════════
+async function switchToDynamsoft() {
+  if (activeEngine === 'dynamsoft') return;
+  console.log('[SCAN] Switching to Dynamsoft enhanced scanner...');
+  showToast('Switching to enhanced scanner...', 'info');
+
+  activeEngine = 'dynamsoft';
+  const statusEl = document.getElementById('scanner-status');
+  statusEl.style.display = '';
+  document.getElementById('scanner-status-text').textContent = 'Enhanced Scanning...';
+
+  // Grab media stream from html5-qrcode video before stopping it
+  let stream = null;
+  try {
+    const videoEl = document.querySelector('#scanner-region video');
+    if (videoEl && videoEl.srcObject) {
+      stream = videoEl.srcObject;
+    }
+  } catch (e) { /* */ }
+
+  // Stop html5-qrcode but keep the stream alive
   if (html5Qr) {
-    html5Qr.stop().catch(() => {});
-    html5Qr.clear();
+    try { await html5Qr.stop(); } catch (e) { /* */ }
+    try { html5Qr.clear(); } catch (e) { /* */ }
     html5Qr = null;
   }
+
+  // If we couldn't get the stream from html5-qrcode, open a new one
+  if (!stream) {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 } } });
+    } catch (e) {
+      showToast('Camera error', 'error');
+      showScreen('home-screen');
+      return;
+    }
+  }
+
+  scannerStream = stream;
+  const tracks = stream.getVideoTracks();
+  if (tracks.length > 0) scannerVideoTrack = tracks[0];
+
+  // Create a fresh video element inside scanner-region
+  const region = document.getElementById('scanner-region');
+  region.innerHTML = '';
+  const video = document.createElement('video');
+  video.autoplay = true;
+  video.playsInline = true;
+  video.muted = true;
+  video.style.cssText = 'width:100%;height:100vh;object-fit:cover;';
+  video.srcObject = stream;
+  region.appendChild(video);
+  await video.play();
+
+  // Load Dynamsoft and start frame decode loop
+  let reader;
+  try {
+    reader = await getDynamsoftReader();
+  } catch (e) {
+    console.error('[DYNAMSOFT] Load error:', e);
+    showToast('Enhanced scanner unavailable', 'warning');
+    return;
+  }
+
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+
+  function decodeFrame() {
+    if (activeEngine !== 'dynamsoft') return;
+    if (video.readyState >= video.HAVE_CURRENT_DATA) {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0);
+      reader.decode(canvas).then(results => {
+        if (results && results.length > 0) {
+          const text = results[0].barcodeText;
+          if (text && text.length > 20) {
+            console.log('[SCAN] Dynamsoft decoded:', text.substring(0, 80));
+            onScanSuccess(text);
+            return;
+          }
+        }
+        dynamsoftFrameLoop = requestAnimationFrame(decodeFrame);
+      }).catch(() => {
+        dynamsoftFrameLoop = requestAnimationFrame(decodeFrame);
+      });
+    } else {
+      dynamsoftFrameLoop = requestAnimationFrame(decodeFrame);
+    }
+  }
+  dynamsoftFrameLoop = requestAnimationFrame(decodeFrame);
+}
+
+// ═══════════════════════════════════════════════════════════
+// SCAN SUCCESS (centralized handler)
+// ═══════════════════════════════════════════════════════════
+function onScanSuccess(decoded) {
+  cleanupScanner();
+
+  // Strong vibration
+  if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
+
+  // Green flash overlay
+  const flash = document.createElement('div');
+  flash.className = 'scan-success-flash';
+  document.body.appendChild(flash);
+  flash.addEventListener('animationend', () => flash.remove());
+
+  // Parse and show confirm
+  const parsed = parsePDF417(decoded);
+  currentScanData = parsed;
+  showConfirmScreen(parsed);
+}
+
+// ═══════════════════════════════════════════════════════════
+// CLEANUP + STOP SCANNER
+// ═══════════════════════════════════════════════════════════
+function cleanupScanner() {
+  // Clear timers
+  if (scannerTimeout) { clearTimeout(scannerTimeout); scannerTimeout = null; }
+  if (dynamsoftFrameLoop) { cancelAnimationFrame(dynamsoftFrameLoop); dynamsoftFrameLoop = null; }
+
+  // Stop html5-qrcode
+  if (html5Qr) {
+    try { html5Qr.stop().catch(() => {}); } catch (e) { /* */ }
+    try { html5Qr.clear(); } catch (e) { /* */ }
+    html5Qr = null;
+  }
+
+  // Stop streams
+  if (scannerStream) {
+    try { scannerStream.getTracks().forEach(t => t.stop()); } catch (e) { /* */ }
+    scannerStream = null;
+  }
+
+  // Reset state
+  scannerVideoTrack = null;
+  torchOn = false;
+  activeEngine = 'html5-qrcode';
+  isPhotoScanMode = false;
+}
+
+function stopScanner() {
+  cleanupScanner();
   showScreen('home-screen');
+}
+
+// ═══════════════════════════════════════════════════════════
+// TORCH TOGGLE
+// ═══════════════════════════════════════════════════════════
+async function toggleTorch() {
+  if (!scannerVideoTrack) {
+    showToast('Torch not available', 'warning');
+    return;
+  }
+  try {
+    const capabilities = scannerVideoTrack.getCapabilities();
+    if (!capabilities.torch) {
+      showToast('Torch not supported on this device', 'warning');
+      return;
+    }
+    torchOn = !torchOn;
+    await scannerVideoTrack.applyConstraints({ advanced: [{ torch: torchOn }] });
+    const btn = document.getElementById('torch-btn');
+    if (btn) btn.classList.toggle('torch-on', torchOn);
+  } catch (e) {
+    showToast('Torch not supported on this device', 'warning');
+    torchOn = false;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// PHOTO SCAN MODE
+// ═══════════════════════════════════════════════════════════
+function enterPhotoMode() {
+  isPhotoScanMode = true;
+
+  // Stop live scanner but don't navigate away
+  if (scannerTimeout) { clearTimeout(scannerTimeout); scannerTimeout = null; }
+  if (dynamsoftFrameLoop) { cancelAnimationFrame(dynamsoftFrameLoop); dynamsoftFrameLoop = null; }
+  if (html5Qr) {
+    try { html5Qr.stop().catch(() => {}); } catch (e) { /* */ }
+    try { html5Qr.clear(); } catch (e) { /* */ }
+    html5Qr = null;
+  }
+  if (scannerStream) {
+    try { scannerStream.getTracks().forEach(t => t.stop()); } catch (e) { /* */ }
+    scannerStream = null;
+    scannerVideoTrack = null;
+  }
+
+  // Open camera overlay for photo capture
+  const overlay = document.getElementById('camera-overlay');
+  const video = document.getElementById('camera-video');
+  const canvas = document.getElementById('camera-canvas');
+  const purpose = document.getElementById('camera-purpose');
+  purpose.textContent = 'Capture License Barcode';
+  overlay.classList.add('active');
+
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 } } })
+    .then(stream => {
+      cameraStream = stream;
+      video.srcObject = stream;
+      video.play();
+
+      document.getElementById('camera-shutter').onclick = async () => {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext('2d').drawImage(video, 0, 0);
+
+        // Stop camera
+        stream.getTracks().forEach(t => t.stop());
+        overlay.classList.remove('active');
+        cameraStream = null;
+
+        showToast('Decoding photo...', 'info');
+
+        // Try Dynamsoft first
+        let decoded = null;
+        try {
+          const reader = await getDynamsoftReader();
+          const results = await reader.decode(canvas);
+          if (results && results.length > 0 && results[0].barcodeText.length > 20) {
+            decoded = results[0].barcodeText;
+          }
+        } catch (e) {
+          console.log('[PHOTO] Dynamsoft decode failed:', e.message);
+        }
+
+        // Fallback: html5-qrcode scanFile
+        if (!decoded) {
+          try {
+            const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.95));
+            const file = new File([blob], 'scan.jpg', { type: 'image/jpeg' });
+            const tempQr = new Html5Qrcode("scanner-region");
+            decoded = await tempQr.scanFile(file, true);
+            tempQr.clear();
+          } catch (e) {
+            console.log('[PHOTO] html5-qrcode scanFile failed:', e.message);
+          }
+        }
+
+        if (decoded && decoded.length > 20) {
+          onScanSuccess(decoded);
+        } else {
+          showToast('Could not read barcode. Try again.', 'error');
+          // Restart live scanner
+          isPhotoScanMode = false;
+          startScanner();
+        }
+      };
+    })
+    .catch(e => {
+      overlay.classList.remove('active');
+      showToast('Camera error: ' + e.message, 'error');
+      isPhotoScanMode = false;
+      startScanner();
+    });
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -803,6 +1145,11 @@ function capturePhoto(type) {
 function cancelCamera() {
   if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null; }
   document.getElementById('camera-overlay').classList.remove('active');
+  // If we were in photo scan mode, restart live scanner
+  if (isPhotoScanMode) {
+    isPhotoScanMode = false;
+    startScanner();
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
