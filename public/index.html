@@ -96,8 +96,14 @@ label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); 
 .nav-grid { padding: 0 16px 24px; }
 
 /* ─── SCANNER ─── */
-#scan-preview img { max-width: 100%; border-radius: 8px; margin-bottom: 16px; }
-#scan-processing { font-size: 16px; font-weight: 600; color: var(--text2); margin-bottom: 16px; min-height: 24px; }
+.scan-subtitle { font-size: 13px; color: var(--text2); margin-bottom: 24px; }
+#scan-preview { margin-bottom: 12px; }
+#scan-preview img { max-width: 100%; border-radius: 4px; }
+#scan-processing { font-size: 14px; font-weight: 600; color: var(--text2); margin: 12px 0 16px; min-height: 20px; }
+#scan-result { display: none; background: #111; border-radius: var(--radius-sm); padding: 12px; margin-top: 16px; text-align: left; }
+#scan-result .field-row { margin-bottom: 6px; }
+#scan-result .field-label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; }
+#scan-result .field-value { font-size: 14px; color: var(--text); }
 
 /* ─── SUCCESS FLASH ─── */
 .scan-success-flash { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 50; background: var(--green); pointer-events: none; animation: successFlash 0.6s ease-out forwards; }
@@ -258,16 +264,26 @@ label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); 
     <div></div>
   </div>
   <div class="content" style="text-align:center;">
+    <p class="scan-subtitle">Driver License Capture (PDF417)</p>
+    <input type="file" id="barcode-file-input" accept="image/*" capture="environment" style="display:none;">
+    <button class="btn btn-primary btn-full btn-lg" id="btn-scan" onclick="captureBarcode()">
+      Scan Driver License
+    </button>
+    <p style="margin-top:12px; color:var(--text3); font-size:12px;">
+      Point your camera at the barcode on the BACK of the license
+    </p>
     <div id="scan-preview"></div>
     <div id="scan-processing"></div>
-    <input type="file" id="barcode-file-input" accept="image/*" capture="environment" style="display:none;">
-    <button class="btn btn-primary btn-full btn-lg" onclick="captureBarcode()">
-      &#128247; TAKE PHOTO OF LICENSE BARCODE
-    </button>
-    <p style="margin-top:16px; color:var(--text2); font-size:13px;">
-      Point your camera at the barcode on the BACK of the driver's license
-    </p>
-    <button class="btn btn-outline btn-full" style="margin-top:12px;" onclick="showScreen('home-screen')">CANCEL</button>
+    <div id="scan-result">
+      <div class="field-row"><div class="field-label">First Name</div><div class="field-value" id="sr-first"></div></div>
+      <div class="field-row"><div class="field-label">Last Name</div><div class="field-value" id="sr-last"></div></div>
+      <div class="field-row"><div class="field-label">DL Number</div><div class="field-value" id="sr-dl"></div></div>
+      <div class="field-row"><div class="field-label">State</div><div class="field-value" id="sr-state"></div></div>
+      <div class="field-row"><div class="field-label">DOB</div><div class="field-value" id="sr-dob"></div></div>
+      <div class="field-row"><div class="field-label">Expiration</div><div class="field-value" id="sr-exp"></div></div>
+      <div class="field-row"><div class="field-label">Address</div><div class="field-value" id="sr-addr"></div></div>
+    </div>
+    <button class="btn btn-outline btn-full" style="margin-top:16px;" onclick="showScreen('home-screen')">CANCEL</button>
   </div>
 </div>
 
@@ -600,7 +616,11 @@ function startScanner() {
   capturedPhotos = { dl: null, bol: null, truck: null };
   document.getElementById('scan-preview').innerHTML = '';
   document.getElementById('scan-processing').innerHTML = '';
+  document.getElementById('scan-result').style.display = 'none';
   document.getElementById('barcode-file-input').value = '';
+  var btn = document.getElementById('btn-scan');
+  btn.disabled = false;
+  btn.textContent = 'Scan Driver License';
   showScreen('scanner-screen');
 }
 
@@ -613,6 +633,10 @@ document.getElementById('barcode-file-input').addEventListener('change', async f
   var file = e.target.files && e.target.files[0];
   if (!file) return;
 
+  var btn = document.getElementById('btn-scan');
+  btn.disabled = true;
+  btn.textContent = 'Processing...';
+
   // Show photo preview
   var preview = document.getElementById('scan-preview');
   var reader = new FileReader();
@@ -623,6 +647,7 @@ document.getElementById('barcode-file-input').addEventListener('change', async f
 
   // Show processing state
   document.getElementById('scan-processing').innerHTML = 'Decoding barcode...';
+  document.getElementById('scan-result').style.display = 'none';
 
   try {
     var formData = new FormData();
@@ -635,6 +660,10 @@ document.getElementById('barcode-file-input').addEventListener('change', async f
     });
     var result = await res.json();
 
+    document.getElementById('scan-processing').innerHTML = '';
+    btn.disabled = false;
+    btn.textContent = 'Scan Driver License';
+
     if (result.success) {
       // Vibrate + green flash
       if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
@@ -643,14 +672,27 @@ document.getElementById('barcode-file-input').addEventListener('change', async f
       document.body.appendChild(flash);
       flash.addEventListener('animationend', function() { flash.remove(); });
 
+      // Show inline result preview
+      var f = result.fields;
+      document.getElementById('sr-first').textContent = f.first_name || '';
+      document.getElementById('sr-last').textContent = f.last_name || '';
+      document.getElementById('sr-dl').textContent = f.dl_number || '';
+      document.getElementById('sr-state').textContent = f.dl_state || f.address_state || '';
+      document.getElementById('sr-dob').textContent = f.date_of_birth || '';
+      document.getElementById('sr-exp').textContent = f.expiration_date || '';
+      document.getElementById('sr-addr').textContent = [f.address_street, f.address_city, f.address_state, f.address_zip].filter(Boolean).join(', ');
+      document.getElementById('scan-result').style.display = '';
+
       currentScanData = result.fields;
-      showConfirmScreen(result.fields);
+      // Brief delay so user sees the result before navigating
+      setTimeout(function() { showConfirmScreen(result.fields); }, 1200);
     } else {
-      document.getElementById('scan-processing').innerHTML = '';
       showToast(result.error || 'Could not read barcode — try again or use Manual Entry', 'error');
     }
   } catch (err) {
     document.getElementById('scan-processing').innerHTML = '';
+    btn.disabled = false;
+    btn.textContent = 'Scan Driver License';
     showToast('Network error — check connection and try again', 'error');
   }
 });
