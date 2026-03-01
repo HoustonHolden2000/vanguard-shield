@@ -317,13 +317,17 @@ if (existingAdmin) {
 // ═══════════════════════════════════════════════════════════
 // AAMVA PDF417 PARSER (server-side)
 // Returns: { first_name, last_name, middle_name, address, city,
-//            state, postal_code, dob, dl_number, expiration, raw }
+//            state, postal_code, dob, dl_number, expiration,
+//            gender, eye_color, height, raw }
 // ═══════════════════════════════════════════════════════════
 function parseAamva(raw) {
   const r = {};
   const lines = raw.split(/[\n\r\x1e\x1d]+/);
   for (const line of lines) {
-    const t = line.trim();
+    let t = line.trim();
+    // Strip "DL" subfile designator that runs into the first field
+    // e.g. "DLDAQ067041259" → "DAQ067041259"
+    if (/^DL[A-Z]{3}/.test(t)) t = t.substring(2);
     if (t.startsWith('DAC')) r.first_name = t.substring(3).trim();
     else if (t.startsWith('DCT') && !r.first_name) r.first_name = t.substring(3).trim();
     else if (t.startsWith('DCS')) r.last_name = t.substring(3).trim();
@@ -336,6 +340,9 @@ function parseAamva(raw) {
     else if (t.startsWith('DBB')) r.dob = t.substring(3).trim();
     else if (t.startsWith('DBA')) r.expiration = t.substring(3).trim();
     else if (t.startsWith('DAQ')) r.dl_number = t.substring(3).trim();
+    else if (t.startsWith('DBC')) r.gender_code = t.substring(3).trim();
+    else if (t.startsWith('DAY')) r.eye_color = t.substring(3).trim();
+    else if (t.startsWith('DAU')) r.height_raw = t.substring(3).trim();
   }
 
   // Normalize dates (MMDDYYYY → YYYY-MM-DD, or YYYYMMDD → YYYY-MM-DD)
@@ -358,6 +365,31 @@ function parseAamva(raw) {
     if (r[nf]) r[nf] = r[nf].charAt(0).toUpperCase() + r[nf].slice(1).toLowerCase();
   }
 
+  // Gender: DBC 1=Male 2=Female 9=Not specified
+  let gender = '';
+  if (r.gender_code === '1') gender = 'Male';
+  else if (r.gender_code === '2') gender = 'Female';
+  else if (r.gender_code) gender = r.gender_code;
+
+  // Eye color: DAY code → readable
+  const eyeMap = { BLK: 'Black', BLU: 'Blue', BRO: 'Brown', GRY: 'Gray', GRN: 'Green', HAZ: 'Hazel', MAR: 'Maroon', PNK: 'Pink', DIC: 'Dichromatic', UNK: 'Unknown' };
+  let eyeColor = '';
+  if (r.eye_color) eyeColor = eyeMap[r.eye_color.toUpperCase()] || r.eye_color;
+
+  // Height: DAU — formats vary: "072 IN", "072 in", "510", "5'-10\""
+  let height = '';
+  if (r.height_raw) {
+    const h = r.height_raw.replace(/\s*(IN|in)\s*$/, '').trim();
+    const inches = parseInt(h, 10);
+    if (!isNaN(inches) && inches > 24 && inches < 96) {
+      const ft = Math.floor(inches / 12);
+      const rem = inches % 12;
+      height = `${ft}'${rem}"`;
+    } else {
+      height = r.height_raw;
+    }
+  }
+
   return {
     first_name: r.first_name || '',
     last_name: r.last_name || '',
@@ -369,6 +401,9 @@ function parseAamva(raw) {
     dob: r.dob || '',
     dl_number: r.dl_number || '',
     expiration: r.expiration || '',
+    gender: gender,
+    eye_color: eyeColor,
+    height: height,
     raw: raw,
   };
 }
