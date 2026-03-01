@@ -131,27 +131,34 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_watchlist_dl ON watchlist(dl_number);
 `);
 
-// Seed admin user if not exists
+// Seed admin user if not exists, or refresh password hashes on startup
 const adminExists = db.prepare("SELECT id FROM users WHERE username = 'admin'").get();
 if (!adminExists) {
   const adminId = uuidv4();
   const siteId = uuidv4();
   const guardId = uuidv4();
-  
+
   const adminHash = bcrypt.hashSync('vanguard2026', 10);
   const guardHash = bcrypt.hashSync('guard123', 10);
-  
+
   db.prepare("INSERT INTO sites (id, name, address, city, state, client_name) VALUES (?, ?, ?, ?, ?, ?)")
     .run(siteId, 'Memphis Distribution Hub', '3500 Tchulahoma Rd', 'Memphis', 'TN', 'Barrett Distribution');
-  
+
   db.prepare("INSERT INTO users (id, username, password_hash, role, full_name, site_id) VALUES (?, ?, ?, ?, ?, ?)")
     .run(adminId, 'admin', adminHash, 'admin', 'Brad Thompson', siteId);
-  
+
   db.prepare("INSERT INTO users (id, username, password_hash, role, full_name, site_id) VALUES (?, ?, ?, ?, ?, ?)")
     .run(guardId, 'mjohnson', guardHash, 'guard', 'Marcus Johnson', siteId);
-  
+
   console.log('[INIT] Seeded admin user (admin/vanguard2026) and guard (mjohnson/guard123)');
   console.log('[INIT] Seeded site: Memphis Distribution Hub');
+} else {
+  // Refresh password hashes to ensure they match current bcrypt library
+  const adminHash = bcrypt.hashSync('vanguard2026', 10);
+  const guardHash = bcrypt.hashSync('guard123', 10);
+  db.prepare("UPDATE users SET password_hash = ? WHERE username = 'admin'").run(adminHash);
+  db.prepare("UPDATE users SET password_hash = ? WHERE username = 'mjohnson'").run(guardHash);
+  console.log('[INIT] Refreshed password hashes for default users');
 }
 
 // ═══════════════════════════════════════════════════════════
