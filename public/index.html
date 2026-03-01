@@ -79,6 +79,10 @@ label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); 
 .login-logo h1 span { color: var(--blue); }
 .login-logo p { font-size: 12px; color: var(--text2); text-transform: uppercase; letter-spacing: 2px; margin-top: 4px; }
 .login-error { background: rgba(255,23,68,0.1); border: 1px solid var(--red); border-radius: var(--radius-sm); padding: 10px 14px; font-size: 13px; color: var(--red); margin-bottom: 16px; display: none; }
+.input-eye-wrap { position: relative; }
+.input-eye-wrap input { width: 100%; padding-right: 44px; }
+.eye-toggle { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text3); cursor: pointer; padding: 4px; display: flex; align-items: center; }
+.eye-toggle:hover { color: var(--text2); }
 .login-footer { text-align: center; margin-top: 32px; font-size: 11px; color: var(--text3); }
 
 /* ─── HOME ─── */
@@ -212,7 +216,13 @@ label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); 
     </div>
     <div class="form-group">
       <label>Password</label>
-      <input type="password" id="login-pass" placeholder="Enter password" autocomplete="current-password">
+      <div class="input-eye-wrap">
+        <input type="password" id="login-pass" placeholder="Enter password" autocomplete="current-password">
+        <button type="button" class="eye-toggle" id="eye-toggle" onclick="togglePassword()" aria-label="Toggle password visibility">
+          <svg id="eye-icon-show" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          <svg id="eye-icon-hide" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+        </button>
+      </div>
     </div>
     <button class="btn btn-primary btn-full btn-lg" onclick="doLogin()">SIGN IN</button>
     <div class="login-footer">Vanguard Security &copy; 2026 &mdash; All Rights Reserved</div>
@@ -447,7 +457,7 @@ let cameraStream = null;
 // ═══════════════════════════════════════════════════════════
 // HELPERS
 // ═══════════════════════════════════════════════════════════
-async function api(method, path, body) {
+async function api(method, path, body, skipAuthCheck) {
   const opts = { method, headers: {} };
   if (token) opts.headers['Authorization'] = `Bearer ${token}`;
   if (body && !(body instanceof FormData)) {
@@ -457,7 +467,7 @@ async function api(method, path, body) {
     opts.body = body;
   }
   const res = await fetch(`/api${path}`, opts);
-  if (res.status === 401 || res.status === 403) { doLogout(); throw new Error('Auth failed'); }
+  if (!skipAuthCheck && (res.status === 401 || res.status === 403) && token) { doLogout(); throw new Error('Auth failed'); }
   return res.json();
 }
 
@@ -498,18 +508,24 @@ async function doLogin() {
   const username = document.getElementById('login-user').value.trim();
   const password = document.getElementById('login-pass').value;
   if (!username || !password) return;
-  
+
   const errEl = document.getElementById('login-error');
+  const btn = document.querySelector('#login-screen .btn-primary');
+  btn.disabled = true;
+  btn.textContent = 'SIGNING IN...';
+  errEl.style.display = 'none';
   try {
-    const data = await api('POST', '/auth/login', { username, password });
+    const data = await api('POST', '/auth/login', { username, password }, true);
     if (data.error) { errEl.textContent = data.error; errEl.style.display = 'block'; return; }
     token = data.token;
     currentUser = data.user;
-    errEl.style.display = 'none';
     enterApp();
   } catch (e) {
     errEl.textContent = 'Connection error. Check network.';
     errEl.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'SIGN IN';
   }
 }
 
@@ -529,6 +545,14 @@ function enterApp() {
   showScreen('home-screen');
   loadHomeStats();
   getGPS();
+}
+
+function togglePassword() {
+  const input = document.getElementById('login-pass');
+  const show = document.getElementById('eye-icon-show');
+  const hide = document.getElementById('eye-icon-hide');
+  if (input.type === 'password') { input.type = 'text'; show.style.display = 'none'; hide.style.display = ''; }
+  else { input.type = 'password'; show.style.display = ''; hide.style.display = 'none'; }
 }
 
 // Enter key login
