@@ -118,6 +118,9 @@ label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); 
 .scanner-toolbar button:active { background: rgba(255,255,255,0.25); }
 .scanner-toolbar button svg { width: 24px; height: 24px; }
 .scanner-toolbar button.torch-on { background: rgba(255,214,0,0.3); color: var(--yellow); }
+.scanner-toolbar button.photo-primary { background: var(--blue); min-width: 100px; padding: 14px 24px; border-radius: 16px; font-size: 14px; font-weight: 700; box-shadow: 0 2px 12px rgba(0,86,160,0.4); }
+.scanner-toolbar button.photo-primary:active { background: var(--blue-light); }
+.scanner-toolbar button.photo-primary svg { width: 28px; height: 28px; }
 
 /* ─── SCANNER STATUS ─── */
 .scanner-status { position: absolute; top: 56px; left: 0; right: 0; z-index: 10; text-align: center; padding: 6px 16px; }
@@ -282,15 +285,15 @@ label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); 
   </div>
   <div class="scanner-status" id="scanner-status" style="display:none;"><span id="scanner-status-text">Enhanced scanner active</span></div>
   <div id="scanner-region"></div>
-  <div class="scanner-hint">Position barcode on back of license in the frame</div>
+  <div class="scanner-hint">Tap PHOTO to capture barcode, or hold steady for live scan</div>
   <div class="scanner-toolbar" id="scanner-toolbar">
     <button id="torch-btn" onclick="toggleTorch()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
       Torch
     </button>
-    <button id="photo-scan-btn" onclick="enterPhotoMode()">
+    <button id="photo-scan-btn" class="photo-primary" onclick="enterPhotoMode()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-      Photo
+      PHOTO
     </button>
     <button onclick="stopScanner()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -738,31 +741,27 @@ async function switchToDynamsoft() {
   statusEl.style.display = '';
   document.getElementById('scanner-status-text').textContent = 'Enhanced Scanning...';
 
-  // Grab media stream from html5-qrcode video before stopping it
-  let stream = null;
-  try {
-    const videoEl = document.querySelector('#scanner-region video');
-    if (videoEl && videoEl.srcObject) {
-      stream = videoEl.srcObject;
-    }
-  } catch (e) { /* */ }
-
-  // Stop html5-qrcode but keep the stream alive
+  // Stop html5-qrcode completely first — it kills its own stream on stop
   if (html5Qr) {
     try { await html5Qr.stop(); } catch (e) { /* */ }
     try { html5Qr.clear(); } catch (e) { /* */ }
     html5Qr = null;
   }
+  // Also kill any leftover stream refs
+  if (scannerStream) {
+    try { scannerStream.getTracks().forEach(t => t.stop()); } catch (e) { /* */ }
+    scannerStream = null;
+    scannerVideoTrack = null;
+  }
 
-  // If we couldn't get the stream from html5-qrcode, open a new one
-  if (!stream) {
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 } } });
-    } catch (e) {
-      showToast('Camera error', 'error');
-      showScreen('home-screen');
-      return;
-    }
+  // Always open a fresh camera stream
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 } } });
+  } catch (e) {
+    showToast('Camera error', 'error');
+    showScreen('home-screen');
+    return;
   }
 
   scannerStream = stream;
@@ -779,7 +778,7 @@ async function switchToDynamsoft() {
   video.style.cssText = 'width:100%;height:100vh;object-fit:cover;';
   video.srcObject = stream;
   region.appendChild(video);
-  await video.play();
+  try { await video.play(); } catch (e) { /* autoplay handles it */ }
 
   // Load Dynamsoft and start frame decode loop
   let reader;
@@ -972,8 +971,8 @@ function enterPhotoMode() {
         if (decoded && decoded.length > 20) {
           onScanSuccess(decoded);
         } else {
-          showToast('Could not read barcode. Try again.', 'error');
-          // Restart live scanner
+          showToast('Could not read barcode — tap PHOTO to retry', 'error');
+          // Go back to scanner screen with live scan + photo button ready
           isPhotoScanMode = false;
           startScanner();
         }
