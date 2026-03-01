@@ -12,6 +12,107 @@ const fs = require('fs');
 const crypto = require('crypto');
 
 // ═══════════════════════════════════════════════════════════
+// BARCODE ENGINE LOADER
+// Primary: Dynamsoft barcode4nodejs (optional native dep)
+// Fallback: @zxing/library (pure JS, always available)
+// ═══════════════════════════════════════════════════════════
+let dbr = null;       // Dynamsoft barcode4nodejs
+let ZXing = null;     // @zxing/library
+let decodeEngine = 'none';
+
+// Try Dynamsoft first
+try {
+  dbr = require('barcode4nodejs');
+  const dynLicense = process.env.DYNAMSOFT_LICENSE || '';
+  if (dynLicense) {
+    dbr.initLicense(dynLicense);
+    decodeEngine = 'dynamsoft';
+    console.log('[BARCODE] Dynamsoft barcode4nodejs loaded (primary engine)');
+  } else {
+    console.log('[BARCODE] Dynamsoft loaded but no DYNAMSOFT_LICENSE env var — skipping');
+    dbr = null;
+  }
+} catch (e) {
+  console.log('[BARCODE] Dynamsoft barcode4nodejs not available:', e.message);
+}
+
+// ZXing fallback (always available)
+try {
+  ZXing = require('@zxing/library');
+  if (!decodeEngine || decodeEngine === 'none') decodeEngine = 'zxing';
+  console.log(`[BARCODE] ZXing loaded (${dbr ? 'fallback' : 'primary'} engine)`);
+} catch (e) {
+  console.log('[BARCODE] ZXing not available:', e.message);
+}
+
+if (decodeEngine === 'none') {
+  console.warn('[BARCODE] WARNING: No barcode decode engine available!');
+}
+
+// ═══════════════════════════════════════════════════════════
+// decodePdf417FromFile(filePath) — CLEAN ABSTRACTION
+// Tries Dynamsoft first, then ZXing. Returns raw string or null.
+// ═══════════════════════════════════════════════════════════
+async function decodePdf417FromFile(filePath) {
+  // --- DYNAMSOFT (primary) ---
+  if (dbr) {
+    try {
+      const results = await new Promise((resolve, reject) => {
+        dbr.decodeFileAsync(filePath, dbr.formats.PDF417, (err, results) => {
+          if (err) return reject(err);
+          resolve(results);
+        });
+      });
+      if (results && results.length > 0 && results[0].value && results[0].value.length > 20) {
+        console.log(`[BARCODE] Dynamsoft decoded: ${results[0].value.substring(0, 60)}...`);
+        return results[0].value;
+      }
+      console.log('[BARCODE] Dynamsoft: no PDF417 found in image');
+    } catch (e) {
+      console.error('[BARCODE] Dynamsoft decode error:', e.message);
+    }
+  }
+
+  // --- ZXING (fallback) ---
+  if (ZXing) {
+    // Try multiple sharp preprocessing variants for best chance
+    const variants = [
+      // 1. Grayscale + normalize
+      () => sharp(filePath).resize(1600, null, { withoutEnlargement: true }).grayscale().normalize().raw().toBuffer({ resolveWithObject: true }),
+      // 2. Grayscale + sharpen
+      () => sharp(filePath).resize(1600, null, { withoutEnlargement: true }).grayscale().sharpen({ sigma: 2 }).normalize().raw().toBuffer({ resolveWithObject: true }),
+      // 3. High contrast + invert
+      () => sharp(filePath).resize(1600, null, { withoutEnlargement: true }).grayscale().linear(1.5, -30).negate().raw().toBuffer({ resolveWithObject: true }),
+    ];
+
+    const hints = new Map();
+    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.PDF_417]);
+    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+    const reader = new ZXing.MultiFormatReader();
+    reader.setHints(hints);
+
+    for (let i = 0; i < variants.length; i++) {
+      try {
+        const { data, info } = await variants[i]();
+        const luminance = new Uint8ClampedArray(data);
+        const source = new ZXing.RGBLuminanceSource(luminance, info.width, info.height);
+        const bitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(source));
+        const result = reader.decode(bitmap);
+        if (result && result.getText() && result.getText().length > 20) {
+          console.log(`[BARCODE] ZXing variant ${i + 1} decoded: ${result.getText().substring(0, 60)}...`);
+          return result.getText();
+        }
+      } catch (e) {
+        // Expected — variant didn't find a barcode
+      }
+    }
+    console.log('[BARCODE] ZXing: all variants failed');
+  }
+
+  return null;
+}
+
+// ═══════════════════════════════════════════════════════════
 // CONFIG
 // ═══════════════════════════════════════════════════════════
 const PORT = process.env.PORT || 3000;
@@ -131,50 +232,61 @@ if (existingAdmin) {
 
 // ═══════════════════════════════════════════════════════════
 // AAMVA PDF417 PARSER (server-side)
+// Returns: { first_name, last_name, middle_name, address, city,
+//            state, postal_code, dob, dl_number, expiration, raw }
 // ═══════════════════════════════════════════════════════════
-function parsePDF417(raw) {
-  const fields = {};
-  const map = {
-    'DCS': 'last_name', 'DAC': 'first_name', 'DCT': 'first_name',
-    'DAD': 'middle_name', 'DBB': 'date_of_birth', 'DBA': 'expiration_date',
-    'DAQ': 'dl_number', 'DAG': 'address_street', 'DAI': 'address_city',
-    'DAJ': 'address_state', 'DAK': 'address_zip', 'DBC': 'gender',
-    'DAY': 'eye_color', 'DAU': 'height', 'DAW': 'weight', 'DCG': 'dl_country',
-    'DCF': 'document_discriminator', 'DCA': 'dl_class', 'DCD': 'endorsements',
-    'DBD': 'issue_date',
-  };
+function parseAamva(raw) {
+  const r = {};
   const lines = raw.split(/[\n\r\x1e\x1d]+/);
   for (const line of lines) {
-    const trimmed = line.trim();
-    for (const [code, field] of Object.entries(map)) {
-      if (trimmed.startsWith(code)) {
-        let val = trimmed.substring(code.length).trim();
-        if (field === 'first_name' && fields.first_name && trimmed.startsWith('DCT')) continue;
-        fields[field] = val;
-      }
-    }
+    const t = line.trim();
+    if (t.startsWith('DAC')) r.first_name = t.substring(3).trim();
+    else if (t.startsWith('DCT') && !r.first_name) r.first_name = t.substring(3).trim();
+    else if (t.startsWith('DCS')) r.last_name = t.substring(3).trim();
+    else if (t.startsWith('DAB') && !r.last_name) r.last_name = t.substring(3).trim();
+    else if (t.startsWith('DAD')) r.middle_name = t.substring(3).trim();
+    else if (t.startsWith('DAG')) r.address = t.substring(3).trim();
+    else if (t.startsWith('DAI')) r.city = t.substring(3).trim();
+    else if (t.startsWith('DAJ')) r.state = t.substring(3).trim();
+    else if (t.startsWith('DAK')) r.postal_code = t.substring(3).trim();
+    else if (t.startsWith('DBB')) r.dob = t.substring(3).trim();
+    else if (t.startsWith('DBA')) r.expiration = t.substring(3).trim();
+    else if (t.startsWith('DAQ')) r.dl_number = t.substring(3).trim();
   }
-  const ansiMatch = raw.match(/\bDL(\w{2})/);
-  if (ansiMatch && !fields.address_state) fields.dl_state = ansiMatch[1];
-  if (fields.address_state) fields.dl_state = fields.address_state;
-  
-  for (const df of ['date_of_birth', 'expiration_date', 'issue_date']) {
-    if (fields[df] && fields[df].length >= 8) {
-      const d = fields[df].replace(/[^0-9]/g, '');
+
+  // Normalize dates (MMDDYYYY → YYYY-MM-DD, or YYYYMMDD → YYYY-MM-DD)
+  for (const df of ['dob', 'expiration']) {
+    if (r[df] && r[df].length >= 8) {
+      const d = r[df].replace(/[^0-9]/g, '');
       if (d.length === 8) {
         const first2 = parseInt(d.slice(0, 2));
-        if (first2 > 12) fields[df] = `${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}`;
-        else fields[df] = `${d.slice(4,8)}-${d.slice(0,2)}-${d.slice(2,4)}`;
+        if (first2 > 12) r[df] = `${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}`;
+        else r[df] = `${d.slice(4,8)}-${d.slice(0,2)}-${d.slice(2,4)}`;
       }
     }
   }
-  if (fields.gender === '1') fields.gender = 'M';
-  else if (fields.gender === '2') fields.gender = 'F';
-  if (fields.address_zip) fields.address_zip = fields.address_zip.substring(0, 5);
-  for (const nf of ['first_name', 'last_name', 'middle_name', 'address_city']) {
-    if (fields[nf]) fields[nf] = fields[nf].charAt(0).toUpperCase() + fields[nf].slice(1).toLowerCase();
+
+  // Clean postal code (first 5 digits)
+  if (r.postal_code) r.postal_code = r.postal_code.substring(0, 5);
+
+  // Title-case names
+  for (const nf of ['first_name', 'last_name', 'middle_name', 'city']) {
+    if (r[nf]) r[nf] = r[nf].charAt(0).toUpperCase() + r[nf].slice(1).toLowerCase();
   }
-  return fields;
+
+  return {
+    first_name: r.first_name || '',
+    last_name: r.last_name || '',
+    middle_name: r.middle_name || '',
+    address: r.address || '',
+    city: r.city || '',
+    state: r.state || '',
+    postal_code: r.postal_code || '',
+    dob: r.dob || '',
+    dl_number: r.dl_number || '',
+    expiration: r.expiration || '',
+    raw: raw,
+  };
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -304,43 +416,54 @@ app.post('/api/auth/verify', authenticateToken, (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════
-// BARCODE DECODE ENDPOINT (server-side fallback)
+// BARCODE DECODE ENDPOINT
+// Accepts: multipart file upload (field: "dlImage")
+//      or: JSON { image: "<base64>" }
+// Returns: { success, data, engine } or { success: false, error }
 // ═══════════════════════════════════════════════════════════
-app.post('/api/decode-dl', authenticateToken, async (req, res) => {
+app.post('/api/decode-dl', authenticateToken, upload.single('dlImage'), async (req, res) => {
+  let tempPath = null;
   try {
-    const { image } = req.body;
-    if (!image) return res.status(400).json({ success: false, error: 'No image provided' });
-    
-    // Decode base64 to buffer
-    const imgBuffer = Buffer.from(image, 'base64');
-    
-    // Preprocess with sharp: resize, grayscale, sharpen for better barcode detection
-    const processed = await sharp(imgBuffer)
+    // Accept either file upload or base64 JSON
+    if (req.file) {
+      tempPath = req.file.path;
+    } else if (req.body && req.body.image) {
+      const imgBuffer = Buffer.from(req.body.image, 'base64');
+      tempPath = path.join(PHOTO_DIR, `decode_${Date.now()}.jpg`);
+      fs.writeFileSync(tempPath, imgBuffer);
+    } else {
+      return res.status(400).json({ success: false, error: 'No image provided' });
+    }
+
+    // Preprocess: save a clean JPEG for the decode engines
+    const preprocessedPath = tempPath + '_pre.jpg';
+    await sharp(tempPath)
       .resize(1600, null, { withoutEnlargement: true })
-      .grayscale()
-      .sharpen({ sigma: 1.5 })
-      .normalize()
       .jpeg({ quality: 95 })
-      .toBuffer();
-    
-    // Save preprocessed image temporarily for potential future processing
-    const tempPath = path.join(PHOTO_DIR, `decode_${Date.now()}.jpg`);
-    fs.writeFileSync(tempPath, processed);
-    
-    // Server-side decode not yet implemented with a barcode library
-    // Return helpful error so client falls back to manual entry
-    // TODO: Add zxing-wasm or zbar-wasm when npm package compatibility is confirmed
-    fs.unlinkSync(tempPath);
-    
-    res.json({ 
-      success: false, 
-      error: 'Server-side barcode decoding coming soon. Use photo mode or manual entry.',
-      preprocessed: true 
-    });
-    
+      .toFile(preprocessedPath);
+
+    // Decode PDF417
+    const rawText = await decodePdf417FromFile(preprocessedPath);
+
+    // Cleanup temp files
+    try { fs.unlinkSync(tempPath); } catch (e) { /* */ }
+    try { fs.unlinkSync(preprocessedPath); } catch (e) { /* */ }
+
+    if (!rawText) {
+      return res.json({ success: false, error: 'Could not read barcode. Try again with better lighting or hold the camera closer.' });
+    }
+
+    const parsed = parseAamva(rawText);
+    console.log(`[DECODE] Success (${decodeEngine}): ${parsed.first_name} ${parsed.last_name} DL:${parsed.dl_number}`);
+
+    return res.json({ success: true, data: parsed, engine: decodeEngine });
+
   } catch (err) {
     console.error('[DECODE ERROR]', err);
-    res.json({ success: false, error: 'Image processing failed' });
+    // Cleanup on error
+    if (tempPath) { try { fs.unlinkSync(tempPath); } catch (e) { /* */ } }
+    try { fs.unlinkSync(tempPath + '_pre.jpg'); } catch (e) { /* */ }
+    return res.json({ success: false, error: 'Image processing failed. Please try again.' });
   }
 });
 
