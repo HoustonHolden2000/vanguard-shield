@@ -6,7 +6,6 @@
 <meta name="theme-color" content="#0056A0">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="manifest" href="/manifest.json">
 <title>Vanguard Shield</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -19,12 +18,8 @@
 }
 html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'Inter', -apple-system, sans-serif; -webkit-font-smoothing: antialiased; overflow: hidden; }
 body { display: flex; flex-direction: column; }
-
-/* ─── SCREENS ─── */
 .screen { display: none; flex-direction: column; height: 100vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 .screen.active { display: flex; }
-
-/* ─── COMMON ─── */
 .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 12px; }
 .btn { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 12px 24px; border: none; border-radius: var(--radius-sm); font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.15s; -webkit-tap-highlight-color: transparent; }
 .btn:active { transform: scale(0.97); }
@@ -37,30 +32,23 @@ body { display: flex; flex-direction: column; }
 .btn-yellow { background: var(--yellow); color: #000; }
 .btn-full { width: 100%; }
 .btn-lg { min-height: 64px; font-size: 18px; font-weight: 700; letter-spacing: 0.5px; }
-
 input, select { width: 100%; min-height: 48px; padding: 12px 16px; background: #111; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-family: inherit; font-size: 16px; outline: none; transition: border-color 0.2s; }
 input:focus, select:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(0,86,160,0.2); }
 input::placeholder { color: var(--text3); }
 label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
 .form-group { margin-bottom: 16px; }
-
 .topbar { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: var(--card); border-bottom: 1px solid var(--border); flex-shrink: 0; min-height: 56px; }
 .topbar-title { font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
 .topbar-sub { font-size: 11px; color: var(--text2); }
 .topbar-back { background: none; border: none; color: var(--text2); font-size: 14px; cursor: pointer; padding: 8px; }
-
 .content { flex: 1; padding: 16px; overflow-y: auto; }
 .badge { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px; font-size: 11px; font-weight: 700; }
 .badge-red { background: var(--red); color: white; }
-.badge-yellow { background: var(--yellow); color: #000; }
-.badge-green { background: var(--green); color: #000; }
-
 .alert-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
 .alert-dot.GREEN { background: var(--green); }
 .alert-dot.YELLOW { background: var(--yellow); }
 .alert-dot.RED { background: var(--red); animation: pulse-red 1s infinite; }
 @keyframes pulse-red { 0%, 100% { box-shadow: 0 0 0 0 rgba(255,23,68,0.5); } 50% { box-shadow: 0 0 0 8px rgba(255,23,68,0); } }
-
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .text-center { text-align: center; }
 .text-muted { color: var(--text2); }
@@ -68,9 +56,8 @@ label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); 
 .mt-8 { margin-top: 8px; }
 .mt-16 { margin-top: 16px; }
 .mb-16 { margin-bottom: 16px; }
-.gap-8 { gap: 8px; }
 
-/* ─── LOGIN ─── */
+/* LOGIN */
 #login-screen { justify-content: center; align-items: center; padding: 24px; }
 .login-card { width: 100%; max-width: 360px; }
 .login-logo { text-align: center; margin-bottom: 32px; }
@@ -78,13 +65,9 @@ label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); 
 .login-logo h1 span { color: var(--blue); }
 .login-logo p { font-size: 12px; color: var(--text2); text-transform: uppercase; letter-spacing: 2px; margin-top: 4px; }
 .login-error { background: rgba(255,23,68,0.1); border: 1px solid var(--red); border-radius: var(--radius-sm); padding: 10px 14px; font-size: 13px; color: var(--red); margin-bottom: 16px; display: none; }
-.input-eye-wrap { position: relative; }
-.input-eye-wrap input { width: 100%; padding-right: 44px; }
-.eye-toggle { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text3); cursor: pointer; padding: 4px; display: flex; align-items: center; }
-.eye-toggle:hover { color: var(--text2); }
 .login-footer { text-align: center; margin-top: 32px; font-size: 11px; color: var(--text3); }
 
-/* ─── HOME ─── */
+/* HOME */
 .scan-btn-wrap { padding: 32px 16px; text-align: center; }
 .scan-btn { width: 100%; min-height: 120px; background: linear-gradient(135deg, var(--blue), var(--blue-light)); border: none; border-radius: 16px; color: white; font-family: inherit; font-size: 22px; font-weight: 800; letter-spacing: 1px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s; box-shadow: 0 4px 24px rgba(0,86,160,0.3); }
 .scan-btn:active { transform: scale(0.97); box-shadow: 0 2px 12px rgba(0,86,160,0.2); }
@@ -95,21 +78,15 @@ label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); 
 .stat-label { font-size: 10px; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; margin-top: 2px; }
 .nav-grid { padding: 0 16px 24px; }
 
-/* ─── SCANNER ─── */
-.scan-subtitle { font-size: 13px; color: var(--text2); margin-bottom: 24px; }
-#scan-preview { margin-bottom: 12px; }
-#scan-preview img { max-width: 100%; border-radius: 4px; }
-#scan-processing { font-size: 14px; font-weight: 600; color: var(--text2); margin: 12px 0 16px; min-height: 20px; }
-#scan-result { display: none; background: #111; border-radius: var(--radius-sm); padding: 12px; margin-top: 16px; text-align: left; }
-#scan-result .field-row { margin-bottom: 6px; }
-#scan-result .field-label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; }
-#scan-result .field-value { font-size: 14px; color: var(--text); }
+/* PROCESSING OVERLAY */
+#processing-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.95); z-index: 200; flex-direction: column; align-items: center; justify-content: center; gap: 24px; }
+#processing-overlay.active { display: flex; }
+.spinner { width: 60px; height: 60px; border: 4px solid var(--border); border-top-color: var(--blue); border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+#processing-text { font-size: 18px; font-weight: 600; color: var(--text); }
+#processing-sub { font-size: 14px; color: var(--text2); max-width: 280px; text-align: center; }
 
-/* ─── SUCCESS FLASH ─── */
-.scan-success-flash { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 50; background: var(--green); pointer-events: none; animation: successFlash 0.6s ease-out forwards; }
-@keyframes successFlash { 0% { opacity: 0.8; } 100% { opacity: 0; } }
-
-/* ─── CONFIRM ─── */
+/* CONFIRM */
 .dl-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .dl-field { background: #111; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; }
 .dl-field-label { font-size: 10px; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; }
@@ -121,7 +98,7 @@ label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); 
 .dl-valid { border-color: var(--green); background: rgba(0,200,83,0.08); }
 .dl-valid .dl-field-value { color: var(--green); }
 
-/* ─── RISK GAUGE ─── */
+/* RISK GAUGE */
 .risk-display { text-align: center; padding: 32px 0; }
 .risk-gauge { position: relative; width: 180px; height: 180px; margin: 0 auto 16px; }
 .risk-gauge svg { width: 180px; height: 180px; transform: rotate(-90deg); }
@@ -136,9 +113,8 @@ label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); 
 .risk-label { font-size: 18px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; }
 .risk-flags { margin-top: 16px; text-align: left; }
 .risk-flag { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: #111; border: 1px solid var(--border); border-radius: var(--radius-sm); margin-bottom: 6px; font-size: 13px; }
-.risk-flag::before { content: '⚠'; font-size: 16px; }
 
-/* ─── SCAN LIST ─── */
+/* SCAN LIST */
 .scan-item { display: flex; align-items: center; gap: 12px; padding: 14px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 8px; cursor: pointer; transition: border-color 0.15s; }
 .scan-item:active { border-color: var(--blue); }
 .scan-item-info { flex: 1; min-width: 0; }
@@ -146,7 +122,7 @@ label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); 
 .scan-item-detail { font-size: 12px; color: var(--text2); margin-top: 2px; }
 .scan-item-time { font-size: 12px; color: var(--text3); text-align: right; white-space: nowrap; }
 
-/* ─── CAMERA OVERLAY ─── */
+/* CAMERA OVERLAY (for evidence photos) */
 #camera-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #000; z-index: 100; flex-direction: column; }
 #camera-overlay.active { display: flex; }
 #camera-overlay video { flex: 1; object-fit: cover; }
@@ -155,13 +131,13 @@ label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); 
 .shutter-btn::after { content: ''; position: absolute; top: 6px; left: 6px; right: 6px; bottom: 6px; border-radius: 50%; background: white; transition: transform 0.1s; }
 .shutter-btn:active::after { transform: scale(0.9); }
 
-/* ─── FILTER TABS ─── */
+/* FILTER TABS */
 .filter-tabs { display: flex; gap: 6px; margin-bottom: 12px; overflow-x: auto; }
 .filter-tab { padding: 8px 14px; border-radius: 20px; border: 1px solid var(--border); background: transparent; color: var(--text2); font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
 .filter-tab.active { background: var(--blue); border-color: var(--blue); color: white; }
 
-/* ─── TOAST ─── */
-#toast-container { position: fixed; top: 16px; left: 16px; right: 16px; z-index: 200; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+/* TOAST */
+#toast-container { position: fixed; top: 16px; left: 16px; right: 16px; z-index: 300; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
 .toast { padding: 14px 18px; border-radius: var(--radius); font-size: 14px; font-weight: 500; transform: translateY(-20px); opacity: 0; transition: all 0.3s; pointer-events: auto; }
 .toast.show { transform: translateY(0); opacity: 1; }
 .toast-success { background: var(--green); color: #000; }
@@ -169,28 +145,40 @@ label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); 
 .toast-error { background: var(--red); color: white; }
 .toast-info { background: var(--blue); color: white; }
 
-/* ─── ADMIN DASHBOARD ─── */
+/* DASHBOARD */
 .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 16px; }
 .big-stat { padding: 16px; text-align: center; }
 .big-stat-num { font-size: 36px; font-weight: 800; }
 
-/* ─── PHOTO THUMB ─── */
-.photo-thumb { width: 60px; height: 60px; border-radius: var(--radius-sm); object-fit: cover; border: 1px solid var(--border); }
+/* PHOTO EVIDENCE */
 .photo-capture-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 48px; background: #111; border: 2px dashed var(--border); border-radius: var(--radius-sm); color: var(--text2); font-family: inherit; font-size: 14px; cursor: pointer; transition: all 0.2s; }
 .photo-capture-btn:hover { border-color: var(--blue); color: var(--blue); }
 .photo-capture-btn.captured { border-color: var(--green); border-style: solid; color: var(--green); }
+
+/* PREVIEW IMAGE */
+#scan-preview { max-width: 100%; max-height: 200px; border-radius: var(--radius); margin: 12px auto; display: none; border: 2px solid var(--border); }
 </style>
 </head>
 <body>
 
-<!-- ═══════════ TOAST CONTAINER ═══════════ -->
+<!-- TOAST -->
 <div id="toast-container"></div>
 
-<!-- ═══════════ CAMERA OVERLAY ═══════════ -->
+<!-- PROCESSING OVERLAY -->
+<div id="processing-overlay">
+  <div class="spinner"></div>
+  <div id="processing-text">Reading barcode...</div>
+  <div id="processing-sub">Hold on, decoding your license photo</div>
+</div>
+
+<!-- HIDDEN FILE INPUT - THIS IS THE KEY CHANGE -->
+<input type="file" id="dl-photo-input" accept="image/*" capture="environment" style="display:none">
+
+<!-- CAMERA OVERLAY (for evidence photos only) -->
 <div id="camera-overlay">
   <div style="position:absolute;top:12px;left:16px;right:16px;z-index:10;display:flex;justify-content:space-between;align-items:center;">
     <span id="camera-purpose" style="color:white;font-weight:600;font-size:14px;text-shadow:0 1px 4px rgba(0,0,0,0.8);"></span>
-    <button onclick="cancelCamera()" style="background:rgba(255,255,255,0.15);border:none;color:white;padding:8px 16px;border-radius:20px;font-family:inherit;font-size:14px;cursor:pointer;">Cancel</button>
+    <button style="background:rgba(255,255,255,0.15);border:none;color:white;padding:8px 16px;border-radius:20px;font-family:inherit;font-size:14px;cursor:pointer;" id="camera-cancel-btn">Cancel</button>
   </div>
   <video id="camera-video" autoplay playsinline></video>
   <div class="camera-controls">
@@ -199,7 +187,7 @@ label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); 
   <canvas id="camera-canvas" style="display:none;"></canvas>
 </div>
 
-<!-- ═══════════ SCREEN: LOGIN ═══════════ -->
+<!-- LOGIN -->
 <div id="login-screen" class="screen active">
   <div class="login-card">
     <div class="login-logo">
@@ -213,100 +201,64 @@ label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); 
     </div>
     <div class="form-group">
       <label>Password</label>
-      <div class="input-eye-wrap">
-        <input type="password" id="login-pass" placeholder="Enter password" autocomplete="current-password">
-        <button type="button" class="eye-toggle" id="eye-toggle" onclick="togglePassword()" aria-label="Toggle password visibility">
-          <svg id="eye-icon-show" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-          <svg id="eye-icon-hide" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-        </button>
-      </div>
+      <input type="password" id="login-pass" placeholder="Enter password" autocomplete="current-password">
     </div>
-    <button class="btn btn-primary btn-full btn-lg" onclick="doLogin()">SIGN IN</button>
+    <button class="btn btn-primary btn-full btn-lg" id="login-btn">SIGN IN</button>
     <div class="login-footer">Vanguard Security &copy; 2026 &mdash; All Rights Reserved</div>
   </div>
 </div>
 
-<!-- ═══════════ SCREEN: HOME ═══════════ -->
+<!-- HOME -->
 <div id="home-screen" class="screen">
   <div class="topbar">
     <div>
       <div class="topbar-title" id="home-guard-name"></div>
       <div class="topbar-sub" id="home-site-name"></div>
     </div>
-    <button class="btn btn-outline" style="min-height:36px;padding:6px 14px;font-size:12px;" onclick="doLogout()">SIGN OUT</button>
+    <button class="btn btn-outline" style="min-height:36px;padding:6px 14px;font-size:12px;" id="logout-btn">SIGN OUT</button>
   </div>
   <div class="scan-btn-wrap">
-    <button class="scan-btn" onclick="startScanner()">
+    <button class="scan-btn" id="scan-btn">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="7" y1="8" x2="17" y2="8"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="7" y1="16" x2="13" y2="16"/></svg>
       SCAN DRIVER LICENSE
     </button>
   </div>
-  <div class="quick-stats" id="home-stats">
+  <div class="quick-stats">
     <div class="stat-box"><div class="stat-num" id="stat-today">0</div><div class="stat-label">Today</div></div>
     <div class="stat-box"><div class="stat-num" style="color:var(--yellow)" id="stat-yellow">0</div><div class="stat-label">Elevated</div></div>
     <div class="stat-box"><div class="stat-num" style="color:var(--red)" id="stat-red">0</div><div class="stat-label">High Risk</div></div>
   </div>
   <div class="nav-grid">
     <div class="grid-2">
-      <button class="btn btn-outline" onclick="showScreen('manual-screen')">&#9997; Manual Entry</button>
-      <button class="btn btn-outline" onclick="loadRecentScans()">&#128196; Recent Scans</button>
-      <button class="btn btn-outline" onclick="loadWatchlist()">&#128680; Watchlist <span id="watchlist-badge" class="badge badge-red" style="display:none;margin-left:4px;">0</span></button>
-      <button class="btn btn-outline" id="admin-btn" style="display:none;" onclick="loadDashboard()">&#128202; Dashboard</button>
+      <button class="btn btn-outline" id="manual-btn">&#9997; Manual Entry</button>
+      <button class="btn btn-outline" id="recent-btn">&#128196; Recent Scans</button>
+      <button class="btn btn-outline" id="watchlist-btn">&#128680; Watchlist <span id="watchlist-badge" class="badge badge-red" style="display:none;margin-left:4px;">0</span></button>
+      <button class="btn btn-outline" id="admin-btn" style="display:none;">&#128202; Dashboard</button>
     </div>
   </div>
 </div>
 
-<!-- ═══════════ SCREEN: SCANNER ═══════════ -->
-<div id="scanner-screen" class="screen">
-  <div class="topbar">
-    <button class="topbar-back" onclick="showScreen('home-screen')">&larr; Back</button>
-    <div class="topbar-title">Scan License</div>
-    <div></div>
-  </div>
-  <div class="content" style="text-align:center;">
-    <p class="scan-subtitle">Driver License Capture (PDF417)</p>
-    <input type="file" id="barcode-file-input" accept="image/*" capture="environment" style="display:none;">
-    <button class="btn btn-primary btn-full btn-lg" id="btn-scan" onclick="captureBarcode()">
-      Scan Driver License
-    </button>
-    <p style="margin-top:12px; color:var(--text3); font-size:12px;">
-      Point your camera at the barcode on the BACK of the license
-    </p>
-    <div id="scan-preview"></div>
-    <div id="scan-processing"></div>
-    <div id="scan-result">
-      <div class="field-row"><div class="field-label">First Name</div><div class="field-value" id="sr-first"></div></div>
-      <div class="field-row"><div class="field-label">Last Name</div><div class="field-value" id="sr-last"></div></div>
-      <div class="field-row"><div class="field-label">DL Number</div><div class="field-value" id="sr-dl"></div></div>
-      <div class="field-row"><div class="field-label">State</div><div class="field-value" id="sr-state"></div></div>
-      <div class="field-row"><div class="field-label">DOB</div><div class="field-value" id="sr-dob"></div></div>
-      <div class="field-row"><div class="field-label">Expiration</div><div class="field-value" id="sr-exp"></div></div>
-      <div class="field-row"><div class="field-label">Address</div><div class="field-value" id="sr-addr"></div></div>
-    </div>
-    <button class="btn btn-outline btn-full" style="margin-top:16px;" onclick="showScreen('home-screen')">CANCEL</button>
-  </div>
-</div>
-
-<!-- ═══════════ SCREEN: CONFIRM DL DATA ═══════════ -->
+<!-- CONFIRM DL DATA -->
 <div id="confirm-screen" class="screen">
   <div class="topbar">
-    <button class="topbar-back" onclick="showScreen('home-screen')">&larr; Cancel</button>
+    <button class="topbar-back" id="confirm-cancel-btn">&larr; Cancel</button>
     <div class="topbar-title">Verify License</div>
     <div></div>
   </div>
   <div class="content">
+    <img id="scan-preview" alt="License photo">
     <div class="dl-fields" id="dl-fields"></div>
     <div class="mt-16 grid-2">
-      <button class="btn btn-outline btn-full" onclick="showScreen('scanner-screen')">RE-SCAN</button>
-      <button class="btn btn-primary btn-full" onclick="showScreen('details-screen')">CONFIRM &rarr;</button>
+      <button class="btn btn-outline btn-full" id="rescan-btn">RE-SCAN</button>
+      <button class="btn btn-primary btn-full" id="confirm-btn">CONFIRM &rarr;</button>
     </div>
   </div>
 </div>
 
-<!-- ═══════════ SCREEN: ADDITIONAL DETAILS ═══════════ -->
+<!-- ADDITIONAL DETAILS -->
 <div id="details-screen" class="screen">
   <div class="topbar">
-    <button class="topbar-back" onclick="showScreen('confirm-screen')">&larr; Back</button>
+    <button class="topbar-back" id="details-back-btn">&larr; Back</button>
     <div class="topbar-title">Carrier &amp; Load</div>
     <div></div>
   </div>
@@ -322,25 +274,19 @@ label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); 
     </div>
     <div class="form-group"><label>BOL / PO Number</label><input type="text" id="d-bol" placeholder="Bill of Lading or PO#"></div>
     <div class="form-group"><label>Notes</label><input type="text" id="d-notes" placeholder="Any additional notes"></div>
-    
     <label style="margin-bottom:8px;">Photo Evidence</label>
     <div class="grid-2 mb-16">
-      <button class="photo-capture-btn" id="photo-dl-btn" onclick="capturePhoto('dl')">&#128247; DL Photo</button>
-      <button class="photo-capture-btn" id="photo-bol-btn" onclick="capturePhoto('bol')">&#128247; BOL Photo</button>
+      <button class="photo-capture-btn" id="photo-dl-btn">&#128247; DL Photo</button>
+      <button class="photo-capture-btn" id="photo-bol-btn">&#128247; BOL Photo</button>
     </div>
-    <button class="photo-capture-btn mb-16" id="photo-truck-btn" onclick="capturePhoto('truck')" style="width:100%;">&#128247; Truck / Plate Photo</button>
-    
-    <button class="btn btn-green btn-full btn-lg" onclick="submitScan()">SUBMIT SCAN</button>
+    <button class="photo-capture-btn mb-16" id="photo-truck-btn" style="width:100%;">&#128247; Truck / Plate Photo</button>
+    <button class="btn btn-green btn-full btn-lg" id="submit-scan-btn">SUBMIT SCAN</button>
   </div>
 </div>
 
-<!-- ═══════════ SCREEN: RISK RESULT ═══════════ -->
+<!-- RISK RESULT -->
 <div id="result-screen" class="screen">
-  <div class="topbar">
-    <div></div>
-    <div class="topbar-title">Scan Result</div>
-    <div></div>
-  </div>
+  <div class="topbar"><div></div><div class="topbar-title">Scan Result</div><div></div></div>
   <div class="content">
     <div class="risk-display">
       <div class="risk-gauge">
@@ -354,14 +300,14 @@ label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); 
     </div>
     <div class="risk-flags" id="risk-flags"></div>
     <div id="risk-actions" class="mt-16"></div>
-    <button class="btn btn-primary btn-full btn-lg mt-16" onclick="resetToHome()">COMPLETE</button>
+    <button class="btn btn-primary btn-full btn-lg mt-16" id="complete-btn">COMPLETE</button>
   </div>
 </div>
 
-<!-- ═══════════ SCREEN: MANUAL ENTRY ═══════════ -->
+<!-- MANUAL ENTRY -->
 <div id="manual-screen" class="screen">
   <div class="topbar">
-    <button class="topbar-back" onclick="showScreen('home-screen')">&larr; Back</button>
+    <button class="topbar-back" id="manual-back-btn">&larr; Back</button>
     <div class="topbar-title">Manual Entry</div>
     <div></div>
   </div>
@@ -391,47 +337,42 @@ label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); 
       <div class="form-group"><label>Trailer #</label><input type="text" id="m-trailer"></div>
     </div>
     <div class="form-group"><label>BOL / PO #</label><input type="text" id="m-bol"></div>
-    <button class="btn btn-green btn-full btn-lg mt-16" onclick="submitManual()">SUBMIT SCAN</button>
+    <button class="btn btn-green btn-full btn-lg mt-16" id="submit-manual-btn">SUBMIT SCAN</button>
   </div>
 </div>
 
-<!-- ═══════════ SCREEN: RECENT SCANS ═══════════ -->
+<!-- RECENT SCANS -->
 <div id="scans-screen" class="screen">
   <div class="topbar">
-    <button class="topbar-back" onclick="showScreen('home-screen')">&larr; Back</button>
+    <button class="topbar-back" id="scans-back-btn">&larr; Back</button>
     <div class="topbar-title">Recent Scans</div>
     <div></div>
   </div>
   <div class="content">
-    <div class="filter-tabs" id="scan-filters">
-      <button class="filter-tab active" onclick="filterScans(this,'')">All</button>
-      <button class="filter-tab" onclick="filterScans(this,'RED')">&#128308; Red</button>
-      <button class="filter-tab" onclick="filterScans(this,'YELLOW')">&#128992; Yellow</button>
-      <button class="filter-tab" onclick="filterScans(this,'GREEN')">&#128994; Green</button>
-    </div>
+    <div class="filter-tabs" id="scan-filters"></div>
     <div id="scans-list"></div>
   </div>
 </div>
 
-<!-- ═══════════ SCREEN: SCAN DETAIL ═══════════ -->
+<!-- SCAN DETAIL -->
 <div id="scan-detail-screen" class="screen">
   <div class="topbar">
-    <button class="topbar-back" onclick="showScreen('scans-screen')">&larr; Back</button>
+    <button class="topbar-back" id="detail-back-btn">&larr; Back</button>
     <div class="topbar-title">Scan Detail</div>
     <div></div>
   </div>
   <div class="content" id="scan-detail-content"></div>
 </div>
 
-<!-- ═══════════ SCREEN: WATCHLIST ═══════════ -->
+<!-- WATCHLIST -->
 <div id="watchlist-screen" class="screen">
   <div class="topbar">
-    <button class="topbar-back" onclick="showScreen('home-screen')">&larr; Back</button>
+    <button class="topbar-back" id="wl-back-btn">&larr; Back</button>
     <div class="topbar-title">Watchlist</div>
     <div></div>
   </div>
   <div class="content">
-    <button class="btn btn-danger btn-full mb-16" onclick="showWatchlistAdd()">+ Add to Watchlist</button>
+    <button class="btn btn-danger btn-full mb-16" id="wl-add-toggle">+ Add to Watchlist</button>
     <div id="watchlist-add-form" style="display:none;" class="card mb-16">
       <div class="form-group"><label>DL Number</label><input type="text" id="w-dl" autocapitalize="characters"></div>
       <div class="grid-2">
@@ -442,18 +383,18 @@ label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); 
       <div class="form-group"><label>Severity</label>
         <select id="w-severity"><option value="YELLOW">Yellow - Caution</option><option value="RED">Red - Do Not Admit</option></select>
       </div>
-      <button class="btn btn-danger btn-full" onclick="addToWatchlist()">ADD TO WATCHLIST</button>
+      <button class="btn btn-danger btn-full" id="wl-add-submit">ADD TO WATCHLIST</button>
     </div>
     <div id="watchlist-list"></div>
   </div>
 </div>
 
-<!-- ═══════════ SCREEN: DASHBOARD ═══════════ -->
+<!-- DASHBOARD -->
 <div id="dashboard-screen" class="screen">
   <div class="topbar">
-    <button class="topbar-back" onclick="showScreen('home-screen')">&larr; Back</button>
+    <button class="topbar-back" id="dash-back-btn">&larr; Back</button>
     <div class="topbar-title">Dashboard</div>
-    <button class="btn btn-outline" style="min-height:36px;padding:6px 12px;font-size:11px;" onclick="exportCSV()">EXPORT</button>
+    <button class="btn btn-outline" style="min-height:36px;padding:6px 12px;font-size:11px;" id="export-btn">EXPORT</button>
   </div>
   <div class="content" id="dashboard-content"></div>
 </div>
@@ -468,44 +409,51 @@ let currentScanData = {};
 let capturedPhotos = { dl: null, bol: null, truck: null };
 let currentLocation = null;
 let currentScanFilter = '';
-let cameraResolve = null;
 let cameraStream = null;
 
 // ═══════════════════════════════════════════════════════════
 // HELPERS
 // ═══════════════════════════════════════════════════════════
-async function api(method, path, body, skipAuthCheck) {
+async function api(method, path, body) {
   const opts = { method, headers: {} };
-  if (token) opts.headers['Authorization'] = `Bearer ${token}`;
+  if (token) opts.headers['Authorization'] = 'Bearer ' + token;
   if (body && !(body instanceof FormData)) {
     opts.headers['Content-Type'] = 'application/json';
     opts.body = JSON.stringify(body);
-  } else if (body) {
-    opts.body = body;
-  }
-  const res = await fetch(`/api${path}`, opts);
-  if (!skipAuthCheck && (res.status === 401 || res.status === 403) && token) { doLogout(); throw new Error('Auth failed'); }
+  } else if (body) { opts.body = body; }
+  const res = await fetch('/api' + path, opts);
+  if (res.status === 401 || res.status === 403) { doLogout(); throw new Error('Auth failed'); }
   return res.json();
 }
 
 function showScreen(id) {
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.screen').forEach(function(s) { s.classList.remove('active'); });
   document.getElementById(id).classList.add('active');
 }
 
-function showToast(msg, type = 'info') {
-  const t = document.createElement('div');
-  t.className = `toast toast-${type}`;
+function showToast(msg, type) {
+  type = type || 'info';
+  var t = document.createElement('div');
+  t.className = 'toast toast-' + type;
   t.textContent = msg;
   document.getElementById('toast-container').appendChild(t);
-  setTimeout(() => t.classList.add('show'), 10);
-  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 3000);
+  setTimeout(function() { t.classList.add('show'); }, 10);
+  setTimeout(function() { t.classList.remove('show'); setTimeout(function() { t.remove(); }, 300); }, 3000);
+}
+
+function showProcessing(text, sub) {
+  document.getElementById('processing-text').textContent = text || 'Processing...';
+  document.getElementById('processing-sub').textContent = sub || '';
+  document.getElementById('processing-overlay').classList.add('active');
+}
+
+function hideProcessing() {
+  document.getElementById('processing-overlay').classList.remove('active');
 }
 
 function timeAgo(ts) {
-  const d = new Date(ts + 'Z');
-  const now = new Date();
-  const diff = Math.floor((now - d) / 1000);
+  var d = new Date(ts + 'Z');
+  var diff = Math.floor((new Date() - d) / 1000);
   if (diff < 60) return 'Just now';
   if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
   if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
@@ -514,41 +462,32 @@ function timeAgo(ts) {
 
 function formatTime(ts) {
   if (!ts) return '';
-  const d = new Date(ts + 'Z');
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return new Date(ts + 'Z').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 // ═══════════════════════════════════════════════════════════
 // AUTH
 // ═══════════════════════════════════════════════════════════
 async function doLogin() {
-  const username = document.getElementById('login-user').value.trim();
-  const password = document.getElementById('login-pass').value;
+  var username = document.getElementById('login-user').value.trim();
+  var password = document.getElementById('login-pass').value;
   if (!username || !password) return;
-
-  const errEl = document.getElementById('login-error');
-  const btn = document.querySelector('#login-screen .btn-primary');
-  btn.disabled = true;
-  btn.textContent = 'SIGNING IN...';
-  errEl.style.display = 'none';
+  var errEl = document.getElementById('login-error');
   try {
-    const data = await api('POST', '/auth/login', { username, password }, true);
+    var data = await api('POST', '/auth/login', { username: username, password: password });
     if (data.error) { errEl.textContent = data.error; errEl.style.display = 'block'; return; }
     token = data.token;
     currentUser = data.user;
+    errEl.style.display = 'none';
     enterApp();
   } catch (e) {
     errEl.textContent = 'Connection error. Check network.';
     errEl.style.display = 'block';
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'SIGN IN';
   }
 }
 
 function doLogout() {
-  token = null;
-  currentUser = null;
+  token = null; currentUser = null;
   showScreen('login-screen');
   document.getElementById('login-pass').value = '';
 }
@@ -564,26 +503,14 @@ function enterApp() {
   getGPS();
 }
 
-function togglePassword() {
-  const input = document.getElementById('login-pass');
-  const show = document.getElementById('eye-icon-show');
-  const hide = document.getElementById('eye-icon-hide');
-  if (input.type === 'password') { input.type = 'text'; show.style.display = 'none'; hide.style.display = ''; }
-  else { input.type = 'password'; show.style.display = ''; hide.style.display = 'none'; }
-}
-
-// Enter key login
-document.getElementById('login-pass').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
-document.getElementById('login-user').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('login-pass').focus(); });
-
 // ═══════════════════════════════════════════════════════════
 // GPS
 // ═══════════════════════════════════════════════════════════
 function getGPS() {
   if (!navigator.geolocation) return;
   navigator.geolocation.getCurrentPosition(
-    p => { currentLocation = { lat: p.coords.latitude, lng: p.coords.longitude }; },
-    () => { currentLocation = null; },
+    function(p) { currentLocation = { lat: p.coords.latitude, lng: p.coords.longitude }; },
+    function() { currentLocation = null; },
     { enableHighAccuracy: true, timeout: 10000 }
   );
 }
@@ -593,107 +520,113 @@ function getGPS() {
 // ═══════════════════════════════════════════════════════════
 async function loadHomeStats() {
   try {
-    const today = new Date().toISOString().slice(0, 10);
-    const data = await api('GET', `/scans?date_from=${today}T00:00:00&limit=200`);
-    const scans = data.scans || [];
+    var today = new Date().toISOString().slice(0, 10);
+    var data = await api('GET', '/scans?date_from=' + today + 'T00:00:00&limit=200');
+    var scans = data.scans || [];
     document.getElementById('stat-today').textContent = scans.length;
-    document.getElementById('stat-yellow').textContent = scans.filter(s => s.alert_level === 'YELLOW').length;
-    document.getElementById('stat-red').textContent = scans.filter(s => s.alert_level === 'RED').length;
-    
-    // Watchlist badge
-    const wl = await api('GET', '/watchlist');
-    const wlBadge = document.getElementById('watchlist-badge');
+    document.getElementById('stat-yellow').textContent = scans.filter(function(s) { return s.alert_level === 'YELLOW'; }).length;
+    document.getElementById('stat-red').textContent = scans.filter(function(s) { return s.alert_level === 'RED'; }).length;
+    var wl = await api('GET', '/watchlist');
+    var wlBadge = document.getElementById('watchlist-badge');
     if (wl.length > 0) { wlBadge.textContent = wl.length; wlBadge.style.display = ''; }
     else { wlBadge.style.display = 'none'; }
   } catch (e) { console.error('Stats error:', e); }
 }
 
 // ═══════════════════════════════════════════════════════════
-// BARCODE SCANNER (server-side decode)
+// SCANNER - PHOTO CAPTURE APPROACH
+// Uses native phone camera via <input type="file">
+// Then attempts to decode the barcode from the photo
 // ═══════════════════════════════════════════════════════════
 function startScanner() {
   currentScanData = {};
   capturedPhotos = { dl: null, bol: null, truck: null };
-  document.getElementById('scan-preview').innerHTML = '';
-  document.getElementById('scan-processing').innerHTML = '';
-  document.getElementById('scan-result').style.display = 'none';
-  document.getElementById('barcode-file-input').value = '';
-  var btn = document.getElementById('btn-scan');
-  btn.disabled = false;
-  btn.textContent = 'Scan Driver License';
-  showScreen('scanner-screen');
+  // Trigger native camera
+  document.getElementById('dl-photo-input').click();
 }
 
-function captureBarcode() {
-  document.getElementById('barcode-file-input').value = '';
-  document.getElementById('barcode-file-input').click();
-}
-
-document.getElementById('barcode-file-input').addEventListener('change', async function(e) {
-  var file = e.target.files && e.target.files[0];
+// Handle the photo from the camera
+document.getElementById('dl-photo-input').addEventListener('change', async function(e) {
+  var file = e.target.files[0];
   if (!file) return;
+  // Reset so same file can be picked again
+  e.target.value = '';
 
-  var btn = document.getElementById('btn-scan');
-  btn.disabled = true;
-  btn.textContent = 'Processing...';
+  showProcessing('Reading barcode...', 'Analyzing your license photo');
 
-  // Show photo preview
-  var preview = document.getElementById('scan-preview');
-  var reader = new FileReader();
-  reader.onload = function(ev) {
-    preview.innerHTML = '<img src="' + ev.target.result + '">';
-  };
-  reader.readAsDataURL(file);
-
-  // Show processing state
-  document.getElementById('scan-processing').innerHTML = 'Decoding barcode...';
-  document.getElementById('scan-result').style.display = 'none';
+  // Create preview URL for confirm screen
+  var previewUrl = URL.createObjectURL(file);
 
   try {
-    var formData = new FormData();
-    formData.append('photo', file);
-
-    var res = await fetch('/api/barcode/decode', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + token },
-      body: formData
-    });
-    var result = await res.json();
-
-    document.getElementById('scan-processing').innerHTML = '';
-    btn.disabled = false;
-    btn.textContent = 'Scan Driver License';
-
-    if (result.success) {
-      // Vibrate + green flash
-      if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
-      var flash = document.createElement('div');
-      flash.className = 'scan-success-flash';
-      document.body.appendChild(flash);
-      flash.addEventListener('animationend', function() { flash.remove(); });
-
-      // Show inline result preview
-      var f = result.fields;
-      document.getElementById('sr-first').textContent = f.first_name || '';
-      document.getElementById('sr-last').textContent = f.last_name || '';
-      document.getElementById('sr-dl').textContent = f.dl_number || '';
-      document.getElementById('sr-state').textContent = f.dl_state || f.address_state || '';
-      document.getElementById('sr-dob').textContent = f.date_of_birth || '';
-      document.getElementById('sr-exp').textContent = f.expiration_date || '';
-      document.getElementById('sr-addr').textContent = [f.address_street, f.address_city, f.address_state, f.address_zip].filter(Boolean).join(', ');
-      document.getElementById('scan-result').style.display = '';
-
-      currentScanData = result.fields;
-      // Brief delay so user sees the result before navigating
-      setTimeout(function() { showConfirmScreen(result.fields); }, 1200);
-    } else {
-      showToast(result.error || 'Could not read barcode — try again or use Manual Entry', 'error');
+    // DECODE APPROACH: Try html5-qrcode scanFile first (client-side)
+    var decoded = null;
+    
+    if (typeof Html5Qrcode !== 'undefined') {
+      try {
+        var tempDiv = document.createElement('div');
+        tempDiv.id = 'scan-temp-' + Date.now();
+        tempDiv.style.display = 'none';
+        document.body.appendChild(tempDiv);
+        var scanner = new Html5Qrcode(tempDiv.id);
+        decoded = await scanner.scanFile(file, false);
+        tempDiv.remove();
+      } catch (scanErr) {
+        console.log('[SCAN] Client decode failed:', scanErr);
+      }
     }
+
+    if (decoded) {
+      // SUCCESS - barcode decoded client-side
+      console.log('[SCAN] Decoded client-side:', decoded.substring(0, 80));
+      if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+      hideProcessing();
+      var parsed = parsePDF417(decoded);
+      currentScanData = parsed;
+      showConfirmScreen(parsed, previewUrl);
+      showToast('License scanned successfully!', 'success');
+      return;
+    }
+
+    // Client decode failed - try server-side
+    showProcessing('Trying enhanced decode...', 'Sending to server for analysis');
+    
+    try {
+      var reader = new FileReader();
+      var base64 = await new Promise(function(resolve, reject) {
+        reader.onload = function() { resolve(reader.result.split(',')[1]); };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      var result = await api('POST', '/decode-dl', { image: base64 });
+      
+      if (result.success && result.fields) {
+        if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+        hideProcessing();
+        currentScanData = result.fields;
+        showConfirmScreen(result.fields, previewUrl);
+        showToast('License decoded by server!', 'success');
+        return;
+      }
+    } catch (serverErr) {
+      console.log('[SCAN] Server decode failed:', serverErr);
+    }
+
+    // BOTH FAILED - show photo + offer manual entry or retry
+    hideProcessing();
+    showToast('Could not read barcode automatically', 'warning');
+    
+    // Show confirm screen with empty fields + photo preview
+    // Guard can see the license photo and type the info manually
+    currentScanData = {};
+    showConfirmScreen({}, previewUrl);
+    showToast('Fill in the details from the photo above, or tap RE-SCAN', 'info');
+
   } catch (err) {
-    document.getElementById('scan-processing').innerHTML = '';
-    btn.disabled = false;
-    btn.textContent = 'Scan Driver License';
-    showToast('Network error — check connection and try again', 'error');
+    hideProcessing();
+    console.error('[SCAN] Error:', err);
+    showToast('Error processing photo: ' + (err.message || err), 'error');
+    showScreen('home-screen');
   }
 });
 
@@ -701,8 +634,8 @@ document.getElementById('barcode-file-input').addEventListener('change', async f
 // PDF417 AAMVA PARSER
 // ═══════════════════════════════════════════════════════════
 function parsePDF417(raw) {
-  const fields = {};
-  const map = {
+  var fields = {};
+  var map = {
     'DCS': 'last_name', 'DAC': 'first_name', 'DCT': 'first_name',
     'DAD': 'middle_name', 'DBB': 'date_of_birth', 'DBA': 'expiration_date',
     'DAQ': 'dl_number', 'DAG': 'address_street', 'DAI': 'address_city',
@@ -711,149 +644,109 @@ function parsePDF417(raw) {
     'DCF': 'document_discriminator', 'DCA': 'dl_class', 'DCD': 'endorsements',
     'DBD': 'issue_date',
   };
-  
-  // Split by various delimiters used in PDF417
-  const lines = raw.split(/[\n\r\x1e\x1d]+/);
-  
-  for (const line of lines) {
-    const trimmed = line.trim();
-    for (const [code, field] of Object.entries(map)) {
-      if (trimmed.startsWith(code)) {
-        let val = trimmed.substring(code.length).trim();
-        // Don't overwrite first_name if already set (DAC takes priority over DCT)
-        if (field === 'first_name' && fields.first_name && trimmed.startsWith('DCT')) continue;
+  var lines = raw.split(/[\n\r\x1e\x1d]+/);
+  for (var i = 0; i < lines.length; i++) {
+    var trimmed = lines[i].trim();
+    for (var code in map) {
+      if (trimmed.indexOf(code) === 0) {
+        var val = trimmed.substring(code.length).trim();
+        var field = map[code];
+        if (field === 'first_name' && fields.first_name && code === 'DCT') continue;
         fields[field] = val;
       }
     }
   }
-  
-  // Also try to extract state from header (ANSI line)
-  const ansiMatch = raw.match(/\bDL(\w{2})/);
-  if (ansiMatch && !fields.address_state) {
-    fields.dl_state = ansiMatch[1];
-  }
+  var ansiMatch = raw.match(/\bDL(\w{2})/);
+  if (ansiMatch && !fields.address_state) fields.dl_state = ansiMatch[1];
   if (fields.address_state) fields.dl_state = fields.address_state;
-
-  // Parse MMDDYYYY or YYYYMMDD dates
-  for (const df of ['date_of_birth', 'expiration_date', 'issue_date']) {
+  var dateFields = ['date_of_birth', 'expiration_date', 'issue_date'];
+  for (var j = 0; j < dateFields.length; j++) {
+    var df = dateFields[j];
     if (fields[df] && fields[df].length >= 8) {
-      const d = fields[df].replace(/[^0-9]/g, '');
+      var d = fields[df].replace(/[^0-9]/g, '');
       if (d.length === 8) {
-        // Determine format: if first 2 digits > 12, it's YYYYMMDD
-        const first2 = parseInt(d.slice(0, 2));
-        if (first2 > 12) {
-          fields[df] = `${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}`;
-        } else {
-          fields[df] = `${d.slice(4,8)}-${d.slice(0,2)}-${d.slice(2,4)}`;
-        }
+        var first2 = parseInt(d.slice(0, 2));
+        if (first2 > 12) fields[df] = d.slice(0,4) + '-' + d.slice(4,6) + '-' + d.slice(6,8);
+        else fields[df] = d.slice(4,8) + '-' + d.slice(0,2) + '-' + d.slice(2,4);
       }
     }
   }
-  
-  // Gender decode
   if (fields.gender === '1') fields.gender = 'M';
   else if (fields.gender === '2') fields.gender = 'F';
-  
-  // Clean zip (take first 5)
   if (fields.address_zip) fields.address_zip = fields.address_zip.substring(0, 5);
-  
-  // Capitalize names
-  for (const nf of ['first_name', 'last_name', 'middle_name', 'address_city']) {
+  var nameFields = ['first_name', 'last_name', 'middle_name', 'address_city'];
+  for (var k = 0; k < nameFields.length; k++) {
+    var nf = nameFields[k];
     if (fields[nf]) fields[nf] = fields[nf].charAt(0).toUpperCase() + fields[nf].slice(1).toLowerCase();
   }
-  
   return fields;
 }
 
 // ═══════════════════════════════════════════════════════════
 // CONFIRM SCREEN
 // ═══════════════════════════════════════════════════════════
-function showConfirmScreen(data) {
+function showConfirmScreen(data, previewUrl) {
   showScreen('confirm-screen');
-  const c = document.getElementById('dl-fields');
   
-  const isExpired = data.expiration_date && new Date(data.expiration_date) < new Date();
-  const expClass = isExpired ? 'dl-expired' : 'dl-valid';
+  // Show photo preview if available
+  var preview = document.getElementById('scan-preview');
+  if (previewUrl) { preview.src = previewUrl; preview.style.display = 'block'; }
+  else { preview.style.display = 'none'; }
   
-  c.innerHTML = `
-    <div class="dl-field dl-name">
-      <div class="dl-field-label">Name</div>
-      <div class="dl-field-value">${data.first_name || '?'} ${data.middle_name || ''} ${data.last_name || '?'}</div>
-    </div>
-    <div class="dl-field">
-      <div class="dl-field-label">DL Number</div>
-      <div class="dl-field-value">${data.dl_number || 'NOT READ'}</div>
-    </div>
-    <div class="dl-field">
-      <div class="dl-field-label">State</div>
-      <div class="dl-field-value">${data.dl_state || data.address_state || '?'}</div>
-    </div>
-    <div class="dl-field">
-      <div class="dl-field-label">Date of Birth</div>
-      <div class="dl-field-value">${data.date_of_birth || '?'}</div>
-    </div>
-    <div class="dl-field ${expClass}">
-      <div class="dl-field-label">Expiration ${isExpired ? '⚠ EXPIRED' : '✓ Valid'}</div>
-      <div class="dl-field-value">${data.expiration_date || '?'}</div>
-    </div>
-    <div class="dl-field" style="grid-column:1/-1;">
-      <div class="dl-field-label">Address</div>
-      <div class="dl-field-value">${data.address_street || ''} ${data.address_city || ''}, ${data.address_state || ''} ${data.address_zip || ''}</div>
-    </div>
-    <div class="dl-field">
-      <div class="dl-field-label">Gender</div>
-      <div class="dl-field-value">${data.gender || '?'}</div>
-    </div>
-    <div class="dl-field">
-      <div class="dl-field-label">Eyes / Height</div>
-      <div class="dl-field-value">${data.eye_color || '?'} / ${data.height || '?'}</div>
-    </div>
-  `;
+  var c = document.getElementById('dl-fields');
+  var isExpired = data.expiration_date && new Date(data.expiration_date) < new Date();
+  var expClass = isExpired ? 'dl-expired' : (data.expiration_date ? 'dl-valid' : '');
+  
+  c.innerHTML = '<div class="dl-field dl-name"><div class="dl-field-label">Name</div>' +
+    '<div class="dl-field-value">' + (data.first_name || '?') + ' ' + (data.middle_name || '') + ' ' + (data.last_name || '?') + '</div></div>' +
+    '<div class="dl-field"><div class="dl-field-label">DL Number</div><div class="dl-field-value">' + (data.dl_number || 'NOT READ') + '</div></div>' +
+    '<div class="dl-field"><div class="dl-field-label">State</div><div class="dl-field-value">' + (data.dl_state || data.address_state || '?') + '</div></div>' +
+    '<div class="dl-field"><div class="dl-field-label">Date of Birth</div><div class="dl-field-value">' + (data.date_of_birth || '?') + '</div></div>' +
+    '<div class="dl-field ' + expClass + '"><div class="dl-field-label">Expiration ' + (isExpired ? '&#9888; EXPIRED' : (data.expiration_date ? '&#10003; Valid' : '')) + '</div><div class="dl-field-value">' + (data.expiration_date || '?') + '</div></div>' +
+    '<div class="dl-field" style="grid-column:1/-1;"><div class="dl-field-label">Address</div><div class="dl-field-value">' + (data.address_street || '') + ' ' + (data.address_city || '') + ', ' + (data.address_state || '') + ' ' + (data.address_zip || '') + '</div></div>' +
+    '<div class="dl-field"><div class="dl-field-label">Gender</div><div class="dl-field-value">' + (data.gender || '?') + '</div></div>' +
+    '<div class="dl-field"><div class="dl-field-label">Eyes / Height</div><div class="dl-field-value">' + (data.eye_color || '?') + ' / ' + (data.height || '?') + '</div></div>';
 }
 
 // ═══════════════════════════════════════════════════════════
-// PHOTO CAPTURE
+// PHOTO CAPTURE (for evidence photos)
 // ═══════════════════════════════════════════════════════════
 function capturePhoto(type) {
-  const overlay = document.getElementById('camera-overlay');
-  const video = document.getElementById('camera-video');
-  const canvas = document.getElementById('camera-canvas');
-  const purpose = document.getElementById('camera-purpose');
-  
-  const labels = { dl: 'Driver License Photo', bol: 'Bill of Lading', truck: 'Truck / Plate' };
+  var overlay = document.getElementById('camera-overlay');
+  var video = document.getElementById('camera-video');
+  var canvas = document.getElementById('camera-canvas');
+  var purpose = document.getElementById('camera-purpose');
+  var labels = { dl: 'Driver License Photo', bol: 'Bill of Lading', truck: 'Truck / Plate' };
   purpose.textContent = labels[type] || 'Photo';
   overlay.classList.add('active');
-  
   navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 } } })
-    .then(stream => {
+    .then(function(stream) {
       cameraStream = stream;
       video.srcObject = stream;
       video.play();
-      
-      document.getElementById('camera-shutter').onclick = () => {
+      document.getElementById('camera-shutter').onclick = function() {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         canvas.getContext('2d').drawImage(video, 0, 0);
-        
-        canvas.toBlob(blob => {
-          stream.getTracks().forEach(t => t.stop());
+        canvas.toBlob(function(blob) {
+          stream.getTracks().forEach(function(t) { t.stop(); });
           overlay.classList.remove('active');
           cameraStream = null;
           capturedPhotos[type] = blob;
-          const btn = document.getElementById(`photo-${type}-btn`);
-          if (btn) { btn.classList.add('captured'); btn.innerHTML = '&#10003; ' + labels[type] + ' Captured'; }
+          var btn = document.getElementById('photo-' + type + '-btn');
+          if (btn) { btn.classList.add('captured'); btn.textContent = '✓ ' + labels[type] + ' Captured'; }
           showToast('Photo captured', 'success');
         }, 'image/jpeg', 0.85);
       };
     })
-    .catch(e => {
+    .catch(function(e) {
       overlay.classList.remove('active');
       showToast('Camera error: ' + e.message, 'error');
     });
 }
 
 function cancelCamera() {
-  if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null; }
+  if (cameraStream) { cameraStream.getTracks().forEach(function(t) { t.stop(); }); cameraStream = null; }
   document.getElementById('camera-overlay').classList.remove('active');
 }
 
@@ -861,14 +754,10 @@ function cancelCamera() {
 // SUBMIT SCAN
 // ═══════════════════════════════════════════════════════════
 async function submitScan() {
-  const formData = new FormData();
-  
-  // DL data from scan
-  for (const [key, val] of Object.entries(currentScanData)) {
-    if (val) formData.append(key, val);
+  var formData = new FormData();
+  for (var key in currentScanData) {
+    if (currentScanData[key]) formData.append(key, currentScanData[key]);
   }
-  
-  // Additional fields
   formData.append('carrier_name', document.getElementById('d-carrier').value);
   formData.append('carrier_mc_number', document.getElementById('d-mc').value);
   formData.append('carrier_dot_number', document.getElementById('d-dot').value);
@@ -876,25 +765,16 @@ async function submitScan() {
   formData.append('trailer_number', document.getElementById('d-trailer').value);
   formData.append('bol_number', document.getElementById('d-bol').value);
   formData.append('notes', document.getElementById('d-notes').value);
-  
-  // GPS
   if (currentLocation) {
     formData.append('latitude', currentLocation.lat);
     formData.append('longitude', currentLocation.lng);
   }
-  
-  // Photos
   if (capturedPhotos.dl) formData.append('dl_photo', capturedPhotos.dl, 'dl.jpg');
   if (capturedPhotos.bol) formData.append('bol_photo', capturedPhotos.bol, 'bol.jpg');
   if (capturedPhotos.truck) formData.append('truck_photo', capturedPhotos.truck, 'truck.jpg');
-  
   try {
-    const res = await fetch('/api/scans', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token}` },
-      body: formData
-    });
-    const result = await res.json();
+    var res = await fetch('/api/scans', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: formData });
+    var result = await res.json();
     if (result.error) throw new Error(result.error);
     showRiskResult(result);
   } catch (e) {
@@ -904,7 +784,7 @@ async function submitScan() {
 }
 
 async function submitManual() {
-  const data = {
+  var data = {
     first_name: document.getElementById('m-first').value,
     last_name: document.getElementById('m-last').value,
     dl_number: document.getElementById('m-dl').value,
@@ -919,19 +799,12 @@ async function submitManual() {
     trailer_number: document.getElementById('m-trailer').value,
     bol_number: document.getElementById('m-bol').value,
   };
-  
-  if (currentLocation) {
-    data.latitude = currentLocation.lat;
-    data.longitude = currentLocation.lng;
-  }
-  
+  if (currentLocation) { data.latitude = currentLocation.lat; data.longitude = currentLocation.lng; }
   try {
-    const result = await api('POST', '/scans', data);
+    var result = await api('POST', '/scans', data);
     if (result.error) throw new Error(result.error);
     showRiskResult(result);
-  } catch (e) {
-    showToast('Error: ' + e.message, 'error');
-  }
+  } catch (e) { showToast('Error: ' + e.message, 'error'); }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -939,79 +812,46 @@ async function submitManual() {
 // ═══════════════════════════════════════════════════════════
 function showRiskResult(result) {
   showScreen('result-screen');
-  
-  const score = result.risk_score || 0;
-  const level = result.alert_level || 'GREEN';
-  const flags = result.risk_flags || [];
-  
-  // Animate gauge
-  const circle = document.getElementById('risk-circle');
-  const circumference = 314; // 2 * PI * 50
-  const offset = circumference - (score / 100) * circumference;
-  circle.className = `fill ${level}`;
-  setTimeout(() => { circle.style.strokeDashoffset = offset; }, 50);
-  
-  // Score number
-  const scoreEl = document.getElementById('risk-score-num');
+  var score = result.risk_score || 0;
+  var level = result.alert_level || 'GREEN';
+  var flags = result.risk_flags || [];
+  var circle = document.getElementById('risk-circle');
+  var offset = 314 - (score / 100) * 314;
+  circle.className = 'fill ' + level;
+  setTimeout(function() { circle.style.strokeDashoffset = offset; }, 50);
+  var scoreEl = document.getElementById('risk-score-num');
   scoreEl.textContent = score;
   scoreEl.style.color = level === 'RED' ? 'var(--red)' : level === 'YELLOW' ? 'var(--yellow)' : 'var(--green)';
-  
-  // Label
-  const labelEl = document.getElementById('risk-label');
-  const labels = { GREEN: 'LOW RISK', YELLOW: 'ELEVATED', RED: 'HIGH RISK' };
+  var labelEl = document.getElementById('risk-label');
+  var labels = { GREEN: 'LOW RISK', YELLOW: 'ELEVATED', RED: 'HIGH RISK' };
   labelEl.textContent = labels[level] || 'ASSESSED';
-  labelEl.style.color = level === 'RED' ? 'var(--red)' : level === 'YELLOW' ? 'var(--yellow)' : 'var(--green)';
-  
-  // Flags
-  const flagsEl = document.getElementById('risk-flags');
-  if (flags.length > 0) {
-    flagsEl.innerHTML = flags.map(f => `<div class="risk-flag">${f}</div>`).join('');
-  } else {
-    flagsEl.innerHTML = '<div class="text-center text-muted text-sm mt-8">No risk flags triggered</div>';
-  }
-  
-  // Actions
-  const actionsEl = document.getElementById('risk-actions');
-  if (level === 'RED') {
-    actionsEl.innerHTML = `
-      <button class="btn btn-danger btn-full" onclick="addCurrentToWatchlist()">&#128680; ADD TO WATCHLIST</button>
-    `;
-  } else {
-    actionsEl.innerHTML = '';
-  }
+  labelEl.style.color = scoreEl.style.color;
+  var flagsEl = document.getElementById('risk-flags');
+  if (flags.length > 0) { flagsEl.innerHTML = flags.map(function(f) { return '<div class="risk-flag">&#9888; ' + f + '</div>'; }).join(''); }
+  else { flagsEl.innerHTML = '<div class="text-center text-muted text-sm mt-8">No risk flags triggered</div>'; }
+  var actionsEl = document.getElementById('risk-actions');
+  if (level === 'RED') { actionsEl.innerHTML = '<button class="btn btn-danger btn-full" id="add-wl-btn">&#128680; ADD TO WATCHLIST</button>'; document.getElementById('add-wl-btn').addEventListener('click', addCurrentToWatchlist); }
+  else { actionsEl.innerHTML = ''; }
 }
 
 function addCurrentToWatchlist() {
-  const dl = currentScanData.dl_number;
+  var dl = currentScanData.dl_number;
   if (!dl) { showToast('No DL number to add', 'error'); return; }
-  api('POST', '/watchlist', {
-    dl_number: dl,
-    dl_state: currentScanData.dl_state || currentScanData.address_state,
-    first_name: currentScanData.first_name,
-    last_name: currentScanData.last_name,
-    reason: 'Flagged during scan - HIGH RISK',
-    severity: 'RED'
-  }).then(() => showToast('Added to watchlist', 'success'))
-    .catch(e => showToast('Error: ' + e.message, 'error'));
+  api('POST', '/watchlist', { dl_number: dl, dl_state: currentScanData.dl_state || currentScanData.address_state, first_name: currentScanData.first_name, last_name: currentScanData.last_name, reason: 'Flagged during scan - HIGH RISK', severity: 'RED' })
+    .then(function() { showToast('Added to watchlist', 'success'); })
+    .catch(function(e) { showToast('Error: ' + e.message, 'error'); });
 }
 
 function resetToHome() {
-  // Reset form fields
-  ['d-carrier','d-mc','d-dot','d-plate','d-trailer','d-bol','d-notes'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.value = '';
-  });
-  ['photo-dl-btn','photo-bol-btn','photo-truck-btn'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) { el.classList.remove('captured'); }
-  });
-  document.getElementById('photo-dl-btn').innerHTML = '&#128247; DL Photo';
-  document.getElementById('photo-bol-btn').innerHTML = '&#128247; BOL Photo';
-  document.getElementById('photo-truck-btn').innerHTML = '&#128247; Truck / Plate Photo';
-  
-  // Reset gauge
+  ['d-carrier','d-mc','d-dot','d-plate','d-trailer','d-bol','d-notes'].forEach(function(id) { var el = document.getElementById(id); if (el) el.value = ''; });
+  document.getElementById('photo-dl-btn').textContent = '📷 DL Photo';
+  document.getElementById('photo-dl-btn').classList.remove('captured');
+  document.getElementById('photo-bol-btn').textContent = '📷 BOL Photo';
+  document.getElementById('photo-bol-btn').classList.remove('captured');
+  document.getElementById('photo-truck-btn').textContent = '📷 Truck / Plate Photo';
+  document.getElementById('photo-truck-btn').classList.remove('captured');
   document.getElementById('risk-circle').style.strokeDashoffset = 314;
-  
+  document.getElementById('scan-preview').style.display = 'none';
   currentScanData = {};
   capturedPhotos = { dl: null, bol: null, truck: null };
   showScreen('home-screen');
@@ -1025,103 +865,72 @@ function resetToHome() {
 async function loadRecentScans() {
   showScreen('scans-screen');
   currentScanFilter = '';
-  document.querySelectorAll('#scan-filters .filter-tab').forEach((t, i) => t.classList.toggle('active', i === 0));
+  document.getElementById('scan-filters').innerHTML =
+    '<button class="filter-tab active" data-filter="">All</button>' +
+    '<button class="filter-tab" data-filter="RED">&#128308; Red</button>' +
+    '<button class="filter-tab" data-filter="YELLOW">&#128992; Yellow</button>' +
+    '<button class="filter-tab" data-filter="GREEN">&#128994; Green</button>';
+  document.querySelectorAll('#scan-filters .filter-tab').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('#scan-filters .filter-tab').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      currentScanFilter = btn.getAttribute('data-filter');
+      renderScans();
+    });
+  });
   await renderScans();
 }
 
-function filterScans(btn, level) {
-  document.querySelectorAll('#scan-filters .filter-tab').forEach(t => t.classList.remove('active'));
-  btn.classList.add('active');
-  currentScanFilter = level;
-  renderScans();
-}
-
 async function renderScans() {
-  const list = document.getElementById('scans-list');
+  var list = document.getElementById('scans-list');
   list.innerHTML = '<div class="text-center text-muted">Loading...</div>';
-  
   try {
-    let url = '/scans?limit=50';
-    if (currentScanFilter) url += `&alert_level=${currentScanFilter}`;
-    const data = await api('GET', url);
-    
-    if (!data.scans || data.scans.length === 0) {
-      list.innerHTML = '<div class="text-center text-muted" style="padding:32px;">No scans found</div>';
-      return;
-    }
-    
-    list.innerHTML = data.scans.map(s => `
-      <div class="scan-item" onclick="showScanDetail('${s.id}')">
-        <span class="alert-dot ${s.alert_level}"></span>
-        <div class="scan-item-info">
-          <div class="scan-item-name">${s.first_name || '?'} ${s.last_name || 'Unknown'}</div>
-          <div class="scan-item-detail">${s.carrier_name || 'No carrier'} &bull; DL: ${s.dl_number || 'N/A'}</div>
-        </div>
-        <div class="scan-item-time">${formatTime(s.scan_timestamp)}<br><span style="font-size:11px;color:var(--text3);">Score: ${s.risk_score}</span></div>
-      </div>
-    `).join('');
-  } catch (e) {
-    list.innerHTML = '<div class="text-center" style="color:var(--red);padding:32px;">Error loading scans</div>';
-  }
+    var url = '/scans?limit=50';
+    if (currentScanFilter) url += '&alert_level=' + currentScanFilter;
+    var data = await api('GET', url);
+    if (!data.scans || data.scans.length === 0) { list.innerHTML = '<div class="text-center text-muted" style="padding:32px;">No scans found</div>'; return; }
+    list.innerHTML = data.scans.map(function(s) {
+      return '<div class="scan-item" data-id="' + s.id + '">' +
+        '<span class="alert-dot ' + s.alert_level + '"></span>' +
+        '<div class="scan-item-info"><div class="scan-item-name">' + (s.first_name || '?') + ' ' + (s.last_name || 'Unknown') + '</div>' +
+        '<div class="scan-item-detail">' + (s.carrier_name || 'No carrier') + ' &bull; DL: ' + (s.dl_number || 'N/A') + '</div></div>' +
+        '<div class="scan-item-time">' + formatTime(s.scan_timestamp) + '<br><span style="font-size:11px;color:var(--text3);">Score: ' + s.risk_score + '</span></div></div>';
+    }).join('');
+    list.querySelectorAll('.scan-item').forEach(function(item) {
+      item.addEventListener('click', function() { showScanDetail(item.getAttribute('data-id')); });
+    });
+  } catch (e) { list.innerHTML = '<div class="text-center" style="color:var(--red);padding:32px;">Error loading scans</div>'; }
 }
 
 async function showScanDetail(id) {
   showScreen('scan-detail-screen');
-  const content = document.getElementById('scan-detail-content');
+  var content = document.getElementById('scan-detail-content');
   content.innerHTML = '<div class="text-center text-muted">Loading...</div>';
-  
   try {
-    const s = await api('GET', `/scans/${id}`);
-    const isExpired = s.expiration_date && new Date(s.expiration_date) < new Date();
-    
-    content.innerHTML = `
-      <div class="card">
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
-          <span class="alert-dot ${s.alert_level}" style="width:16px;height:16px;"></span>
-          <div>
-            <div style="font-size:20px;font-weight:800;">${s.first_name || '?'} ${s.last_name || 'Unknown'}</div>
-            <div class="text-muted text-sm">${s.alert_level} &bull; Risk Score: ${s.risk_score}</div>
-          </div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="dl-fields">
-          <div class="dl-field"><div class="dl-field-label">DL Number</div><div class="dl-field-value">${s.dl_number || 'N/A'}</div></div>
-          <div class="dl-field"><div class="dl-field-label">State</div><div class="dl-field-value">${s.dl_state || 'N/A'}</div></div>
-          <div class="dl-field"><div class="dl-field-label">DOB</div><div class="dl-field-value">${s.date_of_birth || 'N/A'}</div></div>
-          <div class="dl-field ${isExpired ? 'dl-expired' : ''}"><div class="dl-field-label">Expires</div><div class="dl-field-value">${s.expiration_date || 'N/A'}</div></div>
-        </div>
-      </div>
-      <div class="card">
-        <div style="font-weight:600;margin-bottom:8px;">Carrier & Load</div>
-        <div class="text-sm">Carrier: ${s.carrier_name || 'N/A'}</div>
-        <div class="text-sm">MC#: ${s.carrier_mc_number || 'N/A'} | DOT#: ${s.carrier_dot_number || 'N/A'}</div>
-        <div class="text-sm">Plate: ${s.truck_plate || 'N/A'} | Trailer: ${s.trailer_number || 'N/A'}</div>
-        <div class="text-sm">BOL: ${s.bol_number || 'N/A'}</div>
-      </div>
-      ${s.risk_flags ? `<div class="card">
-        <div style="font-weight:600;margin-bottom:8px;">Risk Flags</div>
-        ${JSON.parse(s.risk_flags).map(f => `<div class="risk-flag">${f}</div>`).join('')}
-      </div>` : ''}
-      <div class="card text-sm text-muted">
-        <div>Guard: ${s.guard_name || 'N/A'} | Site: ${s.site_name || 'N/A'}</div>
-        <div>Time: ${new Date(s.scan_timestamp + 'Z').toLocaleString()}</div>
-        <div>GPS: ${s.latitude ? `${s.latitude.toFixed(4)}, ${s.longitude.toFixed(4)}` : 'N/A'}</div>
-        <div style="word-break:break-all;margin-top:4px;">Hash: ${s.integrity_hash || 'N/A'}</div>
-      </div>
-      <button class="btn btn-danger btn-full mt-16" onclick="addToWatchlistFromDetail('${s.dl_number}','${s.dl_state || ''}','${s.first_name || ''}','${s.last_name || ''}')">ADD TO WATCHLIST</button>
-    `;
-  } catch (e) {
-    content.innerHTML = '<div class="text-center" style="color:var(--red);">Error loading scan</div>';
-  }
-}
-
-function addToWatchlistFromDetail(dl, state, first, last) {
-  const reason = prompt('Reason for watchlist:');
-  if (!reason) return;
-  api('POST', '/watchlist', { dl_number: dl, dl_state: state, first_name: first, last_name: last, reason, severity: 'RED' })
-    .then(() => showToast('Added to watchlist', 'success'))
-    .catch(e => showToast('Error', 'error'));
+    var s = await api('GET', '/scans/' + id);
+    var isExpired = s.expiration_date && new Date(s.expiration_date) < new Date();
+    content.innerHTML =
+      '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;">' +
+      '<div><div style="font-size:20px;font-weight:800;">' + (s.first_name || '?') + ' ' + (s.last_name || 'Unknown') + '</div>' +
+      '<div class="text-sm text-muted">DL: ' + (s.dl_number || 'N/A') + ' (' + (s.dl_state || '?') + ')</div></div>' +
+      '<div class="alert-dot ' + s.alert_level + '" style="width:20px;height:20px;"></div></div></div>' +
+      '<div class="card"><div style="font-weight:600;margin-bottom:8px;">Risk Assessment</div>' +
+      '<div style="font-size:36px;font-weight:800;color:' + (s.alert_level === 'RED' ? 'var(--red)' : s.alert_level === 'YELLOW' ? 'var(--yellow)' : 'var(--green)') + ';">' + s.risk_score + '/100</div></div>' +
+      '<div class="card"><div style="font-weight:600;margin-bottom:8px;">License Details</div>' +
+      '<div class="text-sm">DOB: ' + (s.date_of_birth || 'N/A') + '</div>' +
+      '<div class="text-sm">Exp: ' + (s.expiration_date || 'N/A') + (isExpired ? ' ⚠ EXPIRED' : '') + '</div>' +
+      '<div class="text-sm">Address: ' + (s.address_street || '') + ' ' + (s.address_city || '') + ', ' + (s.address_state || '') + ' ' + (s.address_zip || '') + '</div></div>' +
+      '<div class="card"><div style="font-weight:600;margin-bottom:8px;">Carrier & Load</div>' +
+      '<div class="text-sm">Carrier: ' + (s.carrier_name || 'N/A') + '</div>' +
+      '<div class="text-sm">MC#: ' + (s.carrier_mc_number || 'N/A') + ' | DOT#: ' + (s.carrier_dot_number || 'N/A') + '</div>' +
+      '<div class="text-sm">Plate: ' + (s.truck_plate || 'N/A') + ' | Trailer: ' + (s.trailer_number || 'N/A') + '</div>' +
+      '<div class="text-sm">BOL: ' + (s.bol_number || 'N/A') + '</div></div>' +
+      (s.risk_flags ? '<div class="card"><div style="font-weight:600;margin-bottom:8px;">Risk Flags</div>' + JSON.parse(s.risk_flags).map(function(f) { return '<div class="risk-flag">⚠ ' + f + '</div>'; }).join('') + '</div>' : '') +
+      '<div class="card text-sm text-muted"><div>Guard: ' + (s.guard_name || 'N/A') + ' | Site: ' + (s.site_name || 'N/A') + '</div>' +
+      '<div>Time: ' + new Date(s.scan_timestamp + 'Z').toLocaleString() + '</div>' +
+      '<div>GPS: ' + (s.latitude ? s.latitude.toFixed(4) + ', ' + s.longitude.toFixed(4) : 'N/A') + '</div>' +
+      '<div style="word-break:break-all;margin-top:4px;">Hash: ' + (s.integrity_hash || 'N/A') + '</div></div>';
+  } catch (e) { content.innerHTML = '<div class="text-center" style="color:var(--red);">Error loading scan</div>'; }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1130,61 +939,40 @@ function addToWatchlistFromDetail(dl, state, first, last) {
 async function loadWatchlist() {
   showScreen('watchlist-screen');
   document.getElementById('watchlist-add-form').style.display = 'none';
-  const list = document.getElementById('watchlist-list');
+  var list = document.getElementById('watchlist-list');
   list.innerHTML = '<div class="text-center text-muted">Loading...</div>';
-  
   try {
-    const entries = await api('GET', '/watchlist');
-    if (entries.length === 0) {
-      list.innerHTML = '<div class="text-center text-muted" style="padding:32px;">No watchlist entries</div>';
-      return;
-    }
-    list.innerHTML = entries.map(e => `
-      <div class="card" style="border-left:3px solid var(--${e.severity === 'RED' ? 'red' : 'yellow'});">
-        <div style="display:flex;justify-content:space-between;align-items:start;">
-          <div>
-            <div style="font-weight:700;">${e.first_name || '?'} ${e.last_name || 'Unknown'}</div>
-            <div class="text-sm text-muted">DL: ${e.dl_number} ${e.dl_state ? '(' + e.dl_state + ')' : ''}</div>
-            <div class="text-sm" style="margin-top:4px;">${e.reason}</div>
-            <div class="text-sm text-muted" style="margin-top:4px;">Added: ${new Date(e.added_at).toLocaleDateString()} by ${e.added_by_name || 'Unknown'}</div>
-          </div>
-          <button class="btn btn-outline" style="min-height:32px;padding:4px 10px;font-size:11px;" onclick="removeWatchlist('${e.id}')">Remove</button>
-        </div>
-      </div>
-    `).join('');
-  } catch (e) {
-    list.innerHTML = '<div class="text-center" style="color:var(--red);">Error loading watchlist</div>';
-  }
-}
-
-function showWatchlistAdd() {
-  const form = document.getElementById('watchlist-add-form');
-  form.style.display = form.style.display === 'none' ? '' : 'none';
+    var entries = await api('GET', '/watchlist');
+    if (entries.length === 0) { list.innerHTML = '<div class="text-center text-muted" style="padding:32px;">No watchlist entries</div>'; return; }
+    list.innerHTML = entries.map(function(e) {
+      return '<div class="card" style="border-left:3px solid var(--' + (e.severity === 'RED' ? 'red' : 'yellow') + ');">' +
+        '<div style="display:flex;justify-content:space-between;align-items:start;"><div>' +
+        '<div style="font-weight:700;">' + (e.first_name || '?') + ' ' + (e.last_name || 'Unknown') + '</div>' +
+        '<div class="text-sm text-muted">DL: ' + e.dl_number + (e.dl_state ? ' (' + e.dl_state + ')' : '') + '</div>' +
+        '<div class="text-sm" style="margin-top:4px;">' + e.reason + '</div>' +
+        '<div class="text-sm text-muted" style="margin-top:4px;">Added: ' + new Date(e.added_at).toLocaleDateString() + ' by ' + (e.added_by_name || 'Unknown') + '</div></div>' +
+        '<button class="btn btn-outline wl-remove-btn" style="min-height:32px;padding:4px 10px;font-size:11px;" data-id="' + e.id + '">Remove</button></div></div>';
+    }).join('');
+    list.querySelectorAll('.wl-remove-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() { removeWatchlist(btn.getAttribute('data-id')); });
+    });
+  } catch (e) { list.innerHTML = '<div class="text-center" style="color:var(--red);">Error loading watchlist</div>'; }
 }
 
 async function addToWatchlist() {
-  const dl = document.getElementById('w-dl').value.trim();
-  const reason = document.getElementById('w-reason').value.trim();
+  var dl = document.getElementById('w-dl').value.trim();
+  var reason = document.getElementById('w-reason').value.trim();
   if (!dl || !reason) { showToast('DL number and reason required', 'error'); return; }
-  
   try {
-    await api('POST', '/watchlist', {
-      dl_number: dl,
-      first_name: document.getElementById('w-first').value,
-      last_name: document.getElementById('w-last').value,
-      reason,
-      severity: document.getElementById('w-severity').value
-    });
+    await api('POST', '/watchlist', { dl_number: dl, first_name: document.getElementById('w-first').value, last_name: document.getElementById('w-last').value, reason: reason, severity: document.getElementById('w-severity').value });
     showToast('Added to watchlist', 'success');
     loadWatchlist();
-  } catch (e) {
-    showToast('Error adding to watchlist', 'error');
-  }
+  } catch (e) { showToast('Error adding to watchlist', 'error'); }
 }
 
 async function removeWatchlist(id) {
   if (!confirm('Remove from watchlist?')) return;
-  await api('DELETE', `/watchlist/${id}`);
+  await api('DELETE', '/watchlist/' + id);
   showToast('Removed', 'success');
   loadWatchlist();
 }
@@ -1194,95 +982,69 @@ async function removeWatchlist(id) {
 // ═══════════════════════════════════════════════════════════
 async function loadDashboard() {
   showScreen('dashboard-screen');
-  const content = document.getElementById('dashboard-content');
+  var content = document.getElementById('dashboard-content');
   content.innerHTML = '<div class="text-center text-muted">Loading...</div>';
-  
   try {
-    const d = await api('GET', '/dashboard/stats');
-    
-    const alertMap = {};
-    (d.byAlert || []).forEach(a => alertMap[a.alert_level] = a.cnt);
-    
-    content.innerHTML = `
-      <div class="stats-grid">
-        <div class="card big-stat"><div class="big-stat-num">${d.today}</div><div class="stat-label">Today</div></div>
-        <div class="card big-stat"><div class="big-stat-num">${d.week}</div><div class="stat-label">This Week</div></div>
-        <div class="card big-stat"><div class="big-stat-num" style="color:var(--red)">${alertMap.RED || 0}</div><div class="stat-label">Red Alerts (7d)</div></div>
-        <div class="card big-stat"><div class="big-stat-num" style="color:var(--yellow)">${alertMap.YELLOW || 0}</div><div class="stat-label">Elevated (7d)</div></div>
-      </div>
-      
-      ${d.recentRed && d.recentRed.length > 0 ? `
-        <div style="font-weight:700;margin-bottom:8px;">Recent Red Alerts</div>
-        ${d.recentRed.map(s => `
-          <div class="scan-item" onclick="showScanDetail('${s.id}')">
-            <span class="alert-dot RED"></span>
-            <div class="scan-item-info">
-              <div class="scan-item-name">${s.first_name || '?'} ${s.last_name || 'Unknown'}</div>
-              <div class="scan-item-detail">${s.site_name || ''} &bull; Score: ${s.risk_score}</div>
-            </div>
-            <div class="scan-item-time">${timeAgo(s.scan_timestamp)}</div>
-          </div>
-        `).join('')}
-      ` : ''}
-      
-      ${d.topDrivers && d.topDrivers.length > 0 ? `
-        <div style="font-weight:700;margin:16px 0 8px;">Most Scanned Drivers (30d)</div>
-        ${d.topDrivers.map(t => `
-          <div class="card" style="padding:12px;display:flex;justify-content:space-between;align-items:center;">
-            <div>
-              <div style="font-weight:600;">${t.first_name || '?'} ${t.last_name || 'Unknown'}</div>
-              <div class="text-sm text-muted">DL: ${t.dl_number}</div>
-            </div>
-            <div style="text-align:right;">
-              <div style="font-size:20px;font-weight:800;">${t.scan_count}</div>
-              <div class="text-sm text-muted">scans</div>
-            </div>
-          </div>
-        `).join('')}
-      ` : ''}
-      
-      ${d.bySite && d.bySite.length > 0 ? `
-        <div style="font-weight:700;margin:16px 0 8px;">Scans by Site (7d)</div>
-        ${d.bySite.map(s => `
-          <div class="card" style="padding:12px;display:flex;justify-content:space-between;">
-            <span>${s.site_name}</span>
-            <span style="font-weight:700;">${s.cnt}</span>
-          </div>
-        `).join('')}
-      ` : ''}
-      
-      <div class="card text-sm text-muted" style="margin-top:16px;">
-        Watchlist entries: ${d.watchlistCount} &bull; Monthly scans: ${d.month}
-      </div>
-    `;
-  } catch (e) {
-    content.innerHTML = '<div class="text-center" style="color:var(--red);">Error loading dashboard</div>';
-  }
+    var d = await api('GET', '/dashboard/stats');
+    var alertMap = {};
+    (d.byAlert || []).forEach(function(a) { alertMap[a.alert_level] = a.cnt; });
+    content.innerHTML =
+      '<div class="stats-grid">' +
+      '<div class="card big-stat"><div class="big-stat-num">' + d.today + '</div><div class="stat-label">Today</div></div>' +
+      '<div class="card big-stat"><div class="big-stat-num">' + d.week + '</div><div class="stat-label">This Week</div></div>' +
+      '<div class="card big-stat"><div class="big-stat-num" style="color:var(--red)">' + (alertMap.RED || 0) + '</div><div class="stat-label">Red Alerts (7d)</div></div>' +
+      '<div class="card big-stat"><div class="big-stat-num" style="color:var(--yellow)">' + (alertMap.YELLOW || 0) + '</div><div class="stat-label">Elevated (7d)</div></div></div>' +
+      '<div class="card text-sm text-muted">Watchlist entries: ' + d.watchlistCount + ' | Monthly scans: ' + d.month + '</div>';
+  } catch (e) { content.innerHTML = '<div class="text-center" style="color:var(--red);">Error loading dashboard</div>'; }
 }
 
 function exportCSV() {
-  window.open(`/api/export/scans?token=${token}`, '_blank');
-  // Note: auth via query param won't work with current auth middleware
-  // Alternative: fetch and download
-  fetch('/api/export/scans', { headers: { 'Authorization': `Bearer ${token}` } })
-    .then(r => r.blob())
-    .then(blob => {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
+  fetch('/api/export/scans', { headers: { 'Authorization': 'Bearer ' + token } })
+    .then(function(r) { return r.blob(); })
+    .then(function(blob) {
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
       a.href = url;
-      a.download = `shield_export_${new Date().toISOString().slice(0,10)}.csv`;
+      a.download = 'shield_export_' + new Date().toISOString().slice(0,10) + '.csv';
       a.click();
       URL.revokeObjectURL(url);
     })
-    .catch(e => showToast('Export error', 'error'));
+    .catch(function() { showToast('Export error', 'error'); });
 }
 
 // ═══════════════════════════════════════════════════════════
-// PWA
+// EVENT LISTENERS (no inline onclick - avoids CSP issues)
 // ═══════════════════════════════════════════════════════════
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js').catch(() => {});
-}
+document.getElementById('login-btn').addEventListener('click', doLogin);
+document.getElementById('login-pass').addEventListener('keydown', function(e) { if (e.key === 'Enter') doLogin(); });
+document.getElementById('login-user').addEventListener('keydown', function(e) { if (e.key === 'Enter') document.getElementById('login-pass').focus(); });
+document.getElementById('logout-btn').addEventListener('click', doLogout);
+document.getElementById('scan-btn').addEventListener('click', startScanner);
+document.getElementById('manual-btn').addEventListener('click', function() { showScreen('manual-screen'); });
+document.getElementById('recent-btn').addEventListener('click', loadRecentScans);
+document.getElementById('watchlist-btn').addEventListener('click', loadWatchlist);
+document.getElementById('admin-btn').addEventListener('click', loadDashboard);
+document.getElementById('confirm-cancel-btn').addEventListener('click', function() { showScreen('home-screen'); });
+document.getElementById('rescan-btn').addEventListener('click', startScanner);
+document.getElementById('confirm-btn').addEventListener('click', function() { showScreen('details-screen'); });
+document.getElementById('details-back-btn').addEventListener('click', function() { showScreen('confirm-screen'); });
+document.getElementById('photo-dl-btn').addEventListener('click', function() { capturePhoto('dl'); });
+document.getElementById('photo-bol-btn').addEventListener('click', function() { capturePhoto('bol'); });
+document.getElementById('photo-truck-btn').addEventListener('click', function() { capturePhoto('truck'); });
+document.getElementById('submit-scan-btn').addEventListener('click', submitScan);
+document.getElementById('submit-manual-btn').addEventListener('click', submitManual);
+document.getElementById('complete-btn').addEventListener('click', resetToHome);
+document.getElementById('manual-back-btn').addEventListener('click', function() { showScreen('home-screen'); });
+document.getElementById('scans-back-btn').addEventListener('click', function() { showScreen('home-screen'); });
+document.getElementById('detail-back-btn').addEventListener('click', function() { showScreen('scans-screen'); });
+document.getElementById('wl-back-btn').addEventListener('click', function() { showScreen('home-screen'); });
+document.getElementById('wl-add-toggle').addEventListener('click', function() { var f = document.getElementById('watchlist-add-form'); f.style.display = f.style.display === 'none' ? '' : 'none'; });
+document.getElementById('wl-add-submit').addEventListener('click', addToWatchlist);
+document.getElementById('dash-back-btn').addEventListener('click', function() { showScreen('home-screen'); });
+document.getElementById('export-btn').addEventListener('click', exportCSV);
+document.getElementById('camera-cancel-btn').addEventListener('click', cancelCamera);
 </script>
+<!-- Load html5-qrcode for client-side barcode scanning from photos -->
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 </body>
 </html>
