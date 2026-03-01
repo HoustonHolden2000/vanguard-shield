@@ -50,8 +50,14 @@ if (decodeEngine === 'none') {
 }
 
 // ═══════════════════════════════════════════════════════════
-// decodePdf417FromFile(filePath) — CLEAN ABSTRACTION
-// Tries Dynamsoft first, then ZXing with multiple variants.
+// decodePdf417FromFile(filePath) — SINGLE DECODE ENTRY POINT
+// This is the ONE function the rest of the app calls to decode
+// a driver license barcode. To swap engines (e.g. Google ML Kit,
+// Dynamsoft, or a future native SDK), change only this function.
+// The front end and endpoint never touch barcode logic directly.
+//
+// Tries Dynamsoft first, then ZXing with multiple preprocessing
+// variants. Only attempts PDF417 (the US DL standard).
 // Returns: { text, engine, format, debugLog[] } or null
 // ═══════════════════════════════════════════════════════════
 async function decodePdf417FromFile(filePath) {
@@ -617,7 +623,7 @@ app.post('/api/decode-dl', authenticateToken, upload.single('dlImage'), async (r
     if (!decodeResult || !decodeResult.text) {
       return res.json({
         success: false,
-        error: 'Could not read barcode. Try again with better lighting or hold the camera closer.',
+        error: 'Could not read barcode. Conditions here are tough \u2013 please type the details from the card.',
         debug: {
           engine_attempted: decodeEngine,
           raw_barcode_text: null,

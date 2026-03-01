@@ -157,6 +157,25 @@ label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); 
 
 /* PREVIEW IMAGE */
 #scan-preview { max-width: 100%; max-height: 200px; border-radius: var(--radius); margin: 12px auto; display: none; border: 2px solid var(--border); }
+
+/* SCAN GUIDANCE OVERLAY */
+#scan-guidance { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.92); z-index:150; flex-direction:column; align-items:center; justify-content:center; padding:32px; text-align:center; gap:24px; }
+#scan-guidance.active { display:flex; }
+#scan-guidance .guidance-icon { font-size:64px; }
+#scan-guidance .guidance-text { font-size:18px; font-weight:500; line-height:1.6; max-width:320px; color:var(--text); }
+#scan-guidance .guidance-tip { font-size:13px; color:var(--text2); max-width:280px; }
+
+/* PASSWORD TOGGLE */
+.password-wrap { position:relative; }
+.password-wrap input { padding-right:52px; }
+.pw-toggle { position:absolute; right:4px; top:50%; transform:translateY(-50%); width:44px; height:44px; background:none; border:none; color:var(--text2); cursor:pointer; display:flex; align-items:center; justify-content:center; border-radius:var(--radius-sm); }
+.pw-toggle:active { background:rgba(255,255,255,0.1); }
+.pw-toggle svg { width:24px; height:24px; }
+
+/* EDITABLE CONFIRM FIELDS */
+.dl-edit { width:100%; background:transparent; border:none; color:var(--text); font-family:inherit; font-size:15px; font-weight:600; padding:0; outline:none; }
+.dl-edit::placeholder { color:var(--text3); font-weight:400; }
+.dl-name .dl-edit { font-size:20px; font-weight:800; }
 </style>
 </head>
 <body>
@@ -171,8 +190,17 @@ label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); 
   <div id="processing-sub">Hold on, decoding your license photo</div>
 </div>
 
-<!-- HIDDEN FILE INPUT - THIS IS THE KEY CHANGE -->
+<!-- HIDDEN FILE INPUT -->
 <input type="file" id="dl-photo-input" accept="image/*" capture="environment" style="display:none">
+
+<!-- SCAN GUIDANCE OVERLAY -->
+<div id="scan-guidance">
+  <div class="guidance-icon">&#128247;</div>
+  <div class="guidance-text">Fill the screen with just the barcode.<br>Hold steady until it's sharp, then tap the shutter.</div>
+  <div class="guidance-tip">Point at the barcode on the BACK of the license</div>
+  <button class="btn btn-primary btn-full btn-lg" id="guidance-open-btn" style="max-width:320px;">OPEN CAMERA</button>
+  <button class="btn btn-outline" id="guidance-cancel-btn" style="max-width:320px;">Cancel</button>
+</div>
 
 <!-- CAMERA OVERLAY (for evidence photos only) -->
 <div id="camera-overlay">
@@ -201,7 +229,12 @@ label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); 
     </div>
     <div class="form-group">
       <label>Password</label>
-      <input type="password" id="login-pass" placeholder="Enter password" autocomplete="current-password">
+      <div class="password-wrap">
+        <input type="password" id="login-pass" placeholder="Enter password" autocomplete="current-password">
+        <button type="button" class="pw-toggle" aria-label="Show password">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+        </button>
+      </div>
     </div>
     <button class="btn btn-primary btn-full btn-lg" id="login-btn">SIGN IN</button>
     <div class="login-footer">Vanguard Security &copy; 2026 &mdash; All Rights Reserved</div>
@@ -548,6 +581,12 @@ function startScanner() {
   capturedPhotos = { dl: null, bol: null, truck: null };
   document.getElementById('scan-status').style.display = 'none';
   document.getElementById('decode-debug').style.display = 'none';
+  // Show guidance overlay before opening camera
+  document.getElementById('scan-guidance').classList.add('active');
+}
+
+function openCameraAfterGuidance() {
+  document.getElementById('scan-guidance').classList.remove('active');
   document.getElementById('dl-photo-input').click();
 }
 
@@ -556,8 +595,24 @@ document.getElementById('dl-photo-input').addEventListener('change', async funct
   if (!file) return;
   e.target.value = '';
 
-  showProcessing('Reading barcode...', 'Sending photo to server for decode');
+  // Check image dimensions before uploading
   var previewUrl = URL.createObjectURL(file);
+  try {
+    var imgDims = await new Promise(function(resolve, reject) {
+      var img = new Image();
+      img.onload = function() { resolve({ w: img.naturalWidth, h: img.naturalHeight }); };
+      img.onerror = function() { reject(new Error('Could not read image')); };
+      img.src = previewUrl;
+    });
+    if (imgDims.w < 800 && imgDims.h < 800) {
+      showToast('Photo is too small (' + imgDims.w + 'x' + imgDims.h + '). Please retake closer to the barcode.', 'warning');
+      return;
+    }
+  } catch (dimErr) {
+    // Can't check dims — proceed anyway
+  }
+
+  showProcessing('Reading barcode...', 'Sending photo to server for decode');
 
   try {
     // Upload photo directly to server (file upload, not base64)
@@ -619,9 +674,8 @@ document.getElementById('dl-photo-input').addEventListener('change', async funct
       return;
     }
 
-    // Decode failed — show photo + offer manual entry or retry
+    // Decode failed — show photo + editable fields for manual entry
     hideProcessing();
-    showToast(result.error || 'Could not read barcode', 'warning');
     currentScanData = {};
     showConfirmScreen({}, previewUrl);
 
@@ -632,7 +686,7 @@ document.getElementById('dl-photo-input').addEventListener('change', async funct
     statusDiv.innerHTML = '<strong>Server said: FAILED</strong> &ndash; ' + (result.error || 'unknown error') + '<br>' +
       '<span style="font-size:12px;color:#555;">Engine debug: ' + logLines + '</span>';
 
-    showToast('Fill in the details from the photo above, or tap RE-SCAN', 'info');
+    showToast('Could not read barcode. Conditions here are tough \u2013 please type the details from the card.', 'warning');
 
   } catch (err) {
     hideProcessing();
@@ -699,25 +753,63 @@ function parsePDF417(raw) {
 // ═══════════════════════════════════════════════════════════
 function showConfirmScreen(data, previewUrl) {
   showScreen('confirm-screen');
-  
+
   // Show photo preview if available
   var preview = document.getElementById('scan-preview');
   if (previewUrl) { preview.src = previewUrl; preview.style.display = 'block'; }
   else { preview.style.display = 'none'; }
-  
+
   var c = document.getElementById('dl-fields');
   var isExpired = data.expiration_date && new Date(data.expiration_date) < new Date();
   var expClass = isExpired ? 'dl-expired' : (data.expiration_date ? 'dl-valid' : '');
-  
-  c.innerHTML = '<div class="dl-field dl-name"><div class="dl-field-label">Name</div>' +
-    '<div class="dl-field-value">' + (data.first_name || '?') + ' ' + (data.middle_name || '') + ' ' + (data.last_name || '?') + '</div></div>' +
-    '<div class="dl-field"><div class="dl-field-label">DL Number</div><div class="dl-field-value">' + (data.dl_number || 'NOT READ') + '</div></div>' +
-    '<div class="dl-field"><div class="dl-field-label">State</div><div class="dl-field-value">' + (data.dl_state || data.address_state || '?') + '</div></div>' +
-    '<div class="dl-field"><div class="dl-field-label">Date of Birth</div><div class="dl-field-value">' + (data.date_of_birth || '?') + '</div></div>' +
-    '<div class="dl-field ' + expClass + '"><div class="dl-field-label">Expiration ' + (isExpired ? '&#9888; EXPIRED' : (data.expiration_date ? '&#10003; Valid' : '')) + '</div><div class="dl-field-value">' + (data.expiration_date || '?') + '</div></div>' +
-    '<div class="dl-field" style="grid-column:1/-1;"><div class="dl-field-label">Address</div><div class="dl-field-value">' + (data.address_street || '') + ' ' + (data.address_city || '') + ', ' + (data.address_state || '') + ' ' + (data.address_zip || '') + '</div></div>' +
-    '<div class="dl-field"><div class="dl-field-label">Gender</div><div class="dl-field-value">' + (data.gender || '?') + '</div></div>' +
-    '<div class="dl-field"><div class="dl-field-label">Eyes / Height</div><div class="dl-field-value">' + (data.eye_color || '?') + ' / ' + (data.height || '?') + '</div></div>';
+
+  // Editable inputs — guard can always correct or fill in fields
+  c.innerHTML =
+    '<div class="dl-field dl-name"><div class="dl-field-label">First Name</div>' +
+      '<input class="dl-edit" id="cf-first" value="' + (data.first_name || '') + '" placeholder="First name"></div>' +
+    '<div class="dl-field dl-name"><div class="dl-field-label">Last Name</div>' +
+      '<input class="dl-edit" id="cf-last" value="' + (data.last_name || '') + '" placeholder="Last name"></div>' +
+    '<div class="dl-field"><div class="dl-field-label">DL Number</div>' +
+      '<input class="dl-edit" id="cf-dl" value="' + (data.dl_number || '') + '" placeholder="DL number" autocapitalize="characters"></div>' +
+    '<div class="dl-field"><div class="dl-field-label">State</div>' +
+      '<input class="dl-edit" id="cf-state" value="' + (data.dl_state || data.address_state || '') + '" placeholder="State" maxlength="2" autocapitalize="characters"></div>' +
+    '<div class="dl-field"><div class="dl-field-label">Date of Birth</div>' +
+      '<input class="dl-edit" id="cf-dob" type="date" value="' + (data.date_of_birth || '') + '"></div>' +
+    '<div class="dl-field ' + expClass + '"><div class="dl-field-label">Expiration ' + (isExpired ? '&#9888; EXPIRED' : (data.expiration_date ? '&#10003; Valid' : '')) + '</div>' +
+      '<input class="dl-edit" id="cf-exp" type="date" value="' + (data.expiration_date || '') + '"></div>' +
+    '<div class="dl-field" style="grid-column:1/-1;"><div class="dl-field-label">Address</div>' +
+      '<input class="dl-edit" id="cf-addr" value="' + (data.address_street || '') + '" placeholder="Street address"></div>' +
+    '<div class="dl-field"><div class="dl-field-label">City</div>' +
+      '<input class="dl-edit" id="cf-city" value="' + (data.address_city || '') + '" placeholder="City"></div>' +
+    '<div class="dl-field"><div class="dl-field-label">Zip</div>' +
+      '<input class="dl-edit" id="cf-zip" value="' + (data.address_zip || '') + '" placeholder="Zip" inputmode="numeric"></div>' +
+    '<div class="dl-field"><div class="dl-field-label">Gender</div>' +
+      '<input class="dl-edit" id="cf-gender" value="' + (data.gender || '') + '" placeholder="M / F"></div>' +
+    '<div class="dl-field"><div class="dl-field-label">Eyes / Height</div>' +
+      '<input class="dl-edit" id="cf-eyes-ht" value="' + ((data.eye_color || '') + (data.eye_color && data.height ? ' / ' : '') + (data.height || '')) + '" placeholder="e.g. Brown / 6\'0&quot;"></div>';
+}
+
+// Read edited fields back into currentScanData before moving to details
+function readConfirmFields() {
+  currentScanData.first_name = (document.getElementById('cf-first').value || '').trim();
+  currentScanData.last_name = (document.getElementById('cf-last').value || '').trim();
+  currentScanData.dl_number = (document.getElementById('cf-dl').value || '').trim();
+  currentScanData.dl_state = (document.getElementById('cf-state').value || '').trim();
+  currentScanData.address_state = currentScanData.dl_state;
+  currentScanData.date_of_birth = (document.getElementById('cf-dob').value || '').trim();
+  currentScanData.expiration_date = (document.getElementById('cf-exp').value || '').trim();
+  currentScanData.address_street = (document.getElementById('cf-addr').value || '').trim();
+  currentScanData.address_city = (document.getElementById('cf-city').value || '').trim();
+  currentScanData.address_zip = (document.getElementById('cf-zip').value || '').trim();
+  currentScanData.gender = (document.getElementById('cf-gender').value || '').trim();
+  var eyesHt = (document.getElementById('cf-eyes-ht').value || '').trim();
+  if (eyesHt.indexOf('/') > -1) {
+    var parts = eyesHt.split('/');
+    currentScanData.eye_color = parts[0].trim();
+    currentScanData.height = parts[1].trim();
+  } else {
+    currentScanData.eye_color = eyesHt;
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1038,7 +1130,7 @@ document.getElementById('watchlist-btn').addEventListener('click', loadWatchlist
 document.getElementById('admin-btn').addEventListener('click', loadDashboard);
 document.getElementById('confirm-cancel-btn').addEventListener('click', function() { showScreen('home-screen'); });
 document.getElementById('rescan-btn').addEventListener('click', startScanner);
-document.getElementById('confirm-btn').addEventListener('click', function() { showScreen('details-screen'); });
+document.getElementById('confirm-btn').addEventListener('click', function() { readConfirmFields(); showScreen('details-screen'); });
 document.getElementById('details-back-btn').addEventListener('click', function() { showScreen('confirm-screen'); });
 document.getElementById('photo-dl-btn').addEventListener('click', function() { capturePhoto('dl'); });
 document.getElementById('photo-bol-btn').addEventListener('click', function() { capturePhoto('bol'); });
@@ -1055,8 +1147,25 @@ document.getElementById('wl-add-submit').addEventListener('click', addToWatchlis
 document.getElementById('dash-back-btn').addEventListener('click', function() { showScreen('home-screen'); });
 document.getElementById('export-btn').addEventListener('click', exportCSV);
 document.getElementById('camera-cancel-btn').addEventListener('click', cancelCamera);
+
+// Scan guidance overlay
+document.getElementById('guidance-open-btn').addEventListener('click', openCameraAfterGuidance);
+document.getElementById('guidance-cancel-btn').addEventListener('click', function() {
+  document.getElementById('scan-guidance').classList.remove('active');
+});
+
+// Password visibility toggle
+document.querySelectorAll('.pw-toggle').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    var input = btn.parentElement.querySelector('input');
+    var isHidden = input.type === 'password';
+    input.type = isHidden ? 'text' : 'password';
+    // Swap icon: eye-off (hidden) → eye-open (visible)
+    btn.innerHTML = isHidden
+      ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>'
+      : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+  });
+});
 </script>
-<!-- Load html5-qrcode for client-side barcode scanning from photos -->
-<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 </body>
 </html>
