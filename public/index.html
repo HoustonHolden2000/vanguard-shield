@@ -534,90 +534,64 @@ async function loadHomeStats() {
 }
 
 // ═══════════════════════════════════════════════════════════
-// SCANNER - PHOTO CAPTURE APPROACH
-// Uses native phone camera via <input type="file">
-// Then attempts to decode the barcode from the photo
+// SCANNER - PHOTO CAPTURE → SERVER DECODE
+// Native camera photo → upload to /api/decode-dl → show fields
+// No browser barcode libraries. Server does all decoding.
 // ═══════════════════════════════════════════════════════════
 function startScanner() {
   currentScanData = {};
   capturedPhotos = { dl: null, bol: null, truck: null };
-  // Trigger native camera
   document.getElementById('dl-photo-input').click();
 }
 
-// Handle the photo from the camera
 document.getElementById('dl-photo-input').addEventListener('change', async function(e) {
   var file = e.target.files[0];
   if (!file) return;
-  // Reset so same file can be picked again
   e.target.value = '';
 
-  showProcessing('Reading barcode...', 'Analyzing your license photo');
-
-  // Create preview URL for confirm screen
+  showProcessing('Reading barcode...', 'Sending photo to server for decode');
   var previewUrl = URL.createObjectURL(file);
 
   try {
-    // DECODE APPROACH: Try html5-qrcode scanFile first (client-side)
-    var decoded = null;
-    
-    if (typeof Html5Qrcode !== 'undefined') {
-      try {
-        var tempDiv = document.createElement('div');
-        tempDiv.id = 'scan-temp-' + Date.now();
-        tempDiv.style.display = 'none';
-        document.body.appendChild(tempDiv);
-        var scanner = new Html5Qrcode(tempDiv.id);
-        decoded = await scanner.scanFile(file, false);
-        tempDiv.remove();
-      } catch (scanErr) {
-        console.log('[SCAN] Client decode failed:', scanErr);
-      }
-    }
+    // Upload photo directly to server (file upload, not base64)
+    var formData = new FormData();
+    formData.append('dlImage', file);
 
-    if (decoded) {
-      // SUCCESS - barcode decoded client-side
-      console.log('[SCAN] Decoded client-side:', decoded.substring(0, 80));
+    var res = await fetch('/api/decode-dl', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token },
+      body: formData
+    });
+    var result = await res.json();
+
+    if (result.success && result.data) {
+      // Map server response fields → confirm screen fields
+      var d = result.data;
+      var mapped = {
+        first_name: d.first_name || '',
+        last_name: d.last_name || '',
+        middle_name: d.middle_name || '',
+        dl_number: d.dl_number || '',
+        dl_state: d.state || '',
+        address_state: d.state || '',
+        date_of_birth: d.dob || '',
+        expiration_date: d.expiration || '',
+        address_street: d.address || '',
+        address_city: d.city || '',
+        address_zip: d.postal_code || '',
+      };
+
       if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
       hideProcessing();
-      var parsed = parsePDF417(decoded);
-      currentScanData = parsed;
-      showConfirmScreen(parsed, previewUrl);
+      currentScanData = mapped;
+      showConfirmScreen(mapped, previewUrl);
       showToast('License scanned successfully!', 'success');
       return;
     }
 
-    // Client decode failed - try server-side
-    showProcessing('Trying enhanced decode...', 'Sending to server for analysis');
-    
-    try {
-      var reader = new FileReader();
-      var base64 = await new Promise(function(resolve, reject) {
-        reader.onload = function() { resolve(reader.result.split(',')[1]); };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-
-      var result = await api('POST', '/decode-dl', { image: base64 });
-      
-      if (result.success && result.fields) {
-        if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-        hideProcessing();
-        currentScanData = result.fields;
-        showConfirmScreen(result.fields, previewUrl);
-        showToast('License decoded by server!', 'success');
-        return;
-      }
-    } catch (serverErr) {
-      console.log('[SCAN] Server decode failed:', serverErr);
-    }
-
-    // BOTH FAILED - show photo + offer manual entry or retry
+    // Decode failed — show photo + offer manual entry or retry
     hideProcessing();
-    showToast('Could not read barcode automatically', 'warning');
-    
-    // Show confirm screen with empty fields + photo preview
-    // Guard can see the license photo and type the info manually
+    showToast(result.error || 'Could not read barcode', 'warning');
     currentScanData = {};
     showConfirmScreen({}, previewUrl);
     showToast('Fill in the details from the photo above, or tap RE-SCAN', 'info');
@@ -625,7 +599,7 @@ document.getElementById('dl-photo-input').addEventListener('change', async funct
   } catch (err) {
     hideProcessing();
     console.error('[SCAN] Error:', err);
-    showToast('Error processing photo: ' + (err.message || err), 'error');
+    showToast('Error processing photo. Check connection and try again.', 'error');
     showScreen('home-screen');
   }
 });
