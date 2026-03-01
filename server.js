@@ -51,66 +51,149 @@ if (decodeEngine === 'none') {
 
 // ═══════════════════════════════════════════════════════════
 // decodePdf417FromFile(filePath) — CLEAN ABSTRACTION
-// Tries Dynamsoft first, then ZXing. Returns raw string or null.
+// Tries Dynamsoft first, then ZXing with multiple variants.
+// Returns: { text, engine, format, debugLog[] } or null
 // ═══════════════════════════════════════════════════════════
 async function decodePdf417FromFile(filePath) {
+  const debugLog = [];
+  const flat = { background: { r: 255, g: 255, b: 255 } };
+
+  // Log input image info
+  try {
+    const meta = await sharp(filePath).metadata();
+    debugLog.push(`input: ${meta.width}x${meta.height} ${meta.format} ${meta.channels}ch ${meta.space || 'unknown'}`);
+    console.log(`[BARCODE] Input image: ${meta.width}x${meta.height} ${meta.format} ${meta.channels}ch`);
+  } catch (e) {
+    debugLog.push(`input metadata error: ${e.message}`);
+  }
+
   // --- DYNAMSOFT (primary) ---
   if (dbr) {
     try {
+      // Try PDF417 first
       const results = await new Promise((resolve, reject) => {
         dbr.decodeFileAsync(filePath, dbr.formats.PDF417, (err, results) => {
           if (err) return reject(err);
           resolve(results);
         });
       });
-      if (results && results.length > 0 && results[0].value && results[0].value.length > 20) {
-        console.log(`[BARCODE] Dynamsoft decoded: ${results[0].value.substring(0, 60)}...`);
-        return results[0].value;
+      console.log(`[BARCODE] Dynamsoft PDF417 results: ${results ? results.length : 0} barcode(s) found`);
+      debugLog.push(`dynamsoft_pdf417: ${results ? results.length : 0} result(s)`);
+
+      if (results && results.length > 0) {
+        for (let i = 0; i < results.length; i++) {
+          const r = results[i];
+          const fmt = r.format || r.barcodeFormatString || 'unknown';
+          const txt = r.value || r.barcodeText || '';
+          console.log(`[BARCODE]   result[${i}]: format=${fmt} len=${txt.length} text=${txt.substring(0, 80)}`);
+          debugLog.push(`  [${i}] format=${fmt} len=${txt.length} text=${txt.substring(0, 80)}`);
+        }
+        if (results[0].value && results[0].value.length > 20) {
+          return { text: results[0].value, engine: 'dynamsoft', format: 'PDF417', debugLog };
+        }
       }
-      console.log('[BARCODE] Dynamsoft: no PDF417 found in image');
+
+      // Try ALL formats to see if Dynamsoft finds anything else
+      const allResults = await new Promise((resolve, reject) => {
+        dbr.decodeFileAsync(filePath, dbr.formats.ALL, (err, results) => {
+          if (err) return reject(err);
+          resolve(results);
+        });
+      });
+      console.log(`[BARCODE] Dynamsoft ALL-FORMAT results: ${allResults ? allResults.length : 0} barcode(s) found`);
+      debugLog.push(`dynamsoft_all: ${allResults ? allResults.length : 0} result(s)`);
+      if (allResults && allResults.length > 0) {
+        for (let i = 0; i < allResults.length; i++) {
+          const r = allResults[i];
+          const fmt = r.format || r.barcodeFormatString || 'unknown';
+          const txt = r.value || r.barcodeText || '';
+          console.log(`[BARCODE]   all[${i}]: format=${fmt} len=${txt.length} text=${txt.substring(0, 80)}`);
+          debugLog.push(`  all[${i}] format=${fmt} len=${txt.length} text=${txt.substring(0, 80)}`);
+        }
+      }
     } catch (e) {
       console.error('[BARCODE] Dynamsoft decode error:', e.message);
+      debugLog.push(`dynamsoft_error: ${e.message}`);
     }
   }
 
-  // --- ZXING (fallback) ---
+  // --- ZXING ---
   if (ZXing) {
-    // Try multiple sharp preprocessing variants for best chance
+    // Variant pipeline: different sharp preprocessing for each attempt
     // .flatten() composites alpha onto white — critical for PNGs with transparency
-    const variants = [
-      // 1. Grayscale + normalize
-      () => sharp(filePath).flatten({ background: { r: 255, g: 255, b: 255 } }).resize(1600, null, { withoutEnlargement: true }).grayscale().normalize().raw().toBuffer({ resolveWithObject: true }),
-      // 2. Grayscale + sharpen
-      () => sharp(filePath).flatten({ background: { r: 255, g: 255, b: 255 } }).resize(1600, null, { withoutEnlargement: true }).grayscale().sharpen({ sigma: 2 }).normalize().raw().toBuffer({ resolveWithObject: true }),
-      // 3. High contrast + invert
-      () => sharp(filePath).flatten({ background: { r: 255, g: 255, b: 255 } }).resize(1600, null, { withoutEnlargement: true }).grayscale().linear(1.5, -30).negate().raw().toBuffer({ resolveWithObject: true }),
+    const variantDefs = [
+      { name: 'full-res+normalize',    fn: () => sharp(filePath).flatten(flat).grayscale().normalize().raw().toBuffer({ resolveWithObject: true }) },
+      { name: '1600w+normalize',       fn: () => sharp(filePath).flatten(flat).resize(1600, null, { withoutEnlargement: true }).grayscale().normalize().raw().toBuffer({ resolveWithObject: true }) },
+      { name: '2400w+normalize',       fn: () => sharp(filePath).flatten(flat).resize(2400, null, { withoutEnlargement: true }).grayscale().normalize().raw().toBuffer({ resolveWithObject: true }) },
+      { name: '1600w+sharpen',         fn: () => sharp(filePath).flatten(flat).resize(1600, null, { withoutEnlargement: true }).grayscale().sharpen({ sigma: 2 }).normalize().raw().toBuffer({ resolveWithObject: true }) },
+      { name: '1600w+highcontrast',    fn: () => sharp(filePath).flatten(flat).resize(1600, null, { withoutEnlargement: true }).grayscale().linear(1.5, -30).raw().toBuffer({ resolveWithObject: true }) },
+      { name: '1600w+threshold',       fn: () => sharp(filePath).flatten(flat).resize(1600, null, { withoutEnlargement: true }).grayscale().threshold(128).raw().toBuffer({ resolveWithObject: true }) },
+      { name: 'full-res+sharpen',      fn: () => sharp(filePath).flatten(flat).grayscale().sharpen({ sigma: 3 }).normalize().raw().toBuffer({ resolveWithObject: true }) },
+      { name: '1600w+rotate90',        fn: () => sharp(filePath).flatten(flat).rotate(90).resize(1600, null, { withoutEnlargement: true }).grayscale().normalize().raw().toBuffer({ resolveWithObject: true }) },
     ];
 
-    const hints = new Map();
-    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.PDF_417]);
-    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-    const reader = new ZXing.MultiFormatReader();
-    reader.setHints(hints);
+    // PDF417-only reader
+    const pdf417Hints = new Map();
+    pdf417Hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.PDF_417]);
+    pdf417Hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+    const pdf417Reader = new ZXing.MultiFormatReader();
+    pdf417Reader.setHints(pdf417Hints);
 
-    for (let i = 0; i < variants.length; i++) {
+    // Any-format reader (diagnostic)
+    const anyHints = new Map();
+    anyHints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+    const anyReader = new ZXing.MultiFormatReader();
+    anyReader.setHints(anyHints);
+
+    for (let i = 0; i < variantDefs.length; i++) {
+      const v = variantDefs[i];
       try {
-        const { data, info } = await variants[i]();
+        const { data, info } = await v.fn();
         const luminance = new Uint8ClampedArray(data);
         const source = new ZXing.RGBLuminanceSource(luminance, info.width, info.height);
-        const bitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(source));
-        const result = reader.decode(bitmap);
-        if (result && result.getText() && result.getText().length > 20) {
-          console.log(`[BARCODE] ZXing variant ${i + 1} decoded: ${result.getText().substring(0, 60)}...`);
-          return result.getText();
+
+        // Try PDF417 first
+        try {
+          const bitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(source));
+          const result = pdf417Reader.decode(bitmap);
+          if (result && result.getText()) {
+            const txt = result.getText();
+            const fmt = result.getBarcodeFormat ? result.getBarcodeFormat().toString() : 'PDF_417';
+            console.log(`[BARCODE] ZXing [${v.name}] PDF417 HIT: len=${txt.length} fmt=${fmt} text=${txt.substring(0, 80)}`);
+            debugLog.push(`zxing_${v.name}: PDF417 HIT len=${txt.length}`);
+            if (txt.length > 20) {
+              return { text: txt, engine: 'zxing', format: fmt, variant: v.name, debugLog };
+            }
+          }
+        } catch (e) {
+          // PDF417 not found in this variant
         }
+
+        // Try ANY format (diagnostic — find what ZXing CAN see)
+        try {
+          const source2 = new ZXing.RGBLuminanceSource(luminance, info.width, info.height);
+          const bitmap2 = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(source2));
+          const result2 = anyReader.decode(bitmap2);
+          if (result2 && result2.getText()) {
+            const txt = result2.getText();
+            const fmt = result2.getBarcodeFormat ? result2.getBarcodeFormat().toString() : 'unknown';
+            console.log(`[BARCODE] ZXing [${v.name}] ANY-FORMAT HIT: fmt=${fmt} len=${txt.length} text=${txt.substring(0, 80)}`);
+            debugLog.push(`zxing_${v.name}: ANY-HIT fmt=${fmt} len=${txt.length} text=${txt.substring(0, 60)}`);
+          }
+        } catch (e) {
+          // Nothing found at all in this variant
+        }
+
+        debugLog.push(`zxing_${v.name}: ${info.width}x${info.height} no_pdf417`);
       } catch (e) {
-        // Expected — variant didn't find a barcode
+        console.log(`[BARCODE] ZXing [${v.name}] sharp error: ${e.message}`);
+        debugLog.push(`zxing_${v.name}: sharp_error ${e.message}`);
       }
     }
     console.log('[BARCODE] ZXing: all variants failed');
   }
 
-  return null;
+  return { text: null, engine: 'none', format: null, debugLog };
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -417,6 +500,50 @@ app.post('/api/auth/verify', authenticateToken, (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════
+// DECODER INFO (debug route)
+// ═══════════════════════════════════════════════════════════
+app.get('/api/decoder-info', authenticateToken, (req, res) => {
+  const info = {
+    active_engine: decodeEngine,
+    dynamsoft: {
+      available: !!dbr,
+      license_set: !!process.env.DYNAMSOFT_LICENSE,
+      formats_pdf417: dbr ? !!dbr.formats.PDF417 : false,
+      formats_all: dbr ? Object.keys(dbr.formats || {}) : [],
+    },
+    zxing: {
+      available: !!ZXing,
+      pdf417_format_value: ZXing ? ZXing.BarcodeFormat.PDF_417 : null,
+      supported_formats: ZXing ? Object.keys(ZXing.BarcodeFormat).filter(k => !k.startsWith('_') && typeof ZXing.BarcodeFormat[k] === 'number') : [],
+      decode_hints: {
+        POSSIBLE_FORMATS: ['PDF_417'],
+        TRY_HARDER: true,
+      },
+    },
+    preprocessing: {
+      variants: [
+        'full-res+normalize (original resolution, no resize)',
+        '1600w+normalize (standard)',
+        '2400w+normalize (high-res)',
+        '1600w+sharpen (sigma=2)',
+        '1600w+highcontrast (linear 1.5x)',
+        '1600w+threshold (128)',
+        'full-res+sharpen (sigma=3)',
+        '1600w+rotate90',
+      ],
+      flatten_alpha: true,
+      jpeg_preprocess_quality: 95,
+    },
+    runtime: {
+      node_version: process.version,
+      platform: process.platform,
+      sharp_version: sharp.versions ? sharp.versions.sharp : 'unknown',
+    },
+  };
+  res.json(info);
+});
+
+// ═══════════════════════════════════════════════════════════
 // BARCODE DECODE ENDPOINT
 // Accepts: multipart file upload (field: "dlImage")
 //      or: JSON { image: "<base64>" }
@@ -446,20 +573,39 @@ app.post('/api/decode-dl', authenticateToken, upload.single('dlImage'), async (r
       .toFile(preprocessedPath);
 
     // Decode PDF417
-    const rawText = await decodePdf417FromFile(preprocessedPath);
+    const decodeResult = await decodePdf417FromFile(preprocessedPath);
 
     // Cleanup temp files
     try { fs.unlinkSync(tempPath); } catch (e) { /* */ }
     try { fs.unlinkSync(preprocessedPath); } catch (e) { /* */ }
 
-    if (!rawText) {
-      return res.json({ success: false, error: 'Could not read barcode. Try again with better lighting or hold the camera closer.' });
+    if (!decodeResult || !decodeResult.text) {
+      return res.json({
+        success: false,
+        error: 'Could not read barcode. Try again with better lighting or hold the camera closer.',
+        debug: {
+          engine_attempted: decodeEngine,
+          raw_barcode_text: null,
+          raw_barcode_format: null,
+          log: decodeResult ? decodeResult.debugLog : ['no decode result'],
+        }
+      });
     }
 
-    const parsed = parseAamva(rawText);
-    console.log(`[DECODE] Success (${decodeEngine}): ${parsed.first_name} ${parsed.last_name} DL:${parsed.dl_number}`);
+    const parsed = parseAamva(decodeResult.text);
+    console.log(`[DECODE] Success (${decodeResult.engine}): ${parsed.first_name} ${parsed.last_name} DL:${parsed.dl_number}`);
 
-    return res.json({ success: true, data: parsed, engine: decodeEngine });
+    return res.json({
+      success: true,
+      data: parsed,
+      engine: decodeResult.engine,
+      debug: {
+        raw_barcode_text: decodeResult.text,
+        raw_barcode_format: decodeResult.format,
+        variant_used: decodeResult.variant || null,
+        log: decodeResult.debugLog,
+      }
+    });
 
   } catch (err) {
     console.error('[DECODE ERROR]', err);
