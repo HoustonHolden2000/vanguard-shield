@@ -9,6 +9,10 @@ services:
         generateValue: true
       - key: NODE_ENV
         value: production
+      - key: DB_PATH
+        value: /data/shield.db
+      - key: PHOTO_DIR
+        value: /data/photos
     disk:
       name: shield-data
       mountPath: /data
