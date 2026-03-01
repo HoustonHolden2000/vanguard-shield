@@ -10,6 +10,7 @@ const helmet = require('helmet');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const ZXing = require('@zxing/library');
 
 // ═══════════════════════════════════════════════════════════
 // CONFIG
@@ -260,14 +261,14 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://unpkg.com"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
       scriptSrcAttr: ["'unsafe-inline'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "blob:"],
       mediaSrc: ["'self'", "blob:"],
-      connectSrc: ["'self'", "https://cdn.jsdelivr.net"],
-      workerSrc: ["'self'", "blob:", "https://cdn.jsdelivr.net"],
+      connectSrc: ["'self'"],
+      workerSrc: ["'self'", "blob:"],
     }
   }
 }));
@@ -537,6 +538,152 @@ app.get('/api/scans/driver/:dl_number', authenticateToken, (req, res) => {
     ORDER BY s.scan_timestamp DESC
   `).all(req.params.dl_number);
   res.json({ scans, total: scans.length });
+});
+
+// ═══════════════════════════════════════════════════════════
+// SERVER-SIDE BARCODE DECODE
+// ═══════════════════════════════════════════════════════════
+function parsePDF417Server(raw) {
+  const fields = {};
+  const map = {
+    'DCS': 'last_name', 'DAC': 'first_name', 'DCT': 'first_name',
+    'DAD': 'middle_name', 'DBB': 'date_of_birth', 'DBA': 'expiration_date',
+    'DAQ': 'dl_number', 'DAG': 'address_street', 'DAI': 'address_city',
+    'DAJ': 'address_state', 'DAK': 'address_zip', 'DBC': 'gender',
+    'DAY': 'eye_color', 'DAU': 'height', 'DAW': 'weight', 'DCG': 'dl_country',
+    'DCF': 'document_discriminator', 'DCA': 'dl_class', 'DCD': 'endorsements',
+    'DBD': 'issue_date',
+  };
+
+  const lines = raw.split(/[\n\r\x1e\x1d]+/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    for (const [code, field] of Object.entries(map)) {
+      if (trimmed.startsWith(code)) {
+        let val = trimmed.substring(code.length).trim();
+        if (field === 'first_name' && fields.first_name && trimmed.startsWith('DCT')) continue;
+        fields[field] = val;
+      }
+    }
+  }
+
+  const ansiMatch = raw.match(/\bDL(\w{2})/);
+  if (ansiMatch && !fields.address_state) {
+    fields.dl_state = ansiMatch[1];
+  }
+  if (fields.address_state) fields.dl_state = fields.address_state;
+
+  for (const df of ['date_of_birth', 'expiration_date', 'issue_date']) {
+    if (fields[df] && fields[df].length >= 8) {
+      const d = fields[df].replace(/[^0-9]/g, '');
+      if (d.length === 8) {
+        const first2 = parseInt(d.slice(0, 2));
+        if (first2 > 12) {
+          fields[df] = `${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}`;
+        } else {
+          fields[df] = `${d.slice(4,8)}-${d.slice(0,2)}-${d.slice(2,4)}`;
+        }
+      }
+    }
+  }
+
+  if (fields.gender === '1') fields.gender = 'M';
+  else if (fields.gender === '2') fields.gender = 'F';
+
+  if (fields.address_zip) fields.address_zip = fields.address_zip.substring(0, 5);
+
+  for (const nf of ['first_name', 'last_name', 'middle_name', 'address_city']) {
+    if (fields[nf]) fields[nf] = fields[nf].charAt(0).toUpperCase() + fields[nf].slice(1).toLowerCase();
+  }
+
+  return fields;
+}
+
+async function decodeBarcode(buffer) {
+  // Try multiple image preprocessing variants
+  const variants = [
+    // 1. Original grayscale
+    async () => {
+      const { data, info } = await sharp(buffer)
+        .resize(1600, null, { withoutEnlargement: true })
+        .grayscale()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      return { data, width: info.width, height: info.height };
+    },
+    // 2. Normalized + sharpened
+    async () => {
+      const { data, info } = await sharp(buffer)
+        .resize(1600, null, { withoutEnlargement: true })
+        .grayscale()
+        .normalize()
+        .sharpen({ sigma: 2 })
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      return { data, width: info.width, height: info.height };
+    },
+    // 3. Higher contrast + inverted
+    async () => {
+      const { data, info } = await sharp(buffer)
+        .resize(1600, null, { withoutEnlargement: true })
+        .grayscale()
+        .linear(1.5, -30)
+        .negate()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      return { data, width: info.width, height: info.height };
+    },
+  ];
+
+  const hints = new Map();
+  hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.PDF_417]);
+  hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+  const reader = new ZXing.MultiFormatReader();
+  reader.setHints(hints);
+
+  for (let i = 0; i < variants.length; i++) {
+    try {
+      const { data, width, height } = await variants[i]();
+      // Convert grayscale 1-channel to RGBLuminanceSource (expects width*height luminance bytes)
+      const luminance = new Uint8ClampedArray(data);
+      const source = new ZXing.RGBLuminanceSource(luminance, width, height);
+      const bitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(source));
+      const result = reader.decode(bitmap);
+      if (result && result.getText() && result.getText().length > 20) {
+        console.log(`[BARCODE] Decoded on variant ${i + 1}: ${result.getText().substring(0, 60)}...`);
+        return result.getText();
+      }
+    } catch (e) {
+      console.log(`[BARCODE] Variant ${i + 1} failed: ${e.message || e}`);
+    }
+  }
+  return null;
+}
+
+app.post('/api/barcode/decode', authenticateToken, upload.single('photo'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'No photo uploaded' });
+    }
+
+    const fileBuffer = fs.readFileSync(req.file.path);
+    // Clean up temp file
+    try { fs.unlinkSync(req.file.path); } catch (e) { /* */ }
+
+    const decoded = await decodeBarcode(fileBuffer);
+
+    if (!decoded) {
+      return res.json({ success: false, error: 'Could not read barcode from photo. Try again with better lighting or closer to the barcode.' });
+    }
+
+    const fields = parsePDF417Server(decoded);
+    console.log(`[BARCODE] Parsed fields: ${fields.first_name || '?'} ${fields.last_name || '?'} DL:${fields.dl_number || 'N/A'}`);
+
+    res.json({ success: true, fields });
+  } catch (err) {
+    console.error('[BARCODE ERROR]', err);
+    res.status(500).json({ success: false, error: 'Server error decoding barcode' });
+  }
 });
 
 // ═══════════════════════════════════════════════════════════
