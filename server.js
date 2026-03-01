@@ -76,13 +76,14 @@ async function decodePdf417FromFile(filePath) {
   // --- ZXING (fallback) ---
   if (ZXing) {
     // Try multiple sharp preprocessing variants for best chance
+    // .flatten() composites alpha onto white — critical for PNGs with transparency
     const variants = [
       // 1. Grayscale + normalize
-      () => sharp(filePath).resize(1600, null, { withoutEnlargement: true }).grayscale().normalize().raw().toBuffer({ resolveWithObject: true }),
+      () => sharp(filePath).flatten({ background: { r: 255, g: 255, b: 255 } }).resize(1600, null, { withoutEnlargement: true }).grayscale().normalize().raw().toBuffer({ resolveWithObject: true }),
       // 2. Grayscale + sharpen
-      () => sharp(filePath).resize(1600, null, { withoutEnlargement: true }).grayscale().sharpen({ sigma: 2 }).normalize().raw().toBuffer({ resolveWithObject: true }),
+      () => sharp(filePath).flatten({ background: { r: 255, g: 255, b: 255 } }).resize(1600, null, { withoutEnlargement: true }).grayscale().sharpen({ sigma: 2 }).normalize().raw().toBuffer({ resolveWithObject: true }),
       // 3. High contrast + invert
-      () => sharp(filePath).resize(1600, null, { withoutEnlargement: true }).grayscale().linear(1.5, -30).negate().raw().toBuffer({ resolveWithObject: true }),
+      () => sharp(filePath).flatten({ background: { r: 255, g: 255, b: 255 } }).resize(1600, null, { withoutEnlargement: true }).grayscale().linear(1.5, -30).negate().raw().toBuffer({ resolveWithObject: true }),
     ];
 
     const hints = new Map();
