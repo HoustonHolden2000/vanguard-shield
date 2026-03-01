@@ -98,20 +98,7 @@ label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); 
 .dl-valid { border-color: var(--green); background: rgba(0,200,83,0.08); }
 .dl-valid .dl-field-value { color: var(--green); }
 
-/* RISK GAUGE */
-.risk-display { text-align: center; padding: 32px 0; }
-.risk-gauge { position: relative; width: 180px; height: 180px; margin: 0 auto 16px; }
-.risk-gauge svg { width: 180px; height: 180px; transform: rotate(-90deg); }
-.risk-gauge circle { fill: none; stroke-width: 10; stroke-linecap: round; }
-.risk-gauge .bg { stroke: var(--border); }
-.risk-gauge .fill { transition: stroke-dashoffset 1s ease-out; }
-.risk-gauge .fill.GREEN { stroke: var(--green); }
-.risk-gauge .fill.YELLOW { stroke: var(--yellow); }
-.risk-gauge .fill.RED { stroke: var(--red); animation: pulse-gauge 1.5s infinite; }
-@keyframes pulse-gauge { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
-.risk-score-num { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 48px; font-weight: 800; }
-.risk-label { font-size: 18px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; }
-.risk-flags { margin-top: 16px; text-align: left; }
+/* RISK (legacy — kept for scan detail view) */
 .risk-flag { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: #111; border: 1px solid var(--border); border-radius: var(--radius-sm); margin-bottom: 6px; font-size: 13px; }
 
 /* SCAN LIST */
@@ -176,6 +163,17 @@ label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); 
 .dl-edit { width:100%; background:transparent; border:none; color:var(--text); font-family:inherit; font-size:15px; font-weight:600; padding:0; outline:none; }
 .dl-edit::placeholder { color:var(--text3); font-weight:400; }
 .dl-name .dl-edit { font-size:20px; font-weight:800; }
+
+/* FULL-SCREEN RESULT */
+#result-screen { overflow: hidden; }
+#result-bg { color: #fff; }
+#result-bg.GREEN { background: linear-gradient(160deg, #00894e 0%, #00C853 50%, #69F0AE 100%); }
+#result-bg.YELLOW { background: linear-gradient(160deg, #e6a800 0%, #FFD600 50%, #FFF176 100%); color: #1a1a1a; }
+#result-bg.RED { background: linear-gradient(160deg, #b71c1c 0%, #FF1744 50%, #ff5252 100%); }
+#result-bg.YELLOW .topbar-title { color: #1a1a1a; }
+.reason-item { display:flex; align-items:center; gap:8px; padding:8px 12px; background:rgba(255,255,255,0.15); border-radius:6px; margin-bottom:6px; font-size:13px; font-weight:500; }
+.reason-item.positive { background:rgba(255,255,255,0.1); }
+.reason-item.negative { background:rgba(0,0,0,0.15); }
 </style>
 </head>
 <body>
@@ -293,52 +291,50 @@ label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); 
   </div>
 </div>
 
-<!-- ADDITIONAL DETAILS -->
-<div id="details-screen" class="screen">
+<!-- BOL VERIFICATION (Phase 2) -->
+<div id="bol-screen" class="screen">
   <div class="topbar">
-    <button class="topbar-back" id="details-back-btn">&larr; Back</button>
-    <div class="topbar-title">Carrier &amp; Load</div>
+    <button class="topbar-back" id="bol-back-btn">&larr; Back</button>
+    <div class="topbar-title">Verify BOL</div>
     <div></div>
   </div>
   <div class="content">
-    <div class="form-group"><label>Carrier Name</label><input type="text" id="d-carrier" placeholder="e.g. Swift Transport"></div>
-    <div class="grid-2">
-      <div class="form-group"><label>MC #</label><input type="text" id="d-mc" placeholder="MC Number" inputmode="numeric"></div>
-      <div class="form-group"><label>DOT #</label><input type="text" id="d-dot" placeholder="DOT Number" inputmode="numeric"></div>
+    <div style="text-align:center;margin-bottom:16px;">
+      <div style="font-size:13px;color:var(--text2);margin-bottom:8px;">Capture or enter the Bill of Lading details</div>
     </div>
+    <button class="photo-capture-btn mb-16" id="photo-bol-btn" style="min-height:64px;font-size:16px;font-weight:600;">&#128247; TAKE BOL PHOTO</button>
+    <div class="form-group"><label>BOL Number</label><input type="text" id="d-bol" placeholder="e.g. BOL-2026-001" autocapitalize="characters"></div>
+    <div class="form-group"><label>Carrier Name</label><input type="text" id="d-carrier" placeholder="e.g. Swift Transport"></div>
+    <div class="form-group"><label>Pickup Reference</label><input type="text" id="d-pickup-ref" placeholder="e.g. PU-5521" autocapitalize="characters"></div>
+    <div class="form-group"><label>Destination</label><input type="text" id="d-destination" placeholder="e.g. Nashville, TN"></div>
+    <div class="form-group"><label>Scheduled Pickup</label><input type="date" id="d-sched-pickup"></div>
+    <hr style="border-color:var(--border);margin:16px 0;">
     <div class="grid-2">
       <div class="form-group"><label>Truck Plate</label><input type="text" id="d-plate" placeholder="License plate" autocapitalize="characters"></div>
       <div class="form-group"><label>Trailer #</label><input type="text" id="d-trailer" placeholder="Trailer number"></div>
     </div>
-    <div class="form-group"><label>BOL / PO Number</label><input type="text" id="d-bol" placeholder="Bill of Lading or PO#"></div>
     <div class="form-group"><label>Notes</label><input type="text" id="d-notes" placeholder="Any additional notes"></div>
-    <label style="margin-bottom:8px;">Photo Evidence</label>
+    <label style="margin-bottom:8px;">Additional Photos</label>
     <div class="grid-2 mb-16">
       <button class="photo-capture-btn" id="photo-dl-btn">&#128247; DL Photo</button>
-      <button class="photo-capture-btn" id="photo-bol-btn">&#128247; BOL Photo</button>
+      <button class="photo-capture-btn" id="photo-truck-btn">&#128247; Truck Photo</button>
     </div>
-    <button class="photo-capture-btn mb-16" id="photo-truck-btn" style="width:100%;">&#128247; Truck / Plate Photo</button>
-    <button class="btn btn-green btn-full btn-lg" id="submit-scan-btn">SUBMIT SCAN</button>
+    <button class="btn btn-green btn-full btn-lg" id="submit-scan-btn">SUBMIT &amp; SCORE</button>
   </div>
 </div>
 
-<!-- RISK RESULT -->
+<!-- SCORING RESULT (Phase 2 — full screen) -->
 <div id="result-screen" class="screen">
-  <div class="topbar"><div></div><div class="topbar-title">Scan Result</div><div></div></div>
-  <div class="content">
-    <div class="risk-display">
-      <div class="risk-gauge">
-        <svg viewBox="0 0 120 120">
-          <circle class="bg" cx="60" cy="60" r="50"/>
-          <circle class="fill" id="risk-circle" cx="60" cy="60" r="50" stroke-dasharray="314" stroke-dashoffset="314"/>
-        </svg>
-        <div class="risk-score-num" id="risk-score-num">0</div>
-      </div>
-      <div class="risk-label" id="risk-label">ASSESSING...</div>
+  <div id="result-bg" style="display:flex;flex-direction:column;height:100vh;transition:background 0.5s;">
+    <div class="topbar" style="background:transparent;border:none;"><div></div><div class="topbar-title" style="color:inherit;">Scan Result</div><div></div></div>
+    <div class="content" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;">
+      <div id="result-icon" style="font-size:80px;margin-bottom:8px;"></div>
+      <div id="risk-score-num" style="font-size:72px;font-weight:800;line-height:1;"></div>
+      <div id="risk-label" style="font-size:22px;font-weight:700;text-transform:uppercase;letter-spacing:3px;margin-top:8px;"></div>
+      <div id="risk-reasons" style="margin-top:24px;width:100%;max-width:360px;text-align:left;"></div>
+      <div id="risk-actions" class="mt-16" style="width:100%;max-width:360px;"></div>
+      <button class="btn btn-full btn-lg mt-16" id="complete-btn" style="max-width:360px;background:rgba(255,255,255,0.2);color:inherit;font-weight:800;letter-spacing:1px;">CONFIRM &amp; SAVE</button>
     </div>
-    <div class="risk-flags" id="risk-flags"></div>
-    <div id="risk-actions" class="mt-16"></div>
-    <button class="btn btn-primary btn-full btn-lg mt-16" id="complete-btn">COMPLETE</button>
   </div>
 </div>
 
@@ -855,20 +851,24 @@ function cancelCamera() {
 }
 
 // ═══════════════════════════════════════════════════════════
-// SUBMIT SCAN
+// SUBMIT SCAN (Phase 2 — DL + BOL combined)
 // ═══════════════════════════════════════════════════════════
 async function submitScan() {
+  showProcessing('Scoring...', 'Checking BOL against expected pickups');
   var formData = new FormData();
   for (var key in currentScanData) {
     if (currentScanData[key]) formData.append(key, currentScanData[key]);
   }
-  formData.append('carrier_name', document.getElementById('d-carrier').value);
-  formData.append('carrier_mc_number', document.getElementById('d-mc').value);
-  formData.append('carrier_dot_number', document.getElementById('d-dot').value);
-  formData.append('truck_plate', document.getElementById('d-plate').value);
-  formData.append('trailer_number', document.getElementById('d-trailer').value);
-  formData.append('bol_number', document.getElementById('d-bol').value);
-  formData.append('notes', document.getElementById('d-notes').value);
+  // BOL fields
+  formData.append('bol_number', (document.getElementById('d-bol').value || '').trim());
+  formData.append('carrier_name', (document.getElementById('d-carrier').value || '').trim());
+  formData.append('pickup_reference', (document.getElementById('d-pickup-ref').value || '').trim());
+  formData.append('destination', (document.getElementById('d-destination').value || '').trim());
+  formData.append('scheduled_pickup', (document.getElementById('d-sched-pickup').value || '').trim());
+  // Vehicle
+  formData.append('truck_plate', (document.getElementById('d-plate').value || '').trim());
+  formData.append('trailer_number', (document.getElementById('d-trailer').value || '').trim());
+  formData.append('notes', (document.getElementById('d-notes').value || '').trim());
   if (currentLocation) {
     formData.append('latitude', currentLocation.lat);
     formData.append('longitude', currentLocation.lng);
@@ -879,15 +879,18 @@ async function submitScan() {
   try {
     var res = await fetch('/api/scans', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: formData });
     var result = await res.json();
+    hideProcessing();
     if (result.error) throw new Error(result.error);
+    if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
     showRiskResult(result);
   } catch (e) {
-    showToast('Saved offline - will sync later', 'warning');
-    showScreen('home-screen');
+    hideProcessing();
+    showToast('Error: ' + e.message, 'error');
   }
 }
 
 async function submitManual() {
+  showProcessing('Scoring...', 'Checking BOL against expected pickups');
   var data = {
     first_name: document.getElementById('m-first').value,
     last_name: document.getElementById('m-last').value,
@@ -906,36 +909,63 @@ async function submitManual() {
   if (currentLocation) { data.latitude = currentLocation.lat; data.longitude = currentLocation.lng; }
   try {
     var result = await api('POST', '/scans', data);
+    hideProcessing();
     if (result.error) throw new Error(result.error);
+    if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
     showRiskResult(result);
-  } catch (e) { showToast('Error: ' + e.message, 'error'); }
+  } catch (e) {
+    hideProcessing();
+    showToast('Error: ' + e.message, 'error');
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
-// RISK DISPLAY
+// SCORING RESULT DISPLAY (Phase 2 — full screen)
 // ═══════════════════════════════════════════════════════════
 function showRiskResult(result) {
   showScreen('result-screen');
   var score = result.risk_score || 0;
   var level = result.alert_level || 'GREEN';
-  var flags = result.risk_flags || [];
-  var circle = document.getElementById('risk-circle');
-  var offset = 314 - (score / 100) * 314;
-  circle.className = 'fill ' + level;
-  setTimeout(function() { circle.style.strokeDashoffset = offset; }, 50);
+  var reasons = result.reasons || result.risk_flags || [];
+
+  // Full-screen color background
+  var bg = document.getElementById('result-bg');
+  bg.className = level;
+
+  // Icon
+  var icons = { GREEN: '&#9989;', YELLOW: '&#9888;&#65039;', RED: '&#128721;' };
+  document.getElementById('result-icon').innerHTML = icons[level] || '';
+
+  // Score number
   var scoreEl = document.getElementById('risk-score-num');
   scoreEl.textContent = score;
-  scoreEl.style.color = level === 'RED' ? 'var(--red)' : level === 'YELLOW' ? 'var(--yellow)' : 'var(--green)';
+
+  // Label
   var labelEl = document.getElementById('risk-label');
-  var labels = { GREEN: 'LOW RISK', YELLOW: 'ELEVATED', RED: 'HIGH RISK' };
+  var labels = { GREEN: 'CLEARED', YELLOW: 'CAUTION', RED: 'DO NOT ADMIT' };
   labelEl.textContent = labels[level] || 'ASSESSED';
-  labelEl.style.color = scoreEl.style.color;
-  var flagsEl = document.getElementById('risk-flags');
-  if (flags.length > 0) { flagsEl.innerHTML = flags.map(function(f) { return '<div class="risk-flag">&#9888; ' + f + '</div>'; }).join(''); }
-  else { flagsEl.innerHTML = '<div class="text-center text-muted text-sm mt-8">No risk flags triggered</div>'; }
+
+  // Reasons list
+  var reasonsEl = document.getElementById('risk-reasons');
+  if (reasons.length > 0) {
+    reasonsEl.innerHTML = reasons.map(function(r) {
+      var isNeg = r.indexOf('(') > -1 && r.indexOf('-') > -1;
+      var cls = isNeg ? 'negative' : 'positive';
+      var icon = isNeg ? '&#10060;' : '&#9989;';
+      return '<div class="reason-item ' + cls + '">' + icon + ' ' + r + '</div>';
+    }).join('');
+  } else {
+    reasonsEl.innerHTML = '<div class="reason-item positive">&#9989; All checks passed</div>';
+  }
+
+  // Actions (add to watchlist for RED)
   var actionsEl = document.getElementById('risk-actions');
-  if (level === 'RED') { actionsEl.innerHTML = '<button class="btn btn-danger btn-full" id="add-wl-btn">&#128680; ADD TO WATCHLIST</button>'; document.getElementById('add-wl-btn').addEventListener('click', addCurrentToWatchlist); }
-  else { actionsEl.innerHTML = ''; }
+  if (level === 'RED') {
+    actionsEl.innerHTML = '<button class="btn btn-full" id="add-wl-btn" style="background:rgba(255,255,255,0.2);color:inherit;">&#128680; ADD TO WATCHLIST</button>';
+    document.getElementById('add-wl-btn').addEventListener('click', addCurrentToWatchlist);
+  } else {
+    actionsEl.innerHTML = '';
+  }
 }
 
 function addCurrentToWatchlist() {
@@ -947,15 +977,15 @@ function addCurrentToWatchlist() {
 }
 
 function resetToHome() {
-  ['d-carrier','d-mc','d-dot','d-plate','d-trailer','d-bol','d-notes'].forEach(function(id) { var el = document.getElementById(id); if (el) el.value = ''; });
+  ['d-carrier','d-plate','d-trailer','d-bol','d-notes','d-pickup-ref','d-destination','d-sched-pickup'].forEach(function(id) { var el = document.getElementById(id); if (el) el.value = ''; });
   document.getElementById('photo-dl-btn').textContent = '📷 DL Photo';
   document.getElementById('photo-dl-btn').classList.remove('captured');
-  document.getElementById('photo-bol-btn').textContent = '📷 BOL Photo';
+  document.getElementById('photo-bol-btn').textContent = '📷 TAKE BOL PHOTO';
   document.getElementById('photo-bol-btn').classList.remove('captured');
-  document.getElementById('photo-truck-btn').textContent = '📷 Truck / Plate Photo';
+  document.getElementById('photo-truck-btn').textContent = '📷 Truck Photo';
   document.getElementById('photo-truck-btn').classList.remove('captured');
-  document.getElementById('risk-circle').style.strokeDashoffset = 314;
   document.getElementById('scan-preview').style.display = 'none';
+  document.getElementById('result-bg').className = '';
   currentScanData = {};
   capturedPhotos = { dl: null, bol: null, truck: null };
   showScreen('home-screen');
@@ -1024,12 +1054,13 @@ async function showScanDetail(id) {
       '<div class="text-sm">DOB: ' + (s.date_of_birth || 'N/A') + '</div>' +
       '<div class="text-sm">Exp: ' + (s.expiration_date || 'N/A') + (isExpired ? ' ⚠ EXPIRED' : '') + '</div>' +
       '<div class="text-sm">Address: ' + (s.address_street || '') + ' ' + (s.address_city || '') + ', ' + (s.address_state || '') + ' ' + (s.address_zip || '') + '</div></div>' +
-      '<div class="card"><div style="font-weight:600;margin-bottom:8px;">Carrier & Load</div>' +
+      '<div class="card"><div style="font-weight:600;margin-bottom:8px;">BOL &amp; Carrier</div>' +
+      '<div class="text-sm">BOL: ' + (s.bol_number || 'N/A') + '</div>' +
       '<div class="text-sm">Carrier: ' + (s.carrier_name || 'N/A') + '</div>' +
-      '<div class="text-sm">MC#: ' + (s.carrier_mc_number || 'N/A') + ' | DOT#: ' + (s.carrier_dot_number || 'N/A') + '</div>' +
-      '<div class="text-sm">Plate: ' + (s.truck_plate || 'N/A') + ' | Trailer: ' + (s.trailer_number || 'N/A') + '</div>' +
-      '<div class="text-sm">BOL: ' + (s.bol_number || 'N/A') + '</div></div>' +
-      (s.risk_flags ? '<div class="card"><div style="font-weight:600;margin-bottom:8px;">Risk Flags</div>' + JSON.parse(s.risk_flags).map(function(f) { return '<div class="risk-flag">⚠ ' + f + '</div>'; }).join('') + '</div>' : '') +
+      '<div class="text-sm">Destination: ' + (s.destination || 'N/A') + '</div>' +
+      '<div class="text-sm">Pickup Ref: ' + (s.pickup_reference || 'N/A') + '</div>' +
+      '<div class="text-sm">Plate: ' + (s.truck_plate || 'N/A') + ' | Trailer: ' + (s.trailer_number || 'N/A') + '</div></div>' +
+      (s.risk_flags ? '<div class="card"><div style="font-weight:600;margin-bottom:8px;">Score Reasons</div>' + JSON.parse(s.risk_flags).map(function(f) { return '<div class="risk-flag">&#9888; ' + f + '</div>'; }).join('') + '</div>' : '') +
       '<div class="card text-sm text-muted"><div>Guard: ' + (s.guard_name || 'N/A') + ' | Site: ' + (s.site_name || 'N/A') + '</div>' +
       '<div>Time: ' + new Date(s.scan_timestamp + 'Z').toLocaleString() + '</div>' +
       '<div>GPS: ' + (s.latitude ? s.latitude.toFixed(4) + ', ' + s.longitude.toFixed(4) : 'N/A') + '</div>' +
@@ -1130,8 +1161,8 @@ document.getElementById('watchlist-btn').addEventListener('click', loadWatchlist
 document.getElementById('admin-btn').addEventListener('click', loadDashboard);
 document.getElementById('confirm-cancel-btn').addEventListener('click', function() { showScreen('home-screen'); });
 document.getElementById('rescan-btn').addEventListener('click', startScanner);
-document.getElementById('confirm-btn').addEventListener('click', function() { readConfirmFields(); showScreen('details-screen'); });
-document.getElementById('details-back-btn').addEventListener('click', function() { showScreen('confirm-screen'); });
+document.getElementById('confirm-btn').addEventListener('click', function() { readConfirmFields(); showScreen('bol-screen'); });
+document.getElementById('bol-back-btn').addEventListener('click', function() { showScreen('confirm-screen'); });
 document.getElementById('photo-dl-btn').addEventListener('click', function() { capturePhoto('dl'); });
 document.getElementById('photo-bol-btn').addEventListener('click', function() { capturePhoto('bol'); });
 document.getElementById('photo-truck-btn').addEventListener('click', function() { capturePhoto('truck'); });

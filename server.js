@@ -282,6 +282,36 @@ db.exec(`
 `);
 
 // ═══════════════════════════════════════════════════════════
+// PHASE 2 SCHEMA MIGRATION
+// ═══════════════════════════════════════════════════════════
+const migrations = [
+  "ALTER TABLE scans ADD COLUMN pickup_reference TEXT",
+  "ALTER TABLE scans ADD COLUMN destination TEXT",
+  "ALTER TABLE scans ADD COLUMN scheduled_pickup TEXT",
+];
+for (const sql of migrations) {
+  try { db.exec(sql); } catch (e) { /* column already exists */ }
+}
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS expected_pickups (
+    id TEXT PRIMARY KEY,
+    bol_number TEXT NOT NULL,
+    carrier_name TEXT,
+    pickup_reference TEXT,
+    destination TEXT,
+    scheduled_date TEXT,
+    scheduled_time_start TEXT,
+    scheduled_time_end TEXT,
+    site_id TEXT,
+    status TEXT DEFAULT 'PENDING',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (site_id) REFERENCES sites(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_expected_bol ON expected_pickups(bol_number);
+`);
+
+// ═══════════════════════════════════════════════════════════
 // FORCE-REFRESH ADMIN CREDENTIALS ON EVERY STARTUP
 // Prevents bcrypt/bcryptjs hash incompatibility issues
 // ═══════════════════════════════════════════════════════════
@@ -318,6 +348,26 @@ if (existingAdmin) {
   
   console.log('[INIT] Seeded admin (admin/vanguard2026) and guard (mjohnson/guard123)');
   console.log('[INIT] Seeded site: Memphis Distribution Hub');
+}
+
+// Seed expected pickups for demo (if table is empty)
+const demoSite = db.prepare("SELECT id FROM sites LIMIT 1").get();
+if (demoSite) {
+  const existingPickup = db.prepare("SELECT id FROM expected_pickups LIMIT 1").get();
+  if (!existingPickup) {
+    const pickups = [
+      { bol: 'BOL-2026-001', carrier: 'Swift Transport', ref: 'PU-5521', dest: 'Nashville, TN', date: '2026-03-01', start: '06:00', end: '18:00' },
+      { bol: 'BOL-2026-002', carrier: 'FedEx Freight', ref: 'PU-8834', dest: 'Atlanta, GA', date: '2026-03-01', start: '07:00', end: '15:00' },
+      { bol: 'BOL-2026-003', carrier: 'XPO Logistics', ref: 'PU-3301', dest: 'Birmingham, AL', date: '2026-03-02', start: '08:00', end: '16:00' },
+      { bol: 'BOL-2026-004', carrier: 'Old Dominion', ref: 'PU-7710', dest: 'Memphis, TN', date: '2026-03-03', start: '05:00', end: '14:00' },
+      { bol: 'BOL-2026-005', carrier: 'Estes Express', ref: 'PU-2290', dest: 'Jackson, MS', date: '2026-03-03', start: '09:00', end: '17:00' },
+    ];
+    const stmt = db.prepare("INSERT INTO expected_pickups (id, bol_number, carrier_name, pickup_reference, destination, scheduled_date, scheduled_time_start, scheduled_time_end, site_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    for (const p of pickups) {
+      stmt.run(uuidv4(), p.bol, p.carrier, p.ref, p.dest, p.date, p.start, p.end, demoSite.id);
+    }
+    console.log('[INIT] Seeded 5 expected pickups for demo');
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -415,45 +465,108 @@ function parseAamva(raw) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// RISK SCORING ENGINE
+// SCORING ENGINE v1 — Phase 2
+// Starts at 100, deducts for mismatches.
+// GREEN 85-100 | YELLOW 50-84 | RED 0-49
+// Banned DL = force 0 | Watchlisted DL = cap 60
 // ═══════════════════════════════════════════════════════════
-function calculateRiskScore(scanData) {
-  let score = 0;
-  const flags = [];
+function scoreScan(scanData) {
+  let score = 100;
+  const reasons = [];
 
+  // ── Watchlist check (must be first — RED = instant 0) ──
+  if (scanData.dl_number) {
+    const watchHit = db.prepare("SELECT reason, severity FROM watchlist WHERE dl_number = ? AND active = 1").get(scanData.dl_number);
+    if (watchHit && watchHit.severity === 'RED') {
+      return { score: 0, reasons: ['BANNED DRIVER — ' + watchHit.reason], alertLevel: 'RED' };
+    }
+    if (watchHit) {
+      reasons.push('WATCHLIST — ' + watchHit.reason);
+    }
+  }
+
+  // ── BOL verification against ExpectedPickups ──
+  let expectedPickup = null;
+  if (scanData.bol_number) {
+    expectedPickup = db.prepare("SELECT * FROM expected_pickups WHERE bol_number = ? AND status = 'PENDING'").get(scanData.bol_number);
+    if (!expectedPickup) {
+      score -= 40;
+      reasons.push('BOL not found in expected pickups (−40)');
+    } else {
+      reasons.push('BOL verified — matches expected pickup');
+
+      // Carrier match
+      if (expectedPickup.carrier_name && scanData.carrier_name) {
+        if (expectedPickup.carrier_name.toLowerCase().trim() !== scanData.carrier_name.toLowerCase().trim()) {
+          score -= 20;
+          reasons.push('Carrier mismatch: expected "' + expectedPickup.carrier_name + '" (−20)');
+        } else {
+          reasons.push('Carrier verified');
+        }
+      }
+
+      // Destination match
+      if (expectedPickup.destination && scanData.destination) {
+        if (expectedPickup.destination.toLowerCase().trim() !== scanData.destination.toLowerCase().trim()) {
+          score -= 10;
+          reasons.push('Destination mismatch: expected "' + expectedPickup.destination + '" (−10)');
+        } else {
+          reasons.push('Destination verified');
+        }
+      }
+
+      // Schedule match (date check)
+      if (expectedPickup.scheduled_date) {
+        const today = new Date().toISOString().slice(0, 10);
+        const scheduledDate = expectedPickup.scheduled_date;
+        if (today !== scheduledDate) {
+          score -= 10;
+          reasons.push('Schedule mismatch: expected ' + scheduledDate + ' (−10)');
+        } else {
+          reasons.push('Schedule verified — on time');
+        }
+      }
+    }
+  } else {
+    score -= 40;
+    reasons.push('No BOL number provided (−40)');
+  }
+
+  // ── Expired license ──
   if (scanData.expiration_date) {
     const parts = scanData.expiration_date.split('-');
     if (parts.length === 3) {
       const exp = new Date(parts[0], parts[1] - 1, parts[2]);
-      if (exp < new Date()) { score += 40; flags.push('EXPIRED_LICENSE'); }
+      if (exp < new Date()) {
+        score -= 15;
+        reasons.push('Expired license (−15)');
+      }
     }
   }
+
+  // ── No DL number ──
+  if (!scanData.dl_number) {
+    score -= 10;
+    reasons.push('No DL number provided (−10)');
+  }
+
+  // ── YELLOW watchlist cap ──
   if (scanData.dl_number) {
-    const watchHit = db.prepare("SELECT reason, severity FROM watchlist WHERE dl_number = ? AND active = 1").get(scanData.dl_number);
-    if (watchHit) { score += watchHit.severity === 'RED' ? 50 : 30; flags.push(`WATCHLIST_HIT: ${watchHit.reason}`); }
+    const watchHit = db.prepare("SELECT severity FROM watchlist WHERE dl_number = ? AND active = 1").get(scanData.dl_number);
+    if (watchHit && watchHit.severity === 'YELLOW' && score > 60) {
+      score = 60;
+      reasons.push('Score capped at 60 (watchlist caution)');
+    }
   }
-  if (scanData.dl_number) {
-    const multiSite = db.prepare("SELECT COUNT(DISTINCT site_id) as cnt FROM scans WHERE dl_number = ? AND scan_timestamp > datetime('now', '-7 days')").get(scanData.dl_number);
-    if (multiSite && multiSite.cnt >= 3) { score += 20; flags.push(`MULTI_SITE: ${multiSite.cnt} sites in 7 days`); }
-  }
-  if (scanData.dl_number && scanData.site_id) {
-    const freq = db.prepare("SELECT COUNT(*) as cnt FROM scans WHERE dl_number = ? AND site_id = ? AND scan_timestamp > datetime('now', '-1 day')").get(scanData.dl_number, scanData.site_id);
-    if (freq && freq.cnt >= 3) { score += 15; flags.push(`HIGH_FREQUENCY: ${freq.cnt}x in 24h at this site`); }
-  }
-  if (scanData.dl_state && scanData.dl_state !== 'TN') {
-    const prior = db.prepare("SELECT COUNT(*) as cnt FROM scans WHERE dl_number = ?").get(scanData.dl_number);
-    if (!prior || prior.cnt === 0) { score += 10; flags.push(`FIRST_SCAN_OUT_OF_STATE: ${scanData.dl_state}`); }
-  }
-  const hour = new Date().getHours();
-  if (hour >= 22 || hour < 5) { score += 5; flags.push('OFF_HOURS_SCAN'); }
-  if (scanData.bol_number && !scanData.carrier_mc_number && !scanData.carrier_dot_number) { score += 10; flags.push('BOL_NO_CARRIER_ID'); }
-  if (!scanData.dl_number) { score += 25; flags.push('NO_DL_NUMBER'); }
+
+  // Clamp 0-100
+  score = Math.max(0, Math.min(100, score));
 
   let alertLevel = 'GREEN';
-  if (score >= 50) alertLevel = 'RED';
-  else if (score >= 20) alertLevel = 'YELLOW';
+  if (score < 50) alertLevel = 'RED';
+  else if (score < 85) alertLevel = 'YELLOW';
 
-  return { score: Math.min(score, 100), flags, alertLevel };
+  return { score, reasons, alertLevel };
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -671,7 +784,7 @@ app.post('/api/scans', authenticateToken, scanUpload, async (req, res) => {
     const scanId = uuidv4();
     const data = req.body;
     let dlPhotoPath = null, bolPhotoPath = null, truckPhotoPath = null;
-    
+
     if (req.files) {
       for (const [fieldName, files] of Object.entries(req.files)) {
         if (files && files[0]) {
@@ -689,7 +802,8 @@ app.post('/api/scans', authenticateToken, scanUpload, async (req, res) => {
       }
     }
 
-    const riskResult = calculateRiskScore({ ...data, site_id: req.user.site_id });
+    // Phase 2: scoring engine (starts at 100, deducts)
+    const scoreResult = scoreScan({ ...data, site_id: req.user.site_id });
     const hashInput = JSON.stringify({ dl_number: data.dl_number, timestamp: new Date().toISOString(), site_id: req.user.site_id, guard_id: req.user.id });
     const integrityHash = crypto.createHash('sha256').update(hashInput).digest('hex');
 
@@ -700,10 +814,11 @@ app.post('/api/scans', authenticateToken, scanUpload, async (req, res) => {
         gender, eye_color, height, weight,
         carrier_name, carrier_mc_number, carrier_dot_number,
         truck_plate, trailer_number, bol_number,
+        pickup_reference, destination, scheduled_pickup,
         dl_photo_path, bol_photo_path, truck_photo_path,
         risk_score, risk_flags, alert_level,
         latitude, longitude, integrity_hash, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       scanId, req.user.id, req.user.site_id || 'unassigned',
       data.dl_number || null, data.dl_state || null,
@@ -714,14 +829,20 @@ app.post('/api/scans', authenticateToken, scanUpload, async (req, res) => {
       data.gender || null, data.eye_color || null, data.height || null, data.weight || null,
       data.carrier_name || null, data.carrier_mc_number || null, data.carrier_dot_number || null,
       data.truck_plate || null, data.trailer_number || null, data.bol_number || null,
+      data.pickup_reference || null, data.destination || null, data.scheduled_pickup || null,
       dlPhotoPath, bolPhotoPath, truckPhotoPath,
-      riskResult.score, JSON.stringify(riskResult.flags), riskResult.alertLevel,
+      scoreResult.score, JSON.stringify(scoreResult.reasons), scoreResult.alertLevel,
       data.latitude ? parseFloat(data.latitude) : null, data.longitude ? parseFloat(data.longitude) : null,
       integrityHash, data.notes || null
     );
 
-    audit(req.user.id, 'SCAN_CREATED', `Scan ${scanId} - DL: ${data.dl_number || 'N/A'} - Risk: ${riskResult.alertLevel}`, req.ip);
-    res.json({ id: scanId, risk_score: riskResult.score, risk_flags: riskResult.flags, alert_level: riskResult.alertLevel, integrity_hash: integrityHash });
+    // Mark expected pickup as fulfilled if BOL matched
+    if (data.bol_number) {
+      db.prepare("UPDATE expected_pickups SET status = 'FULFILLED' WHERE bol_number = ? AND status = 'PENDING'").run(data.bol_number);
+    }
+
+    audit(req.user.id, 'SCAN_CREATED', `Scan ${scanId} - DL: ${data.dl_number || 'N/A'} - Score: ${scoreResult.score} ${scoreResult.alertLevel}`, req.ip);
+    res.json({ id: scanId, risk_score: scoreResult.score, reasons: scoreResult.reasons, alert_level: scoreResult.alertLevel, integrity_hash: integrityHash });
   } catch (err) {
     console.error('[SCAN ERROR]', err);
     res.status(500).json({ error: 'Failed to save scan' });
@@ -773,6 +894,34 @@ app.delete('/api/watchlist/:id', authenticateToken, (req, res) => {
   db.prepare("UPDATE watchlist SET active = 0 WHERE id = ?").run(req.params.id);
   audit(req.user.id, 'WATCHLIST_REMOVE', `Deactivated ${req.params.id}`, req.ip);
   res.json({ message: 'Removed from watchlist' });
+});
+
+// ═══════════════════════════════════════════════════════════
+// EXPECTED PICKUPS ROUTES
+// ═══════════════════════════════════════════════════════════
+app.get('/api/expected-pickups', authenticateToken, (req, res) => {
+  const { status } = req.query;
+  let where = [], params = [];
+  if (status) { where.push('ep.status = ?'); params.push(status); }
+  const whereClause = where.length > 0 ? 'WHERE ' + where.join(' AND ') : '';
+  const pickups = db.prepare(`SELECT ep.*, s.name as site_name FROM expected_pickups ep LEFT JOIN sites s ON ep.site_id = s.id ${whereClause} ORDER BY ep.scheduled_date, ep.scheduled_time_start`).all(...params);
+  res.json(pickups);
+});
+
+app.post('/api/expected-pickups', authenticateToken, requireRole('admin', 'supervisor'), (req, res) => {
+  const { bol_number, carrier_name, pickup_reference, destination, scheduled_date, scheduled_time_start, scheduled_time_end, site_id } = req.body;
+  if (!bol_number) return res.status(400).json({ error: 'BOL number required' });
+  const id = uuidv4();
+  db.prepare("INSERT INTO expected_pickups (id, bol_number, carrier_name, pickup_reference, destination, scheduled_date, scheduled_time_start, scheduled_time_end, site_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+    .run(id, bol_number, carrier_name || null, pickup_reference || null, destination || null, scheduled_date || null, scheduled_time_start || null, scheduled_time_end || null, site_id || null);
+  audit(req.user.id, 'PICKUP_CREATED', `Expected pickup ${bol_number}`, req.ip);
+  res.json({ id, message: 'Expected pickup created' });
+});
+
+app.delete('/api/expected-pickups/:id', authenticateToken, requireRole('admin', 'supervisor'), (req, res) => {
+  db.prepare("DELETE FROM expected_pickups WHERE id = ?").run(req.params.id);
+  audit(req.user.id, 'PICKUP_DELETED', `Deleted pickup ${req.params.id}`, req.ip);
+  res.json({ message: 'Deleted' });
 });
 
 // ═══════════════════════════════════════════════════════════
