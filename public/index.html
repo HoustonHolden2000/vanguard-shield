@@ -207,6 +207,9 @@ label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); 
 <!-- ═══════════ TOAST CONTAINER ═══════════ -->
 <div id="toast-container"></div>
 
+<!-- Hidden file input for photo-based barcode scanning (native camera) -->
+<input type="file" id="barcode-file-input" accept="image/*" capture="environment" style="display:none;">
+
 <!-- ═══════════ CAMERA OVERLAY ═══════════ -->
 <div id="camera-overlay">
   <div style="position:absolute;top:12px;left:16px;right:16px;z-index:10;display:flex;justify-content:space-between;align-items:center;">
@@ -662,9 +665,12 @@ async function getDynamsoftReader() {
 }
 
 // ═══════════════════════════════════════════════════════════
-// BARCODE SCANNER (UPGRADED)
+// BARCODE SCANNER
 // ═══════════════════════════════════════════════════════════
 async function startScanner() {
+  // Always fully clean up previous scanner state first
+  cleanupScanner();
+
   currentScanData = {};
   capturedPhotos = { dl: null, bol: null, truck: null };
   isPhotoScanMode = false;
@@ -673,53 +679,51 @@ async function startScanner() {
   showScreen('scanner-screen');
 
   // Reset UI
-  const statusEl = document.getElementById('scanner-status');
-  statusEl.style.display = 'none';
-  const torchBtn = document.getElementById('torch-btn');
+  document.getElementById('scanner-status').style.display = 'none';
+  var torchBtn = document.getElementById('torch-btn');
   if (torchBtn) torchBtn.classList.remove('torch-on');
 
-  // Responsive qrbox
-  const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
-  const qrW = Math.min(Math.floor(vw * 0.85), 480);
-  const qrH = Math.floor(qrW * 0.6);
+  // CRITICAL: Always nuke scanner-region DOM to prevent leftover element conflicts
+  document.getElementById('scanner-region').innerHTML = '';
+
+  // Conservative qrbox - must be smaller than the video feed
+  var vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+  var qrW = Math.min(Math.floor(vw * 0.7), 380);
+  var qrH = Math.floor(qrW * 0.6);
 
   try {
-    html5Qr = new Html5Qrcode("scanner-region");
-
-    const config = {
-      fps: 10,
-      qrbox: { width: qrW, height: qrH },
-      aspectRatio: 1.777,
-    };
-
-    if (typeof Html5QrcodeSupportedFormats !== 'undefined' && Html5QrcodeSupportedFormats.PDF_417 !== undefined) {
-      config.formatsToSupport = [Html5QrcodeSupportedFormats.PDF_417];
+    // formatsToSupport goes in constructor, NOT start config
+    try {
+      html5Qr = new Html5Qrcode("scanner-region", {
+        formatsToSupport: [Html5QrcodeSupportedFormats.PDF_417]
+      });
+    } catch (constructErr) {
+      // Fallback for older library versions without constructor config
+      html5Qr = new Html5Qrcode("scanner-region");
     }
 
     await html5Qr.start(
       { facingMode: "environment" },
-      config,
-      (decoded) => {
+      { fps: 10, qrbox: { width: qrW, height: qrH } },
+      function(decoded) {
         console.log('[SCAN] html5-qrcode decoded:', decoded.substring(0, 80));
         onScanSuccess(decoded);
       },
-      (err) => { /* scanning... */ }
+      function() { /* scanning... */ }
     );
 
-    // Grab video track reference for torch
+    // Grab video track for torch control
     try {
-      const videoEl = document.querySelector('#scanner-region video');
+      var videoEl = document.querySelector('#scanner-region video');
       if (videoEl && videoEl.srcObject) {
         scannerStream = videoEl.srcObject;
-        const tracks = scannerStream.getVideoTracks();
+        var tracks = scannerStream.getVideoTracks();
         if (tracks.length > 0) scannerVideoTrack = tracks[0];
       }
-    } catch (e) { /* no track access */ }
+    } catch (e) { /* */ }
 
-    // 10-second timer: auto-switch to Dynamsoft if no read
-    scannerTimeout = setTimeout(() => {
-      switchToDynamsoft();
-    }, 10000);
+    // 10-second fallback to Dynamsoft
+    scannerTimeout = setTimeout(function() { switchToDynamsoft(); }, 10000);
 
   } catch (e) {
     console.error('[SCANNER ERROR]', e);
@@ -733,31 +737,34 @@ async function startScanner() {
 // ═══════════════════════════════════════════════════════════
 async function switchToDynamsoft() {
   if (activeEngine === 'dynamsoft') return;
-  console.log('[SCAN] Switching to Dynamsoft enhanced scanner...');
-  showToast('Switching to enhanced scanner...', 'info');
-
   activeEngine = 'dynamsoft';
-  const statusEl = document.getElementById('scanner-status');
-  statusEl.style.display = '';
+  console.log('[SCAN] Switching to Dynamsoft...');
+  showToast('Switching to enhanced scanner...', 'info');
+  document.getElementById('scanner-status').style.display = '';
   document.getElementById('scanner-status-text').textContent = 'Enhanced Scanning...';
 
-  // Stop html5-qrcode completely first — it kills its own stream on stop
+  // Stop html5-qrcode completely and release camera
   if (html5Qr) {
     try { await html5Qr.stop(); } catch (e) { /* */ }
     try { html5Qr.clear(); } catch (e) { /* */ }
     html5Qr = null;
   }
-  // Also kill any leftover stream refs
   if (scannerStream) {
-    try { scannerStream.getTracks().forEach(t => t.stop()); } catch (e) { /* */ }
+    try { scannerStream.getTracks().forEach(function(t) { t.stop(); }); } catch (e) { /* */ }
     scannerStream = null;
     scannerVideoTrack = null;
   }
 
-  // Always open a fresh camera stream
-  let stream;
+  // Clear DOM
+  var region = document.getElementById('scanner-region');
+  region.innerHTML = '';
+
+  // Open fresh camera
+  var stream;
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 } } });
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 1920 } }
+    });
   } catch (e) {
     showToast('Camera error', 'error');
     showScreen('home-screen');
@@ -765,23 +772,22 @@ async function switchToDynamsoft() {
   }
 
   scannerStream = stream;
-  const tracks = stream.getVideoTracks();
+  var tracks = stream.getVideoTracks();
   if (tracks.length > 0) scannerVideoTrack = tracks[0];
 
-  // Create a fresh video element inside scanner-region
-  const region = document.getElementById('scanner-region');
-  region.innerHTML = '';
-  const video = document.createElement('video');
+  // Fresh video element
+  var video = document.createElement('video');
   video.autoplay = true;
   video.playsInline = true;
   video.muted = true;
+  video.setAttribute('playsinline', '');
   video.style.cssText = 'width:100%;height:100vh;object-fit:cover;';
   video.srcObject = stream;
   region.appendChild(video);
-  try { await video.play(); } catch (e) { /* autoplay handles it */ }
+  try { await video.play(); } catch (e) { /* */ }
 
-  // Load Dynamsoft and start frame decode loop
-  let reader;
+  // Load Dynamsoft
+  var reader;
   try {
     reader = await getDynamsoftReader();
   } catch (e) {
@@ -790,8 +796,8 @@ async function switchToDynamsoft() {
     return;
   }
 
-  const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d');
+  var canvas = document.createElement('canvas');
+  var ctx = canvas.getContext('2d');
 
   function decodeFrame() {
     if (activeEngine !== 'dynamsoft') return;
@@ -799,9 +805,9 @@ async function switchToDynamsoft() {
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       ctx.drawImage(video, 0, 0);
-      reader.decode(canvas).then(results => {
+      reader.decode(canvas).then(function(results) {
         if (results && results.length > 0) {
-          const text = results[0].barcodeText;
+          var text = results[0].barcodeText;
           if (text && text.length > 20) {
             console.log('[SCAN] Dynamsoft decoded:', text.substring(0, 80));
             onScanSuccess(text);
@@ -809,7 +815,7 @@ async function switchToDynamsoft() {
           }
         }
         dynamsoftFrameLoop = requestAnimationFrame(decodeFrame);
-      }).catch(() => {
+      }).catch(function() {
         dynamsoftFrameLoop = requestAnimationFrame(decodeFrame);
       });
     } else {
@@ -829,13 +835,13 @@ function onScanSuccess(decoded) {
   if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
 
   // Green flash overlay
-  const flash = document.createElement('div');
+  var flash = document.createElement('div');
   flash.className = 'scan-success-flash';
   document.body.appendChild(flash);
-  flash.addEventListener('animationend', () => flash.remove());
+  flash.addEventListener('animationend', function() { flash.remove(); });
 
   // Parse and show confirm
-  const parsed = parsePDF417(decoded);
+  var parsed = parsePDF417(decoded);
   currentScanData = parsed;
   showConfirmScreen(parsed);
 }
@@ -848,18 +854,21 @@ function cleanupScanner() {
   if (scannerTimeout) { clearTimeout(scannerTimeout); scannerTimeout = null; }
   if (dynamsoftFrameLoop) { cancelAnimationFrame(dynamsoftFrameLoop); dynamsoftFrameLoop = null; }
 
-  // Stop html5-qrcode
+  // Stop html5-qrcode (stop is async but we fire-and-forget since we nuke the DOM below)
   if (html5Qr) {
-    try { html5Qr.stop().catch(() => {}); } catch (e) { /* */ }
+    try { html5Qr.stop().catch(function(){}); } catch (e) { /* */ }
     try { html5Qr.clear(); } catch (e) { /* */ }
     html5Qr = null;
   }
 
-  // Stop streams
+  // Stop all media streams
   if (scannerStream) {
-    try { scannerStream.getTracks().forEach(t => t.stop()); } catch (e) { /* */ }
+    try { scannerStream.getTracks().forEach(function(t) { t.stop(); }); } catch (e) { /* */ }
     scannerStream = null;
   }
+
+  // CRITICAL: Nuke scanner-region DOM so next startScanner() gets a clean slate
+  try { document.getElementById('scanner-region').innerHTML = ''; } catch (e) { /* */ }
 
   // Reset state
   scannerVideoTrack = null;
@@ -882,14 +891,14 @@ async function toggleTorch() {
     return;
   }
   try {
-    const capabilities = scannerVideoTrack.getCapabilities();
+    var capabilities = scannerVideoTrack.getCapabilities();
     if (!capabilities.torch) {
       showToast('Torch not supported on this device', 'warning');
       return;
     }
     torchOn = !torchOn;
     await scannerVideoTrack.applyConstraints({ advanced: [{ torch: torchOn }] });
-    const btn = document.getElementById('torch-btn');
+    var btn = document.getElementById('torch-btn');
     if (btn) btn.classList.toggle('torch-on', torchOn);
   } catch (e) {
     showToast('Torch not supported on this device', 'warning');
@@ -898,93 +907,79 @@ async function toggleTorch() {
 }
 
 // ═══════════════════════════════════════════════════════════
-// PHOTO SCAN MODE
+// PHOTO SCAN MODE (native camera via file input)
 // ═══════════════════════════════════════════════════════════
 function enterPhotoMode() {
-  isPhotoScanMode = true;
-
-  // Stop live scanner but don't navigate away
-  if (scannerTimeout) { clearTimeout(scannerTimeout); scannerTimeout = null; }
-  if (dynamsoftFrameLoop) { cancelAnimationFrame(dynamsoftFrameLoop); dynamsoftFrameLoop = null; }
-  if (html5Qr) {
-    try { html5Qr.stop().catch(() => {}); } catch (e) { /* */ }
-    try { html5Qr.clear(); } catch (e) { /* */ }
-    html5Qr = null;
-  }
-  if (scannerStream) {
-    try { scannerStream.getTracks().forEach(t => t.stop()); } catch (e) { /* */ }
-    scannerStream = null;
-    scannerVideoTrack = null;
-  }
-
-  // Open camera overlay for photo capture
-  const overlay = document.getElementById('camera-overlay');
-  const video = document.getElementById('camera-video');
-  const canvas = document.getElementById('camera-canvas');
-  const purpose = document.getElementById('camera-purpose');
-  purpose.textContent = 'Capture License Barcode';
-  overlay.classList.add('active');
-
-  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 } } })
-    .then(stream => {
-      cameraStream = stream;
-      video.srcObject = stream;
-      video.play();
-
-      document.getElementById('camera-shutter').onclick = async () => {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        canvas.getContext('2d').drawImage(video, 0, 0);
-
-        // Stop camera
-        stream.getTracks().forEach(t => t.stop());
-        overlay.classList.remove('active');
-        cameraStream = null;
-
-        showToast('Decoding photo...', 'info');
-
-        // Try Dynamsoft first
-        let decoded = null;
-        try {
-          const reader = await getDynamsoftReader();
-          const results = await reader.decode(canvas);
-          if (results && results.length > 0 && results[0].barcodeText.length > 20) {
-            decoded = results[0].barcodeText;
-          }
-        } catch (e) {
-          console.log('[PHOTO] Dynamsoft decode failed:', e.message);
-        }
-
-        // Fallback: html5-qrcode scanFile
-        if (!decoded) {
-          try {
-            const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.95));
-            const file = new File([blob], 'scan.jpg', { type: 'image/jpeg' });
-            const tempQr = new Html5Qrcode("scanner-region");
-            decoded = await tempQr.scanFile(file, true);
-            tempQr.clear();
-          } catch (e) {
-            console.log('[PHOTO] html5-qrcode scanFile failed:', e.message);
-          }
-        }
-
-        if (decoded && decoded.length > 20) {
-          onScanSuccess(decoded);
-        } else {
-          showToast('Could not read barcode — tap PHOTO to retry', 'error');
-          // Go back to scanner screen with live scan + photo button ready
-          isPhotoScanMode = false;
-          startScanner();
-        }
-      };
-    })
-    .catch(e => {
-      overlay.classList.remove('active');
-      showToast('Camera error: ' + e.message, 'error');
-      isPhotoScanMode = false;
-      startScanner();
-    });
+  // Trigger native camera file input — don't cleanup live scanner yet
+  // (cleanup happens in the change handler once we have a photo)
+  var input = document.getElementById('barcode-file-input');
+  input.value = '';
+  input.click();
 }
+
+// Handle photo captured from native camera
+document.getElementById('barcode-file-input').addEventListener('change', async function(e) {
+  var file = e.target.files && e.target.files[0];
+  if (!file) return; // User cancelled — live scanner keeps running
+
+  // We have a photo — stop live scanner and show processing state
+  cleanupScanner();
+  showScreen('scanner-screen');
+  document.getElementById('scanner-status').style.display = '';
+  document.getElementById('scanner-status-text').textContent = 'Decoding photo...';
+  document.getElementById('scanner-region').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;color:white;font-size:18px;font-weight:600;">Analyzing barcode...</div>';
+
+  var decoded = null;
+
+  // Method 1: html5-qrcode scanFile (all formats for maximum coverage)
+  try {
+    var tempDiv = document.createElement('div');
+    tempDiv.id = 'temp-decode-region';
+    tempDiv.style.cssText = 'position:absolute;left:-9999px;width:300px;height:300px;';
+    document.body.appendChild(tempDiv);
+    var tempQr = new Html5Qrcode("temp-decode-region");
+    decoded = await tempQr.scanFile(file, false);
+    try { tempQr.clear(); } catch (ce) { /* */ }
+    try { tempDiv.remove(); } catch (re) { /* */ }
+    console.log('[PHOTO] html5-qrcode decoded:', (decoded || '').substring(0, 80));
+  } catch (e) {
+    console.log('[PHOTO] html5-qrcode scanFile failed:', e.message || e);
+    try { var td = document.getElementById('temp-decode-region'); if (td) td.remove(); } catch (re) { /* */ }
+  }
+
+  // Method 2: Dynamsoft BarcodeReader on full-res image
+  if (!decoded) {
+    try {
+      var reader = await getDynamsoftReader();
+      var img = new Image();
+      var url = URL.createObjectURL(file);
+      await new Promise(function(resolve, reject) {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = url;
+      });
+      var canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      canvas.getContext('2d').drawImage(img, 0, 0);
+      URL.revokeObjectURL(url);
+      var results = await reader.decode(canvas);
+      if (results && results.length > 0 && results[0].barcodeText.length > 20) {
+        decoded = results[0].barcodeText;
+        console.log('[PHOTO] Dynamsoft decoded:', decoded.substring(0, 80));
+      }
+    } catch (e) {
+      console.log('[PHOTO] Dynamsoft failed:', e.message || e);
+    }
+  }
+
+  if (decoded && decoded.length > 20) {
+    onScanSuccess(decoded);
+  } else {
+    showToast('Could not read barcode — try again', 'error');
+    startScanner();
+  }
+});
 
 // ═══════════════════════════════════════════════════════════
 // PDF417 AAMVA PARSER
@@ -1144,11 +1139,6 @@ function capturePhoto(type) {
 function cancelCamera() {
   if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null; }
   document.getElementById('camera-overlay').classList.remove('active');
-  // If we were in photo scan mode, restart live scanner
-  if (isPhotoScanMode) {
-    isPhotoScanMode = false;
-    startScanner();
-  }
 }
 
 // ═══════════════════════════════════════════════════════════
