@@ -283,29 +283,42 @@ if (TK && US) {
 }
 
 // ═══════════════════════════════════════════════
-// DYNAMSOFT SDK — EXACT PATTERN FROM test_scanner.html
+// ERROR REPORTING — posts to server so we can diagnose
 // ═══════════════════════════════════════════════
-function loadScript(url) {
+function logError(step, error, details) {
+  try {
+    fetch('/api/client-error', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({step: step, error: String(error), details: details || ''})
+    }).catch(function(){});
+  } catch(x) {}
+}
+
+// ═══════════════════════════════════════════════
+// DYNAMSOFT SDK — config set ON LOAD (v5.0.2 proven fix)
+// engineResourcePath + license MUST be set before createInstance/loadWasm
+// ═══════════════════════════════════════════════
+function loadSDK() {
   return new Promise(function(resolve, reject) {
+    if (sdkLoaded && window.Dynamsoft) { resolve(); return; }
     var s = document.createElement('script');
-    s.src = url;
-    s.onload = function() { resolve(url); };
-    s.onerror = function() { reject(new Error('Script load failed: ' + url)); };
+    s.src = '/dbr/dbr.js';
+    s.onload = function() {
+      if (!window.Dynamsoft) { reject(new Error('Dynamsoft global not found')); return; }
+      // SET CONFIG IMMEDIATELY — before any auto-init can happen
+      Dynamsoft.DBR.BarcodeReader.engineResourcePath = '/dbr/';
+      Dynamsoft.DBR.BarcodeReader.license = 'DLS2eyJvcmdhbml6YXRpb25JRCI6IjIwMDAwMSJ9';
+      sdkLoaded = true;
+      resolve();
+    };
+    s.onerror = function() { reject(new Error('Script load failed')); };
     document.head.appendChild(s);
   });
 }
 
-async function loadSDK() {
-  if (sdkLoaded && window.Dynamsoft) return;
-  await loadScript('/dbr/dbr.js');
-  if (!window.Dynamsoft) throw new Error('Dynamsoft global not found');
-  sdkLoaded = true;
-}
-
 async function initDynamsoft() {
   await loadSDK();
-  Dynamsoft.DBR.BarcodeReader.engineResourcePath = '/dbr/';
-  Dynamsoft.DBR.BarcodeReader.license = 'DLS2eyJvcmdhbml6YXRpb25JRCI6IjIwMDAwMSJ9';
   reader = await Dynamsoft.DBR.BarcodeReader.createInstance();
   var settings = await reader.getRuntimeSettings();
   settings.barcodeFormatIds = Dynamsoft.DBR.EnumBarcodeFormat.BF_PDF417;
@@ -333,21 +346,25 @@ document.getElementById('photo-input').addEventListener('change', async function
   var file = e.target.files[0];
   if (!file) return;
 
-  photoStatus.textContent = 'Decoding photo...';
   photoStatus.style.color = '#aaa';
 
-  // Init Dynamsoft if needed (exact same as test_scanner.html)
+  // Step 1: Init Dynamsoft if needed
   if (!reader) {
-    try { await initDynamsoft(); }
-    catch(err) {
-      photoStatus.textContent = 'Could not load decoder. Try again.';
+    photoStatus.textContent = 'Step 1: Loading barcode decoder...';
+    try {
+      await initDynamsoft();
+      photoStatus.textContent = 'Step 1: Decoder ready.';
+    } catch(err) {
+      photoStatus.textContent = 'Decoder failed: ' + err.message;
       photoStatus.style.color = '#f44';
+      logError('initDynamsoft', err.message, navigator.userAgent);
       e.target.value = '';
       return;
     }
   }
 
-  // Load photo into canvas (exact same as test_scanner.html)
+  // Step 2: Load photo
+  photoStatus.textContent = 'Step 2: Loading photo...';
   try {
     var img = new Image();
     var url = URL.createObjectURL(file);
@@ -358,7 +375,8 @@ document.getElementById('photo-input').addEventListener('change', async function
     canvas.getContext('2d').drawImage(img, 0, 0);
     URL.revokeObjectURL(url);
 
-    photoStatus.textContent = 'Decoding ' + img.naturalWidth + 'x' + img.naturalHeight + ' image...';
+    // Step 3: Decode
+    photoStatus.textContent = 'Step 3: Decoding ' + img.naturalWidth + 'x' + img.naturalHeight + '...';
     var t0 = Date.now();
     var results = await reader.decode(canvas);
     var elapsed = Date.now() - t0;
@@ -369,12 +387,15 @@ document.getElementById('photo-input').addEventListener('change', async function
       var parsed = parsePDF417(results[0].barcodeText);
       onDecodeSuccess(parsed);
     } else {
-      photoStatus.textContent = 'No barcode found. Try again with good lighting.';
+      var resultInfo = results ? results.length + ' results' : 'null';
+      photoStatus.textContent = 'No barcode found (' + elapsed + 'ms). Try again with good lighting.';
       photoStatus.style.color = '#f44';
+      logError('decode-no-result', resultInfo, img.naturalWidth + 'x' + img.naturalHeight + ' ' + elapsed + 'ms');
     }
   } catch(err) {
-    photoStatus.textContent = 'Could not read barcode. Try again or use Manual Entry.';
+    photoStatus.textContent = 'Decode error: ' + err.message;
     photoStatus.style.color = '#f44';
+    logError('decode-error', err.message, navigator.userAgent);
   }
 
   e.target.value = '';
