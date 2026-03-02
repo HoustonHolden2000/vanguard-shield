@@ -372,51 +372,71 @@ document.getElementById('photo-input').addEventListener('change', async function
   photoStatus.style.color = '#aaa';
   photoStatus.textContent = 'Processing photo...';
 
-  // Try client-side Dynamsoft first, fall back to server
-  var decoded = false;
-
-  // === PATH A: Client-side Dynamsoft (fast if WASM is cached) ===
+  // === STEP 1: Ensure Dynamsoft reader is ready ===
   if (!reader) {
-    photoStatus.textContent = 'Loading barcode decoder...';
+    photoStatus.textContent = 'Initializing decoder...';
     try {
       await initDynamsoft(function(msg) { photoStatus.textContent = msg; });
     } catch(err) {
-      // WASM failed — go straight to server decode (Path B)
       logError('wasm-failed', err.message, navigator.userAgent);
       reader = null;
     }
   }
 
+  // === STEP 2: Load photo into canvas ===
+  photoStatus.textContent = 'Loading photo...';
+  var img = new Image();
+  var imgUrl = URL.createObjectURL(file);
+  try {
+    await new Promise(function(resolve, reject) { img.onload = resolve; img.onerror = reject; img.src = imgUrl; });
+  } catch(err) {
+    photoStatus.textContent = 'Could not load photo.';
+    photoStatus.style.color = '#f44';
+    URL.revokeObjectURL(imgUrl);
+    e.target.value = '';
+    return;
+  }
+  URL.revokeObjectURL(imgUrl);
+  var W = img.naturalWidth, H = img.naturalHeight;
+  photoStatus.textContent = 'Photo: ' + W + 'x' + H + '. Decoding...';
+
+  // === STEP 3: Try Dynamsoft client-side at multiple sizes ===
+  var decoded = false;
   if (reader) {
-    try {
-      photoStatus.textContent = 'Reading photo...';
-      var img = new Image();
-      var url = URL.createObjectURL(file);
-      await new Promise(function(resolve, reject) { img.onload = resolve; img.onerror = reject; img.src = url; });
-      var canvas = document.createElement('canvas');
-      canvas.width = img.naturalWidth;
-      canvas.height = img.naturalHeight;
-      canvas.getContext('2d').drawImage(img, 0, 0);
-      URL.revokeObjectURL(url);
-
-      photoStatus.textContent = 'Decoding ' + img.naturalWidth + 'x' + img.naturalHeight + '...';
-      var t0 = Date.now();
-      var results = await reader.decode(canvas);
-      var elapsed = Date.now() - t0;
-
-      if (results && results.length > 0 && results[0].barcodeText && results[0].barcodeText.length > 20) {
-        photoStatus.textContent = 'Decoded in ' + elapsed + 'ms!';
-        photoStatus.style.color = '#0f0';
-        var parsed = parsePDF417(results[0].barcodeText);
-        onDecodeSuccess(parsed);
-        decoded = true;
+    var sizes = [
+      { w: W, h: H, label: 'full' },
+      { w: Math.round(W*0.5), h: Math.round(H*0.5), label: '50%' },
+      { w: Math.round(W*0.75), h: Math.round(H*0.75), label: '75%' }
+    ];
+    for (var si = 0; si < sizes.length && !decoded; si++) {
+      var sz = sizes[si];
+      try {
+        photoStatus.textContent = 'Dynamsoft try ' + (si+1) + '/3: ' + sz.w + 'x' + sz.h + '...';
+        var canvas = document.createElement('canvas');
+        canvas.width = sz.w;
+        canvas.height = sz.h;
+        canvas.getContext('2d').drawImage(img, 0, 0, sz.w, sz.h);
+        var t0 = Date.now();
+        var results = await reader.decode(canvas);
+        var elapsed = Date.now() - t0;
+        var found = results && results.length > 0 && results[0].barcodeText && results[0].barcodeText.length > 20;
+        photoStatus.textContent = 'Dynamsoft ' + sz.label + ': ' + (found ? 'FOUND ' + results[0].barcodeText.length + ' chars' : 'no barcode') + ' (' + elapsed + 'ms)';
+        if (found) {
+          photoStatus.style.color = '#0f0';
+          var parsed = parsePDF417(results[0].barcodeText);
+          onDecodeSuccess(parsed);
+          decoded = true;
+        }
+      } catch(err) {
+        photoStatus.textContent = 'Dynamsoft ' + sz.label + ': error - ' + (err.message || err);
+        logError('client-decode-' + sz.label, err.message || String(err));
       }
-    } catch(err) {
-      logError('client-decode-error', err.message);
     }
+  } else {
+    photoStatus.textContent = 'No client decoder — trying server...';
   }
 
-  // === PATH B: Server-side decode (fallback — always works) ===
+  // === STEP 4: Fall back to server decode ===
   if (!decoded) {
     photoStatus.textContent = 'Uploading to server for decode...';
     photoStatus.style.color = '#aaa';
@@ -430,19 +450,24 @@ document.getElementById('photo-input').addEventListener('change', async function
       });
       var result = await resp.json();
       if (result.success && result.fields) {
-        photoStatus.textContent = 'Decoded by server in ' + (result.elapsed || '?') + 'ms!';
+        photoStatus.textContent = 'Server decoded in ' + (result.elapsed || '?') + 'ms!';
         photoStatus.style.color = '#0f0';
         onDecodeSuccess(result.fields);
         decoded = true;
       } else {
-        photoStatus.textContent = 'No barcode found. Try again with good lighting.';
+        photoStatus.textContent = 'Server: no barcode. ' + (result.error || '');
         photoStatus.style.color = '#f44';
       }
     } catch(err) {
-      photoStatus.textContent = 'Could not read barcode. Try again or Manual Entry.';
+      photoStatus.textContent = 'Server error: ' + (err.message || err);
       photoStatus.style.color = '#f44';
       logError('server-decode-error', err.message);
     }
+  }
+
+  if (!decoded) {
+    photoStatus.textContent = 'Could not read barcode. Make sure you photograph the BARCODE on the BACK of the license. Good lighting, hold steady.';
+    photoStatus.style.color = '#f44';
   }
 
   e.target.value = '';
