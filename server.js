@@ -1,37 +1,19 @@
 /**
- * IRON HALO VERIFY v4.0.1 — Live Camera Scanner
+ * IRON HALO VERIFY v4.1 — Hybrid Scanner
  *
- * Scanner architecture: CLIENT-SIDE decode via Dynamsoft + html5-qrcode
- * - html5-qrcode: live camera viewfinder, continuous PDF417 scan
- * - Dynamsoft BarcodeReader: auto-switch after 10s, deblurLevel=5
- * - Photo mode: still capture + client-side decode fallback
+ * Scanner architecture:
+ * - CLIENT-SIDE: Dynamsoft + html5-qrcode live camera (best-effort)
+ * - SERVER-SIDE: Photo capture → upload → @zxing/library decode (reliable fallback)
+ * - Photo mode: native camera still → Dynamsoft client decode → server decode
  * - Manual entry: smooth fallback from scanner toolbar
  *
- * Server handles: auth, scan storage, risk scoring, watchlist, dashboard
- * Server does NOT decode barcodes (zxing-wasm removed — never worked on Render)
+ * Server handles: auth, barcode decode, scan storage, risk scoring, watchlist, dashboard
  *
- * Stack: Node 18+, Express 4, SQLite (better-sqlite3), bcryptjs, multer, uuid
+ * Stack: Node 18+, Express 4, SQLite, @zxing/library, sharp, bcryptjs, multer, uuid
  * Brand: Matte black + Vanguard blue (#0056A0)
  * Live URL: vanguard-shield.onrender.com
  *
- * ═══════════════════════════════════════════════════════════════
- * DEMO CHECKLIST — Normandy Park & Gardens Field Test
- * ═══════════════════════════════════════════════════════════════
- *
- * BEFORE DEMO:
- *   [ ] Render health: GET /api/health → {"status":"ok","version":"4.0.0"}
- *   [ ] Login on iPhone Safari: admin / vanguard2026
- *
- * SCAN FLOW:
- *   [ ] Tap big scan button → live camera opens with viewfinder
- *   [ ] Point at barcode on back of TN license
- *   [ ] html5-qrcode scans first 10 seconds
- *   [ ] Auto-switches to Dynamsoft enhanced scanner
- *   [ ] Success: vibrate + green flash → fields auto-filled
- *   [ ] Fail: tap Manual in toolbar → enter from license
- *
  * Logins: admin/vanguard2026 | guard/guard123 | demo/demo
- * ═══════════════════════════════════════════════════════════════
  */
 
 const express = require('express');
@@ -41,6 +23,8 @@ const Database = require('better-sqlite3');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const fs = require('fs');
+const sharp = require('sharp');
+const ZXing = require('@zxing/library');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -128,7 +112,6 @@ const sessions = new Map();
 
 function auth(req, res, next) {
   let tk = req.headers['x-auth-token'];
-  // Also accept Bearer token for compatibility
   if (!tk) {
     const ah = req.headers['authorization'];
     if (ah && ah.startsWith('Bearer ')) tk = ah.substring(7);
@@ -136,6 +119,121 @@ function auth(req, res, next) {
   if (!tk || !sessions.has(tk)) return res.status(401).json({ error: 'Not authenticated' });
   req.user = sessions.get(tk);
   next();
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// BARCODE DECODE ENGINE (server-side)
+// ═══════════════════════════════════════════════════════════════
+
+async function decodeBarcode(imageBuffer) {
+  const {
+    MultiFormatReader, BarcodeFormat, DecodeHintType,
+    RGBLuminanceSource, BinaryBitmap, HybridBinarizer
+  } = ZXing;
+
+  const reader = new MultiFormatReader();
+
+  const attempts = [
+    { label: 'Original 1600px', resize: 1600, sharpen: false, normalize: false, tryHarder: false },
+    { label: 'Sharpen+Normalize 1600px TRY_HARDER', resize: 1600, sharpen: true, normalize: true, tryHarder: true },
+    { label: 'High-res 2400px sharpened TRY_HARDER', resize: 2400, sharpen: true, normalize: false, tryHarder: true },
+  ];
+
+  for (const attempt of attempts) {
+    try {
+      let pipeline = sharp(imageBuffer)
+        .rotate() // auto-rotate based on EXIF
+        .resize(attempt.resize, null, { withoutEnlargement: true });
+      if (attempt.sharpen) pipeline = pipeline.sharpen();
+      if (attempt.normalize) pipeline = pipeline.normalize();
+      pipeline = pipeline.ensureAlpha().raw();
+
+      const { data, info } = await pipeline.toBuffer({ resolveWithObject: true });
+
+      const hints = new Map();
+      hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.PDF_417]);
+      if (attempt.tryHarder) hints.set(DecodeHintType.TRY_HARDER, true);
+      reader.setHints(hints);
+
+      const luminanceSource = new RGBLuminanceSource(
+        new Uint8ClampedArray(data), info.width, info.height
+      );
+      const bitmap = new BinaryBitmap(new HybridBinarizer(luminanceSource));
+      const result = reader.decode(bitmap);
+
+      if (result && result.getText()) {
+        console.log(`  [DECODE] Success on: ${attempt.label}`);
+        return result.getText();
+      }
+    } catch (e) {
+      console.log(`  [DECODE] "${attempt.label}" failed: ${e.message || 'no barcode'}`);
+    }
+  }
+
+  return null;
+}
+
+function parseAAMVA(raw) {
+  const fields = {};
+  const map = {
+    'DCS': 'last_name', 'DAB': 'last_name', 'DAC': 'first_name', 'DCT': 'first_name',
+    'DAD': 'middle_name', 'DBB': 'dob', 'DBA': 'expiration',
+    'DAQ': 'dl_number', 'DAG': 'address', 'DAI': 'city',
+    'DAJ': 'state', 'DAK': 'postal_code', 'DBC': 'sex',
+  };
+
+  // Method 1: Split by delimiters
+  const lines = raw.split(/[\n\r\x1e\x1d]+/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    for (const [code, field] of Object.entries(map)) {
+      if (trimmed.startsWith(code)) {
+        let val = trimmed.substring(code.length).trim();
+        if (field === 'first_name' && fields.first_name && code === 'DCT') continue;
+        if (val) fields[field] = val;
+      }
+    }
+  }
+
+  // Method 2: Regex fallback
+  for (const [code, field] of Object.entries(map)) {
+    if (fields[field]) continue;
+    const re = new RegExp(code + '([^\\n\\r\\x1e\\x1d]{1,120}?)(?=D[A-Z]{2}|[\\n\\r\\x1e\\x1d]|$)');
+    const m = re.exec(raw);
+    if (m && m[1] && m[1].trim()) fields[field] = m[1].trim();
+  }
+
+  // Method 3: Aggressive matchAll
+  if (Object.keys(fields).length < 3) {
+    const allMatches = [...raw.matchAll(/(D[A-Z]{2})([\s\S]*?)(?=D[A-Z]{2}|$)/g)];
+    for (const m of allMatches) {
+      const code = m[1], val = m[2].trim();
+      if (map[code] && val && !fields[map[code]]) fields[map[code]] = val;
+    }
+  }
+
+  // Format dates
+  for (const df of ['dob', 'expiration']) {
+    if (fields[df] && fields[df].length >= 8) {
+      const d = fields[df].replace(/[^0-9]/g, '');
+      if (d.length === 8) {
+        const f2 = parseInt(d.slice(0, 2));
+        if (f2 > 12) fields[df] = d.slice(4, 6) + '/' + d.slice(6, 8) + '/' + d.slice(0, 4);
+        else fields[df] = d.slice(0, 2) + '/' + d.slice(2, 4) + '/' + d.slice(4, 8);
+      }
+    }
+  }
+
+  if (fields.sex === '1') fields.sex = 'M';
+  else if (fields.sex === '2') fields.sex = 'F';
+  if (fields.postal_code) fields.postal_code = fields.postal_code.replace(/\s+/g, '').substring(0, 5);
+
+  for (const nf of ['first_name', 'last_name', 'middle_name', 'city']) {
+    if (fields[nf]) fields[nf] = fields[nf].charAt(0).toUpperCase() + fields[nf].slice(1).toLowerCase();
+  }
+
+  return fields;
 }
 
 
@@ -159,6 +257,33 @@ app.post('/api/logout', (req, res) => {
   const tk = req.headers['x-auth-token'];
   if (tk) sessions.delete(tk);
   res.json({ ok: true });
+});
+
+// --- Barcode Decode (server-side) ---
+app.post('/api/barcode/decode', auth, upload.single('photo'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ success: false, error: 'No photo provided' });
+
+  console.log(`  [DECODE] Photo received: ${(req.file.size/1024).toFixed(0)}KB from ${req.user.display_name}`);
+  const startTime = Date.now();
+
+  try {
+    const raw = await decodeBarcode(req.file.buffer);
+    const elapsed = Date.now() - startTime;
+
+    if (raw) {
+      console.log(`  [DECODE] SUCCESS in ${elapsed}ms, raw length: ${raw.length}`);
+      db.prepare('INSERT INTO raw_decodes (raw, engine, length, guard_id, guard_name) VALUES (?, ?, ?, ?, ?)')
+        .run(raw, 'server-zxing', raw.length, req.user.id, req.user.display_name);
+      const fields = parseAAMVA(raw);
+      res.json({ success: true, raw, fields, elapsed });
+    } else {
+      console.log(`  [DECODE] FAILED after ${elapsed}ms — no barcode found`);
+      res.json({ success: false, error: 'Could not decode barcode from photo', elapsed });
+    }
+  } catch (e) {
+    console.error(`  [DECODE] ERROR: ${e.message}`);
+    res.json({ success: false, error: e.message });
+  }
 });
 
 // --- Scans ---
@@ -248,24 +373,22 @@ app.get('/api/dashboard', auth, (req, res) => {
   res.json({ today:today.c, flagged:flagged.c, total:total.c, watchlist:wl.c, recent });
 });
 
-// --- Debug: raw barcode captures ---
+// --- Debug ---
 app.post('/api/debug/raw-decode', auth, (req, res) => {
   const { raw, engine, length } = req.body;
   if (!raw) return res.status(400).json({ error: 'No raw data' });
   db.prepare('INSERT INTO raw_decodes (raw, engine, length, guard_id, guard_name) VALUES (?, ?, ?, ?, ?)')
     .run(raw, engine || '', length || raw.length, req.user.id, req.user.display_name);
-  console.log(`  [RAW-DECODE] Captured ${raw.length} chars from ${engine} by ${req.user.display_name}`);
   res.json({ ok: true, stored: raw.length });
 });
 
 app.get('/api/debug/raw-decode', auth, (req, res) => {
-  const rows = db.prepare('SELECT * FROM raw_decodes ORDER BY created_at DESC LIMIT 20').all();
-  res.json(rows);
+  res.json(db.prepare('SELECT * FROM raw_decodes ORDER BY created_at DESC LIMIT 20').all());
 });
 
 // --- Health ---
 app.get('/api/health', (req, res) => {
-  res.json({ status:'ok', version:'4.0.1', scanner:'client-side (Dynamsoft + html5-qrcode)', uptime:Math.round(process.uptime()) });
+  res.json({ status:'ok', version:'4.1.0', scanner:'hybrid (client Dynamsoft + server @zxing/library)', uptime:Math.round(process.uptime()) });
 });
 
 
@@ -275,14 +398,14 @@ app.get('/api/health', (req, res) => {
 
 app.listen(PORT, async () => {
   console.log('\n\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557');
-  console.log('\u2551  IRON HALO VERIFY v4.0                   \u2551');
-  console.log('\u2551  Client-Side Scanner (Dynamsoft + h5qr)   \u2551');
+  console.log('\u2551  IRON HALO VERIFY v4.1                   \u2551');
+  console.log('\u2551  Hybrid: Dynamsoft + Server @zxing        \u2551');
   console.log('\u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d\n');
   console.log(`  \u25b8 Server: http://localhost:${PORT}`);
-  console.log('  \u25b8 Scanner: Dynamsoft BarcodeReader + html5-qrcode (client-side)');
+  console.log('  \u25b8 Live scan: Dynamsoft BarcodeReader + html5-qrcode (client-side)');
+  console.log('  \u25b8 Photo decode: @zxing/library + sharp (server-side)');
   console.log('  \u25b8 Logins: admin/vanguard2026 | guard/guard123 | demo/demo\n');
 
-  // Startup self-test
   try {
     const resp = await fetch(`http://localhost:${PORT}/api/health`);
     const data = await resp.json();
