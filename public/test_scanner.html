@@ -83,41 +83,25 @@ var btnStop = document.getElementById('btn-stop');
 var photoStatus = document.getElementById('photo-status');
 
 // ═════════════════════════════════════════════
-// LOAD DYNAMSOFT SDK — try 3 CDNs
+// LOAD DYNAMSOFT SDK — self-hosted (no CDN)
 // ═════════════════════════════════════════════
-var CDN_URLS = [
-  'https://cdn.jsdelivr.net/npm/dynamsoft-javascript-barcode@9.6.42/dist/dbr.js',
-  'https://unpkg.com/dynamsoft-javascript-barcode@9.6.42/dist/dbr.js',
-  'https://cdn.jsdelivr.net/npm/dynamsoft-javascript-barcode@9.6.40/dist/dbr.js'
-];
-
 function loadScript(url) {
   return new Promise(function(resolve, reject) {
     var s = document.createElement('script');
     s.src = url;
     s.onload = function() { resolve(url); };
-    s.onerror = function() { reject(url); };
+    s.onerror = function() { reject(new Error('Script load failed: ' + url)); };
     document.head.appendChild(s);
   });
 }
 
 async function loadSDK() {
   if (sdkLoaded && window.Dynamsoft) return;
-  for (var i = 0; i < CDN_URLS.length; i++) {
-    var url = CDN_URLS[i];
-    statusEl.textContent = 'Loading SDK (CDN ' + (i+1) + '/' + CDN_URLS.length + ')...';
-    try {
-      await loadScript(url);
-      if (window.Dynamsoft) {
-        sdkLoaded = true;
-        statusEl.textContent = 'SDK loaded from CDN ' + (i+1) + '.';
-        return;
-      }
-    } catch(e) {
-      statusEl.textContent = 'CDN ' + (i+1) + ' failed. Trying next...';
-    }
-  }
-  throw new Error('All 3 CDNs failed. Check WiFi/data connection.');
+  statusEl.textContent = 'Loading Dynamsoft SDK from server...';
+  await loadScript('/dbr/dbr.js');
+  if (!window.Dynamsoft) throw new Error('Dynamsoft global not found after script load');
+  sdkLoaded = true;
+  statusEl.textContent = 'SDK loaded from server.';
 }
 
 // ═════════════════════════════════════════════
@@ -127,6 +111,7 @@ async function initDynamsoft() {
   await loadSDK();
   if (typeof Dynamsoft === 'undefined') throw new Error('Dynamsoft not available');
   statusEl.textContent = 'Creating BarcodeReader...';
+  Dynamsoft.DBR.BarcodeReader.engineResourcePath = '/dbr/';
   Dynamsoft.DBR.BarcodeReader.license = 'DLS2eyJvcmdhbml6YXRpb25JRCI6IjIwMDAwMSJ9';
   reader = await Dynamsoft.DBR.BarcodeReader.createInstance();
   var settings = await reader.getRuntimeSettings();
@@ -370,7 +355,7 @@ loadSDK().then(function() {
   statusEl.textContent = 'SDK loaded. Ready to scan.';
   btnScan.disabled = false;
 }).catch(function(e) {
-  statusEl.textContent = 'SDK failed: ' + e.message + ' — Use TAKE PHOTO button instead.';
+  statusEl.textContent = 'SDK error: ' + e.message + ' — Use TAKE PHOTO button instead.';
   document.getElementById('btn-retry-sdk').style.display = 'block';
   btnScan.disabled = false;
 });
