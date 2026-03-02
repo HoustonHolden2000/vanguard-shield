@@ -329,7 +329,7 @@ function initDynamsoft(statusFn) {
     return Promise.race([
       Dynamsoft.DBR.BarcodeReader.createInstance(),
       new Promise(function(_, reject) {
-        setTimeout(function() { reject(new Error('WASM load timed out after 45s')); }, 45000);
+        setTimeout(function() { reject(new Error('WASM load timed out — using server decode')); }, 90000);
       })
     ]);
   }).then(function(r) {
@@ -751,14 +751,20 @@ document.getElementById('add-wl-btn').addEventListener('click', function() {
 });
 
 // ═══════════════════════════════════════════════
-// PRELOAD SDK (non-blocking, same as test_scanner.html)
+// PRELOAD: Start full Dynamsoft init (including WASM download)
+// so it's ready by the time user takes a photo
 // ═══════════════════════════════════════════════
-loadSDK().then(function() {
-  photoStatus.textContent = 'Ready';
-  photoStatus.style.color = '#0f0';
-  setTimeout(function() { photoStatus.textContent = ''; }, 2000);
+initDynamsoft(function(msg) {
+  if (photoStatus) photoStatus.textContent = msg;
+}).then(function() {
+  if (photoStatus) {
+    photoStatus.textContent = 'Decoder ready';
+    photoStatus.style.color = '#0f0';
+    setTimeout(function() { photoStatus.textContent = ''; }, 2000);
+  }
 }).catch(function() {
-  // SDK will load on first photo attempt
+  // WASM failed to preload — server decode will be used as fallback
+  if (photoStatus) photoStatus.textContent = '';
 });
 </script>
 </body>

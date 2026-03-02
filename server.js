@@ -16,6 +16,7 @@
  */
 
 const express = require('express');
+const compression = require('compression');
 const multer = require('multer');
 const bcrypt = require('bcryptjs');
 const Database = require('better-sqlite3');
@@ -27,6 +28,9 @@ const ZXing = require('@zxing/library');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Gzip compression — critical for 3MB WASM file → ~1MB transfer
+app.use(compression());
 
 
 // ═══════════════════════════════════════════════════════════════
@@ -143,30 +147,38 @@ async function decodeBarcode(imageBuffer) {
     RGBLuminanceSource, BinaryBitmap, HybridBinarizer
   } = ZXing;
 
-  const reader = new MultiFormatReader();
-
+  // 7 decode attempts with different preprocessing
   const attempts = [
-    { label: 'Original 1600px', resize: 1600, sharpen: false, normalize: false, tryHarder: false },
-    { label: 'Sharpen+Normalize 1600px TRY_HARDER', resize: 1600, sharpen: true, normalize: true, tryHarder: true },
-    { label: 'High-res 2400px sharpened TRY_HARDER', resize: 2400, sharpen: true, normalize: false, tryHarder: true },
+    { label: '1600px plain',          resize: 1600, sharpen: false, normalize: false, tryHarder: true },
+    { label: '1600px sharp+norm',     resize: 1600, sharpen: true,  normalize: true,  tryHarder: true },
+    { label: '2400px sharp',          resize: 2400, sharpen: true,  normalize: false, tryHarder: true },
+    { label: '1200px sharp+norm',     resize: 1200, sharpen: true,  normalize: true,  tryHarder: true },
+    { label: '800px sharp+norm',      resize: 800,  sharpen: true,  normalize: true,  tryHarder: true },
+    { label: '3200px plain',          resize: 3200, sharpen: false, normalize: false, tryHarder: true },
+    { label: '1600px threshold',      resize: 1600, sharpen: true,  normalize: true,  tryHarder: true, threshold: true },
   ];
 
   for (const attempt of attempts) {
     try {
+      // Output RGBA (4 channels) — what RGBLuminanceSource expects
       let pipeline = sharp(imageBuffer)
-        .rotate() // auto-rotate based on EXIF
+        .rotate()
         .resize(attempt.resize, null, { withoutEnlargement: true });
-      if (attempt.sharpen) pipeline = pipeline.sharpen();
+      if (attempt.sharpen) pipeline = pipeline.sharpen({ sigma: 1.5 });
       if (attempt.normalize) pipeline = pipeline.normalize();
-      pipeline = pipeline.grayscale().raw();
+      if (attempt.threshold) pipeline = pipeline.threshold(128);
+      pipeline = pipeline.ensureAlpha().raw();
 
       const { data, info } = await pipeline.toBuffer({ resolveWithObject: true });
+      console.log(`  [DECODE] Try "${attempt.label}": ${info.width}x${info.height} ch=${info.channels} data=${data.length}`);
 
+      const reader = new MultiFormatReader();
       const hints = new Map();
       hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.PDF_417]);
-      if (attempt.tryHarder) hints.set(DecodeHintType.TRY_HARDER, true);
+      hints.set(DecodeHintType.TRY_HARDER, true);
       reader.setHints(hints);
 
+      // RGBLuminanceSource expects RGBA data (4 bytes per pixel)
       const luminanceSource = new RGBLuminanceSource(
         new Uint8ClampedArray(data), info.width, info.height
       );
@@ -174,7 +186,7 @@ async function decodeBarcode(imageBuffer) {
       const result = reader.decode(bitmap);
 
       if (result && result.getText()) {
-        console.log(`  [DECODE] Success on: ${attempt.label}`);
+        console.log(`  [DECODE] SUCCESS on: "${attempt.label}"`);
         return result.getText();
       }
     } catch (e) {
@@ -423,7 +435,7 @@ app.get('/api/debug/raw-decode', auth, (req, res) => {
 
 // --- Health ---
 app.get('/api/health', (req, res) => {
-  res.json({ status:'ok', version:'6.1.0', scanner:'Dynamsoft BarcodeReader v9.6.42 (photo-only)', uptime:Math.round(process.uptime()) });
+  res.json({ status:'ok', version:'6.2.0', scanner:'Dynamsoft BarcodeReader v9.6.42 (photo-only)', uptime:Math.round(process.uptime()) });
 });
 
 
