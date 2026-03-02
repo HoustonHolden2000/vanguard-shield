@@ -329,7 +329,7 @@ function initDynamsoft(statusFn) {
     return Promise.race([
       Dynamsoft.DBR.BarcodeReader.createInstance(),
       new Promise(function(_, reject) {
-        setTimeout(function() { reject(new Error('WASM load timed out — using server decode')); }, 90000);
+        setTimeout(function() { reject(new Error('Decoder download timed out after 2 min')); }, 120000);
       })
     ]);
   }).then(function(r) {
@@ -372,8 +372,18 @@ document.getElementById('photo-input').addEventListener('change', async function
   photoStatus.style.color = '#aaa';
   photoStatus.textContent = 'Processing photo...';
 
-  // === STEP 1: Use Dynamsoft ONLY if already loaded (don't wait for WASM) ===
-  // WASM preloads in background — if it's ready, great. If not, skip to server.
+  // === STEP 1: Ensure Dynamsoft is ready (wait if needed — it's the only reliable decoder) ===
+  if (!reader) {
+    photoStatus.textContent = 'Downloading decoder (first time only — please wait)...';
+    try {
+      await initDynamsoft(function(msg) { photoStatus.textContent = msg; });
+      photoStatus.textContent = 'Decoder ready!';
+    } catch(err) {
+      // WASM failed even with wait — fall through to server as last resort
+      logError('wasm-failed', err.message, navigator.userAgent);
+      reader = null;
+    }
+  }
 
   // === STEP 2: Load photo into canvas ===
   photoStatus.textContent = 'Loading photo...';
