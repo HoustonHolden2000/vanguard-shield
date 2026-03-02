@@ -305,36 +305,53 @@ document.getElementById('l-pass').addEventListener('keydown',e=>{if(e.key==='Ent
 
 // ═══════════════════════════════════════════════════════════
 // DYNAMSOFT SDK (self-hosted from /dbr/, loaded dynamically)
+// engineResourcePath + license MUST be set before createInstance
 // ═══════════════════════════════════════════════════════════
-let sdkLoaded=false;
+let sdkLoaded=false,readerInitPromise=null;
+
 function loadSDK(){
   return new Promise(function(resolve,reject){
     if(sdkLoaded&&window.Dynamsoft){resolve();return;}
     console.log('[DYN] Loading SDK from /dbr/dbr.js...');
     var s=document.createElement('script');
     s.src='/dbr/dbr.js';
-    s.onload=function(){sdkLoaded=true;console.log('[DYN] SDK loaded OK');resolve();};
+    s.onload=function(){
+      sdkLoaded=true;
+      // Configure IMMEDIATELY on load, BEFORE any createInstance/loadWasm
+      Dynamsoft.DBR.BarcodeReader.engineResourcePath='/dbr/';
+      Dynamsoft.DBR.BarcodeReader.license='DLS2eyJvcmdhbml6YXRpb25JRCI6IjIwMDAwMSJ9';
+      console.log('[DYN] SDK loaded + configured');
+      resolve();
+    };
     s.onerror=function(){reject(new Error('Failed to load Dynamsoft SDK'));};
     document.head.appendChild(s);
   });
 }
 
-async function getDynamsoftReader(){
-  if(dynamsoftReader)return dynamsoftReader;
-  await loadSDK();
-  if(typeof Dynamsoft==='undefined')throw new Error('Dynamsoft SDK not available');
-  console.log('[DYN] Creating reader instance...');
-  Dynamsoft.DBR.BarcodeReader.engineResourcePath='/dbr/';
-  Dynamsoft.DBR.BarcodeReader.license='DLS2eyJvcmdhbml6YXRpb25JRCI6IjIwMDAwMSJ9';
-  dynamsoftReader=await Dynamsoft.DBR.BarcodeReader.createInstance();
-  var settings=await dynamsoftReader.getRuntimeSettings();
-  settings.barcodeFormatIds=Dynamsoft.DBR.EnumBarcodeFormat.BF_PDF417;
-  settings.expectedBarcodesCount=1;
-  settings.deblurLevel=5;
-  await dynamsoftReader.updateRuntimeSettings(settings);
-  dynamsoftReady=true;
-  console.log('[DYN] Reader ready: PDF417, deblurLevel=5');
-  return dynamsoftReader;
+function getDynamsoftReader(){
+  if(dynamsoftReader)return Promise.resolve(dynamsoftReader);
+  // Single shared promise — prevents concurrent createInstance race
+  if(readerInitPromise)return readerInitPromise;
+  readerInitPromise=loadSDK().then(function(){
+    console.log('[DYN] Creating reader instance...');
+    return Dynamsoft.DBR.BarcodeReader.createInstance();
+  }).then(function(reader){
+    dynamsoftReader=reader;
+    return reader.getRuntimeSettings();
+  }).then(function(settings){
+    settings.barcodeFormatIds=Dynamsoft.DBR.EnumBarcodeFormat.BF_PDF417;
+    settings.expectedBarcodesCount=1;
+    settings.deblurLevel=5;
+    return dynamsoftReader.updateRuntimeSettings(settings);
+  }).then(function(){
+    dynamsoftReady=true;
+    console.log('[DYN] Reader ready: PDF417, deblurLevel=5');
+    return dynamsoftReader;
+  }).catch(function(err){
+    readerInitPromise=null; // allow retry on failure
+    throw err;
+  });
+  return readerInitPromise;
 }
 
 // ═══════════════════════════════════════════════════════════
