@@ -296,35 +296,58 @@ function logError(step, error, details) {
 }
 
 // ═══════════════════════════════════════════════
-// DYNAMSOFT SDK — config set ON LOAD (v5.0.2 proven fix)
-// engineResourcePath + license MUST be set before createInstance/loadWasm
+// DYNAMSOFT SDK — shared promises prevent double-load
 // ═══════════════════════════════════════════════
+var sdkLoadPromise = null;
+var readerInitPromise = null;
+
 function loadSDK() {
-  return new Promise(function(resolve, reject) {
+  if (sdkLoadPromise) return sdkLoadPromise;
+  sdkLoadPromise = new Promise(function(resolve, reject) {
     if (sdkLoaded && window.Dynamsoft) { resolve(); return; }
     var s = document.createElement('script');
     s.src = '/dbr/dbr.js';
     s.onload = function() {
-      if (!window.Dynamsoft) { reject(new Error('Dynamsoft global not found')); return; }
-      // SET CONFIG IMMEDIATELY — before any auto-init can happen
+      if (!window.Dynamsoft) { sdkLoadPromise = null; reject(new Error('Dynamsoft global not found')); return; }
       Dynamsoft.DBR.BarcodeReader.engineResourcePath = '/dbr/';
       Dynamsoft.DBR.BarcodeReader.license = 'DLS2eyJvcmdhbml6YXRpb25JRCI6IjIwMDAwMSJ9';
       sdkLoaded = true;
       resolve();
     };
-    s.onerror = function() { reject(new Error('Script load failed')); };
+    s.onerror = function() { sdkLoadPromise = null; reject(new Error('Script load failed')); };
     document.head.appendChild(s);
   });
+  return sdkLoadPromise;
 }
 
-async function initDynamsoft() {
-  await loadSDK();
-  reader = await Dynamsoft.DBR.BarcodeReader.createInstance();
-  var settings = await reader.getRuntimeSettings();
-  settings.barcodeFormatIds = Dynamsoft.DBR.EnumBarcodeFormat.BF_PDF417;
-  settings.expectedBarcodesCount = 1;
-  settings.deblurLevel = 5;
-  await reader.updateRuntimeSettings(settings);
+function initDynamsoft(statusFn) {
+  if (reader) return Promise.resolve();
+  if (readerInitPromise) return readerInitPromise;
+  readerInitPromise = loadSDK().then(function() {
+    if (statusFn) statusFn('Creating decoder instance (loading WASM)...');
+    // Timeout: if createInstance hangs for 45s, reject
+    return Promise.race([
+      Dynamsoft.DBR.BarcodeReader.createInstance(),
+      new Promise(function(_, reject) {
+        setTimeout(function() { reject(new Error('WASM load timed out after 45s')); }, 45000);
+      })
+    ]);
+  }).then(function(r) {
+    reader = r;
+    if (statusFn) statusFn('Configuring for PDF417...');
+    return reader.getRuntimeSettings();
+  }).then(function(settings) {
+    settings.barcodeFormatIds = Dynamsoft.DBR.EnumBarcodeFormat.BF_PDF417;
+    settings.expectedBarcodesCount = 1;
+    settings.deblurLevel = 5;
+    return reader.updateRuntimeSettings(settings);
+  }).then(function() {
+    return reader;
+  }).catch(function(err) {
+    readerInitPromise = null;
+    throw err;
+  });
+  return readerInitPromise;
 }
 
 // ═══════════════════════════════════════════════
@@ -350,12 +373,12 @@ document.getElementById('photo-input').addEventListener('change', async function
 
   // Step 1: Init Dynamsoft if needed
   if (!reader) {
-    photoStatus.textContent = 'Step 1: Loading barcode decoder...';
+    photoStatus.textContent = 'Loading SDK script...';
     try {
-      await initDynamsoft();
-      photoStatus.textContent = 'Step 1: Decoder ready.';
+      await initDynamsoft(function(msg) { photoStatus.textContent = msg; });
+      photoStatus.textContent = 'Decoder ready!';
     } catch(err) {
-      photoStatus.textContent = 'Decoder failed: ' + err.message;
+      photoStatus.textContent = 'FAILED: ' + err.message;
       photoStatus.style.color = '#f44';
       logError('initDynamsoft', err.message, navigator.userAgent);
       e.target.value = '';
