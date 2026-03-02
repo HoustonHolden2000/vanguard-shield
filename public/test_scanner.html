@@ -41,7 +41,7 @@ input[type=file]{display:none;}
 <div class="divider">— OR —</div>
 
 <!-- TEST B: Photo upload to server -->
-<button class="btn btn-green" onclick="document.getElementById('photo-input').click()">TAKE PHOTO → SERVER DECODE</button>
+<button class="btn btn-green" onclick="document.getElementById('photo-input').click()">TAKE PHOTO OF BARCODE</button>
 <input type="file" id="photo-input" accept="image/*" capture="environment">
 <div id="photo-status" style="text-align:center;color:#aaa;font-size:12px;margin-bottom:8px;"></div>
 
@@ -196,62 +196,55 @@ function retrySdk() {
 }
 
 // ═════════════════════════════════════════════
-// TEST B: PHOTO → SERVER DECODE
+// TEST B: PHOTO → CLIENT-SIDE DYNAMSOFT DECODE
 // ═════════════════════════════════════════════
 document.getElementById('photo-input').addEventListener('change', async function(e) {
   var file = e.target.files[0];
   if (!file) return;
 
-  photoStatus.textContent = 'Uploading ' + (file.size/1024).toFixed(0) + 'KB photo to server...';
+  photoStatus.textContent = 'Decoding photo client-side...';
   photoStatus.style.color = '#aaa';
 
-  // Need auth token — login first
-  var token = null;
-  try {
-    var loginRes = await fetch('/api/login', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({username:'admin', password:'vanguard2026'})
-    });
-    var loginData = await loginRes.json();
-    token = loginData.token;
-  } catch(e) {
-    photoStatus.textContent = 'Login failed: ' + e.message;
-    photoStatus.style.color = '#f44';
-    return;
-  }
-
-  // Upload photo
-  try {
-    var formData = new FormData();
-    formData.append('photo', file);
-    var res = await fetch('/api/barcode/decode', {
-      method: 'POST',
-      headers: {'x-auth-token': token},
-      body: formData
-    });
-    var result = await res.json();
-
-    photoStatus.textContent = 'Server responded: success=' + result.success + ', elapsed=' + (result.elapsed||'?') + 'ms';
-
-    if (result.success && result.raw) {
-      photoStatus.style.color = '#0f0';
-      onDecoded(result.raw, 'server-zxing');
-    } else if (result.success && result.fields) {
-      photoStatus.style.color = '#0f0';
-      rawOutput.value = '(server parsed directly — no raw text returned)';
-      showFields(result.fields);
-      document.getElementById('engine-info').textContent = 'Engine: server-zxing | elapsed: ' + result.elapsed + 'ms';
-    } else {
+  // Init Dynamsoft if needed
+  if (!reader) {
+    try { await initDynamsoft(); }
+    catch(err) {
+      photoStatus.textContent = 'SDK error: ' + err.message;
       photoStatus.style.color = '#f44';
-      photoStatus.textContent = 'Server decode FAILED: ' + (result.error || 'no barcode found') + ' (' + (result.elapsed||'?') + 'ms)';
+      e.target.value = '';
+      return;
     }
-  } catch(e) {
-    photoStatus.textContent = 'Upload error: ' + e.message;
+  }
+
+  // Load photo into canvas
+  try {
+    var img = new Image();
+    var url = URL.createObjectURL(file);
+    await new Promise(function(resolve, reject) { img.onload = resolve; img.onerror = reject; img.src = url; });
+    var canvas = document.createElement('canvas');
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    canvas.getContext('2d').drawImage(img, 0, 0);
+    URL.revokeObjectURL(url);
+
+    photoStatus.textContent = 'Decoding ' + img.naturalWidth + 'x' + img.naturalHeight + ' image...';
+    var t0 = Date.now();
+    var results = await reader.decode(canvas);
+    var elapsed = Date.now() - t0;
+
+    if (results && results.length > 0 && results[0].barcodeText && results[0].barcodeText.length > 20) {
+      photoStatus.textContent = 'Decoded in ' + elapsed + 'ms!';
+      photoStatus.style.color = '#0f0';
+      onDecoded(results[0].barcodeText, 'dynamsoft-photo');
+    } else {
+      photoStatus.textContent = 'No barcode found in photo (' + elapsed + 'ms). Try again — hold camera steady, good lighting.';
+      photoStatus.style.color = '#f44';
+    }
+  } catch(err) {
+    photoStatus.textContent = 'Decode error: ' + err.message;
     photoStatus.style.color = '#f44';
   }
 
-  // Reset file input so same file can be re-selected
   e.target.value = '';
 });
 

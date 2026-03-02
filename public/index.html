@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Iron Halo Verify</title>
-<script src="/html5-qrcode.min.js"></script>
+<script src="/dbr/dbr.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--bg:#0a0a0f;--surface:#14141f;--card:#1a1a2e;--border:#2a2a3e;--blue:#0056A0;--green:#00c853;--red:#ff3d3d;--amber:#ffab00;--text:#e8e8f0;--muted:#8888a0;--radius:12px}
@@ -107,7 +107,7 @@ input,button,select,textarea{font-family:inherit;font-size:inherit}
   <div class="screen active" id="s-login">
     <div style="flex:1;display:flex;align-items:center;justify-content:center">
       <div class="login-box">
-        <div class="login-logo"><h2>IRON HALO VERIFY</h2><p>Guard Verification System v4.1</p></div>
+        <div class="login-logo"><h2>IRON HALO VERIFY</h2><p>Guard Verification System v5.0</p></div>
         <div class="field"><label>Username</label><input type="text" id="l-user" autocapitalize="none" autocomplete="username"></div>
         <div class="field"><label>Password</label>
           <div class="input-eye-wrap">
@@ -128,11 +128,11 @@ input,button,select,textarea{font-family:inherit;font-size:inherit}
         <svg viewBox="0 0 24 24"><path d="M12 15.2a3.2 3.2 0 100-6.4 3.2 3.2 0 000 6.4z"/><path d="M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/></svg>
       </div>
       <div style="font-size:18px;font-weight:700">SCAN LICENSE</div>
-      <div style="font-size:13px;color:var(--muted);text-align:center;max-width:260px">Tap to open live camera or use <strong>Take Photo</strong> for best results</div>
+      <div style="font-size:13px;color:var(--muted);text-align:center;max-width:260px">Tap circle for live scan or use <strong>Take Photo</strong> below</div>
       <button class="btn btn-primary" onclick="takePhoto()" style="margin-top:8px;font-size:16px;padding:14px 20px;">
         &#128247; TAKE PHOTO OF BARCODE
       </button>
-      <div style="font-size:11px;color:var(--muted);margin-top:2px">Uses your camera + server decode — most reliable</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:2px">Photo of back barcode — most reliable method</div>
     </div>
     <button class="btn btn-outline btn-sm" onclick="goManual()" style="margin-top:auto">Manual Entry</button>
   </div>
@@ -223,7 +223,7 @@ input,button,select,textarea{font-family:inherit;font-size:inherit}
   <div class="screen" id="s-dash">
     <h2 style="margin-bottom:14px;font-size:18px">Dashboard</h2>
     <div class="stat-grid" id="d-stats"></div>
-    <div class="card"><div class="card-label">Decode Engine</div><div id="d-decode" style="font-size:14px;margin-top:4px">Hybrid: Dynamsoft live + server @zxing photo decode</div></div>
+    <div class="card"><div class="card-label">Decode Engine</div><div id="d-decode" style="font-size:14px;margin-top:4px">Dynamsoft BarcodeReader v9.6.42 (self-hosted)</div></div>
     <h3 style="font-size:14px;margin:14px 0 8px;color:var(--muted)">Watchlist</h3>
     <div id="d-wl"></div>
     <button class="btn btn-outline btn-sm" onclick="toggleWLForm()" style="margin-top:10px">+ Add to Watchlist</button>
@@ -253,9 +253,9 @@ input,button,select,textarea{font-family:inherit;font-size:inherit}
 // STATE
 // ═══════════════════════════════════════════════════════════
 let TK=localStorage.getItem('stk')||'',US=JSON.parse(localStorage.getItem('sus')||'null'),CD={};
-let html5Qr=null,scannerTimeout=null,manualTimeout=null,dynamsoftReader=null,dynamsoftLoaded=false;
-let dynamsoftFrameLoop=null,torchOn=false,scannerVideoTrack=null,scannerStream=null;
-let activeEngine='html5-qrcode',dynFrameCount=0;
+let dynamsoftReader=null,dynamsoftReady=false;
+let scannerStream=null,scannerVideoTrack=null,dynamsoftFrameLoop=null;
+let torchOn=false,dynFrameCount=0,scannerTimeout=null;
 
 // ═══════════════════════════════════════════════════════════
 // HELPERS
@@ -296,45 +296,36 @@ async function doLogin(){
     const d=await r.json();if(!r.ok)throw new Error(d.error);
     TK=d.token;US=d;localStorage.setItem('stk',TK);localStorage.setItem('sus',JSON.stringify(US));
     showApp();
-    // Preload Dynamsoft in background
-    loadDynamsoftSDK().catch(()=>{});
+    // Preload Dynamsoft reader in background
+    getDynamsoftReader().catch(()=>{});
   }catch(e){document.getElementById('l-err').textContent=e.message||'Login failed';}
   document.getElementById('l-btn').textContent='Sign In';
 }
-if(TK&&US){fetch('/api/dashboard',{headers:{'x-auth-token':TK}}).then(r=>{if(r.ok){showApp();loadDynamsoftSDK().catch(()=>{});}else throw 0;}).catch(()=>{TK='';US=null;localStorage.clear();});}
+if(TK&&US){fetch('/api/dashboard',{headers:{'x-auth-token':TK}}).then(r=>{if(r.ok){showApp();getDynamsoftReader().catch(()=>{});}else throw 0;}).catch(()=>{TK='';US=null;localStorage.clear();});}
 document.getElementById('l-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 
 // ═══════════════════════════════════════════════════════════
-// DYNAMSOFT SDK LOADER
+// DYNAMSOFT SDK (self-hosted from /dbr/)
 // ═══════════════════════════════════════════════════════════
-function loadDynamsoftSDK(){
-  return new Promise((resolve,reject)=>{
-    if(dynamsoftLoaded&&window.Dynamsoft){resolve();return;}
-    console.log('[DYN] Loading Dynamsoft SDK from CDN...');
-    const s=document.createElement('script');
-    s.src='https://cdn.jsdelivr.net/npm/dynamsoft-javascript-barcode@9.6.42/dist/dbr.js';
-    s.onload=()=>{dynamsoftLoaded=true;console.log('[DYN] SDK loaded OK');resolve();};
-    s.onerror=()=>{console.error('[DYN] SDK load FAILED');reject(new Error('Dynamsoft SDK failed to load'));};
-    document.head.appendChild(s);
-  });
-}
-
 async function getDynamsoftReader(){
   if(dynamsoftReader)return dynamsoftReader;
-  await loadDynamsoftSDK();
+  if(typeof Dynamsoft==='undefined')throw new Error('Dynamsoft SDK not loaded');
   console.log('[DYN] Creating reader instance...');
+  Dynamsoft.DBR.BarcodeReader.engineResourcePath='/dbr/';
   Dynamsoft.DBR.BarcodeReader.license='DLS2eyJvcmdhbml6YXRpb25JRCI6IjIwMDAwMSJ9';
   dynamsoftReader=await Dynamsoft.DBR.BarcodeReader.createInstance();
   const settings=await dynamsoftReader.getRuntimeSettings();
   settings.barcodeFormatIds=Dynamsoft.DBR.EnumBarcodeFormat.BF_PDF417;
+  settings.expectedBarcodesCount=1;
   settings.deblurLevel=5;
   await dynamsoftReader.updateRuntimeSettings(settings);
+  dynamsoftReady=true;
   console.log('[DYN] Reader ready: PDF417, deblurLevel=5');
   return dynamsoftReader;
 }
 
 // ═══════════════════════════════════════════════════════════
-// PHOTO CAPTURE → SERVER DECODE (most reliable path)
+// PHOTO CAPTURE → CLIENT-SIDE DYNAMSOFT DECODE
 // ═══════════════════════════════════════════════════════════
 function takePhoto(){
   const input=document.getElementById('photo-file-input');
@@ -346,17 +337,9 @@ function takePhotoFromScanner(){
   takePhoto();
 }
 
-// Report client errors to server for debugging
-function reportError(step,error,details){
-  try{fetch('/api/debug/client-error',{method:'POST',headers:{'Content-Type':'application/json','x-auth-token':TK},
-    body:JSON.stringify({step:step,error:String(error),details:details||''})}).catch(()=>{});}catch(x){}
-}
-
 document.getElementById('photo-file-input').addEventListener('change',async function(e){
   const file=e.target.files[0];
   if(!file)return;
-
-  reportError('photo-start','file selected','size='+file.size+' type='+file.type);
 
   // Show decode overlay
   showS('s-scanner');
@@ -364,62 +347,45 @@ document.getElementById('photo-file-input').addEventListener('change',async func
   const overlay=document.getElementById('decode-overlay');
   overlay.style.display='flex';
   document.getElementById('decode-status-text').textContent='Decoding barcode...';
-  document.getElementById('decode-step-text').textContent='Uploading photo to server...';
+  document.getElementById('decode-step-text').textContent='Reading photo with Dynamsoft...';
   document.getElementById('scanner-header-text').textContent='Processing photo...';
 
-  // GO STRAIGHT TO SERVER — most reliable path
   try{
-    const formData=new FormData();
-    formData.append('photo',file);
-    reportError('photo-upload','starting fetch','size='+file.size);
-    const res=await fetch('/api/barcode/decode',{
-      method:'POST',
-      headers:{'x-auth-token':TK},
-      body:formData
-    });
-    const result=await res.json();
-    reportError('photo-result','server responded',JSON.stringify({success:result.success,elapsed:result.elapsed,error:result.error,fieldCount:result.fields?Object.keys(result.fields).length:0}));
+    // Init Dynamsoft reader if needed
+    const reader=await getDynamsoftReader();
 
-    if(result.success&&result.fields){
+    // Load photo into canvas
+    const img=new Image();
+    const url=URL.createObjectURL(file);
+    await new Promise((res,rej)=>{img.onload=res;img.onerror=rej;img.src=url;});
+    const canvas=document.createElement('canvas');
+    canvas.width=img.naturalWidth;
+    canvas.height=img.naturalHeight;
+    canvas.getContext('2d').drawImage(img,0,0);
+    URL.revokeObjectURL(url);
+
+    document.getElementById('decode-step-text').textContent='Decoding '+img.naturalWidth+'x'+img.naturalHeight+' image...';
+    const t0=Date.now();
+    const results=await reader.decode(canvas);
+    const elapsed=Date.now()-t0;
+
+    if(results&&results.length>0&&results[0].barcodeText&&results[0].barcodeText.length>20){
+      console.log('[PHOTO] Dynamsoft decoded in '+elapsed+'ms, len='+results[0].barcodeText.length);
       overlay.style.display='none';
-      onDecodeSuccess(result.fields,'server-zxing');
+      const parsed=parsePDF417(results[0].barcodeText);
+      onDecodeSuccess(parsed,'dynamsoft-photo');
       return;
     }
-    if(result.success&&result.raw&&result.raw.length>20){
-      overlay.style.display='none';
-      const parsed=parsePDF417(result.raw);
-      onDecodeSuccess(parsed,'server-zxing');
-      return;
-    }
-    // Server decode failed — try Dynamsoft client-side on the photo
-    document.getElementById('decode-step-text').textContent='Trying client-side decode...';
-    try{
-      const reader=await Promise.race([getDynamsoftReader(),new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),5000))]);
-      const img=new Image();
-      const url=URL.createObjectURL(file);
-      await new Promise((res,rej)=>{img.onload=res;img.onerror=rej;img.src=url;});
-      const canvas=document.createElement('canvas');
-      canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;
-      canvas.getContext('2d').drawImage(img,0,0);
-      URL.revokeObjectURL(url);
-      const results=await reader.decode(canvas);
-      if(results&&results.length>0&&results[0].barcodeText.length>20){
-        overlay.style.display='none';
-        const parsed=parsePDF417(results[0].barcodeText);
-        onDecodeSuccess(parsed,'dynamsoft-photo');
-        return;
-      }
-    }catch(dynErr){reportError('photo-dynamsoft','failed',String(dynErr));}
-
     overlay.style.display='none';
     toast('Could not read barcode — try again or Manual Entry','error');
     showS('s-scan');
-  }catch(e){
-    reportError('photo-fetch-error','fetch failed',e.message);
+  }catch(err){
+    console.error('[PHOTO] Decode error:',err);
     overlay.style.display='none';
-    toast('Upload failed: '+e.message,'error');
+    toast('Decode error: '+(err.message||err),'error');
     showS('s-scan');
   }
+  e.target.value='';
 });
 
 // Unified decode success handler
@@ -438,55 +404,77 @@ function onDecodeSuccess(fields,engine){
 }
 
 // ═══════════════════════════════════════════════════════════
-// LIVE BARCODE SCANNER (best-effort, html5-qrcode + Dynamsoft)
+// LIVE BARCODE SCANNER (Dynamsoft frame-by-frame)
 // ═══════════════════════════════════════════════════════════
 async function startScanner(){
   CD={};
-  activeEngine='html5-qrcode';torchOn=false;dynFrameCount=0;
+  torchOn=false;dynFrameCount=0;
   showS('s-scanner');
   document.getElementById('scanner-header-text').textContent='Scanning...';
   document.getElementById('decode-overlay').style.display='none';
-
-  const statusEl=document.getElementById('scanner-status');
-  statusEl.style.display='none';
+  document.getElementById('scanner-status').style.display='none';
+  document.getElementById('scanner-hint').textContent='Position barcode on back of license in frame';
   const torchBtn=document.getElementById('torch-btn');
   if(torchBtn)torchBtn.classList.remove('torch-on');
-  document.getElementById('scanner-hint').textContent='Position barcode on back of license in frame';
-
-  const vw=Math.max(document.documentElement.clientWidth||0,window.innerWidth||0);
-  const qrW=Math.min(Math.floor(vw*0.85),480);
-  const qrH=Math.floor(qrW*0.6);
 
   try{
-    html5Qr=new Html5Qrcode("scanner-region");
-    const config={fps:10,qrbox:{width:qrW,height:qrH},aspectRatio:1.777};
-    if(typeof Html5QrcodeSupportedFormats!=='undefined'&&Html5QrcodeSupportedFormats.PDF_417!==undefined){
-      config.formatsToSupport=[Html5QrcodeSupportedFormats.PDF_417];
+    // Init reader first
+    let reader;
+    try{reader=await getDynamsoftReader();}
+    catch(e){
+      console.error('[SCAN] Reader init failed:',e);
+      toast('Scanner init failed — use Take Photo instead','error');
+      showS('s-scan');
+      return;
     }
-    await html5Qr.start(
-      {facingMode:"environment"},config,
-      (decoded)=>{
-        console.log('[SCAN] html5-qrcode decoded, length='+decoded.length);
-        if(decoded&&decoded.length>20){onLiveScanSuccess(decoded,'html5-qrcode');}
-      },
-      (err)=>{/* scanning... */}
-    );
-    try{
-      const videoEl=document.querySelector('#scanner-region video');
-      if(videoEl&&videoEl.srcObject){
-        scannerStream=videoEl.srcObject;
-        const tracks=scannerStream.getVideoTracks();
-        if(tracks.length>0)scannerVideoTrack=tracks[0];
-      }
-    }catch(e){}
-    // 10s: switch to Dynamsoft
-    scannerTimeout=setTimeout(()=>{switchToDynamsoft();},10000);
-    // 20s: smooth transition to manual entry
-    manualTimeout=setTimeout(()=>{
-      cleanupScanner();
-      toast('Scanner couldn\u0027t read \u2014 switching to manual entry','info');
-      goManualFromScanner();
-    },20000);
+
+    // Open camera
+    scannerStream=await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:'environment',width:{ideal:1920},height:{ideal:1080}}
+    });
+    const tracks=scannerStream.getVideoTracks();
+    if(tracks.length>0)scannerVideoTrack=tracks[0];
+
+    const region=document.getElementById('scanner-region');
+    region.innerHTML='';
+    const video=document.createElement('video');
+    video.autoplay=true;video.playsInline=true;video.muted=true;
+    video.style.cssText='width:100%;height:100vh;object-fit:cover;';
+    video.srcObject=scannerStream;
+    region.appendChild(video);
+    await video.play();
+    console.log('[SCAN] Video:',video.videoWidth,'x',video.videoHeight);
+
+    const canvas=document.createElement('canvas');
+    const ctx=canvas.getContext('2d');
+
+    function decodeFrame(){
+      if(!scannerStream)return;
+      dynFrameCount++;
+      if(video.readyState>=video.HAVE_CURRENT_DATA){
+        canvas.width=video.videoWidth;canvas.height=video.videoHeight;
+        ctx.drawImage(video,0,0);
+        reader.decode(canvas).then(results=>{
+          if(results&&results.length>0&&results[0].barcodeText&&results[0].barcodeText.length>20){
+            console.log('[SCAN] DECODED! len='+results[0].barcodeText.length);
+            cleanupScanner();
+            const parsed=parsePDF417(results[0].barcodeText);
+            onDecodeSuccess(parsed,'dynamsoft-live');
+            return;
+          }
+          if(dynFrameCount%30===0){
+            document.getElementById('scanner-header-text').textContent='Scanning... ('+dynFrameCount+' frames)';
+          }
+          dynamsoftFrameLoop=requestAnimationFrame(decodeFrame);
+        }).catch(()=>{dynamsoftFrameLoop=requestAnimationFrame(decodeFrame);});
+      }else{dynamsoftFrameLoop=requestAnimationFrame(decodeFrame);}
+    }
+    dynamsoftFrameLoop=requestAnimationFrame(decodeFrame);
+
+    // 30s: suggest photo or manual
+    scannerTimeout=setTimeout(()=>{
+      document.getElementById('scanner-hint').textContent='Having trouble? Tap Photo or Manual below';
+    },30000);
   }catch(e){
     console.error('[SCANNER ERROR]',e);
     toast('Camera error: '+(e.message||e),'error');
@@ -495,102 +483,13 @@ async function startScanner(){
 }
 
 // ═══════════════════════════════════════════════════════════
-// DYNAMSOFT AUTO-SWITCH (10-second fallback)
-// ═══════════════════════════════════════════════════════════
-async function switchToDynamsoft(){
-  if(activeEngine==='dynamsoft')return;
-  console.log('[SCAN] Switching to Dynamsoft...');
-  activeEngine='dynamsoft';
-  const statusEl=document.getElementById('scanner-status');
-  statusEl.style.display='';
-  document.getElementById('scanner-status-text').textContent='Enhanced Scanning...';
-  document.getElementById('scanner-header-text').textContent='Enhanced scanner active';
-
-  let stream=null;
-  try{const videoEl=document.querySelector('#scanner-region video');if(videoEl&&videoEl.srcObject)stream=videoEl.srcObject;}catch(e){}
-  if(html5Qr){try{await html5Qr.stop();}catch(e){}try{html5Qr.clear();}catch(e){}html5Qr=null;}
-  if(!stream){
-    try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1920},height:{ideal:1080}}});}
-    catch(e){console.error('[DYN] Camera error:',e);toast('Camera error','error');showS('s-scan');return;}
-  }
-  scannerStream=stream;
-  const tracks=stream.getVideoTracks();
-  if(tracks.length>0)scannerVideoTrack=tracks[0];
-
-  const region=document.getElementById('scanner-region');
-  region.innerHTML='';
-  const video=document.createElement('video');
-  video.autoplay=true;video.playsInline=true;video.muted=true;
-  video.style.cssText='width:100%;height:100vh;object-fit:cover;';
-  video.srcObject=stream;
-  region.appendChild(video);
-  await video.play();
-  console.log('[DYN] Video playing:',video.videoWidth,'x',video.videoHeight);
-
-  let reader;
-  try{reader=await getDynamsoftReader();}
-  catch(e){
-    console.error('[DYN] Reader init failed:',e);
-    document.getElementById('scanner-status-text').textContent='Enhanced scanner failed — use Photo';
-    return;
-  }
-
-  const canvas=document.createElement('canvas');
-  const ctx=canvas.getContext('2d');
-  dynFrameCount=0;
-
-  function decodeFrame(){
-    if(activeEngine!=='dynamsoft')return;
-    dynFrameCount++;
-    if(video.readyState>=video.HAVE_CURRENT_DATA){
-      canvas.width=video.videoWidth;canvas.height=video.videoHeight;
-      ctx.drawImage(video,0,0);
-      reader.decode(canvas).then(results=>{
-        if(results&&results.length>0){
-          const text=results[0].barcodeText;
-          if(text&&text.length>20){console.log('[DYN] DECODED! len='+text.length);onLiveScanSuccess(text,'dynamsoft');return;}
-        }
-        if(dynFrameCount%100===0){
-          document.getElementById('scanner-status-text').textContent='Enhanced: Frame '+dynFrameCount+'...';
-        }
-        dynamsoftFrameLoop=requestAnimationFrame(decodeFrame);
-      }).catch(err=>{
-        if(dynFrameCount%100===0)console.log('[DYN] Frame',dynFrameCount,'error:',err.message||err);
-        dynamsoftFrameLoop=requestAnimationFrame(decodeFrame);
-      });
-    }else{dynamsoftFrameLoop=requestAnimationFrame(decodeFrame);}
-  }
-  dynamsoftFrameLoop=requestAnimationFrame(decodeFrame);
-}
-
-// ═══════════════════════════════════════════════════════════
-// LIVE SCAN SUCCESS
-// ═══════════════════════════════════════════════════════════
-function onLiveScanSuccess(decoded,engine){
-  cleanupScanner();
-  console.log('[SUCCESS] Engine:',engine,'Raw length:',decoded.length);
-
-  // Send raw data to server for debugging
-  try{
-    fetch('/api/debug/raw-decode',{method:'POST',headers:{'Content-Type':'application/json','x-auth-token':TK},
-      body:JSON.stringify({raw:decoded,engine:engine,length:decoded.length})
-    }).catch(()=>{});
-  }catch(e){}
-
-  const parsed=parsePDF417(decoded);
-  onDecodeSuccess(parsed,engine);
-}
-
-// ═══════════════════════════════════════════════════════════
 // CLEANUP SCANNER
 // ═══════════════════════════════════════════════════════════
 function cleanupScanner(){
   if(scannerTimeout){clearTimeout(scannerTimeout);scannerTimeout=null;}
-  if(manualTimeout){clearTimeout(manualTimeout);manualTimeout=null;}
   if(dynamsoftFrameLoop){cancelAnimationFrame(dynamsoftFrameLoop);dynamsoftFrameLoop=null;}
-  if(html5Qr){try{html5Qr.stop().catch(()=>{});}catch(e){}try{html5Qr.clear();}catch(e){}html5Qr=null;}
   if(scannerStream){try{scannerStream.getTracks().forEach(t=>t.stop());}catch(e){}scannerStream=null;}
-  scannerVideoTrack=null;torchOn=false;activeEngine='html5-qrcode';
+  scannerVideoTrack=null;torchOn=false;
 }
 function stopScanner(){cleanupScanner();showS('s-scan');}
 
