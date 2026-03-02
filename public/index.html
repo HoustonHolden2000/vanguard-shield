@@ -346,98 +346,78 @@ function takePhotoFromScanner(){
   takePhoto();
 }
 
+// Report client errors to server for debugging
+function reportError(step,error,details){
+  try{fetch('/api/debug/client-error',{method:'POST',headers:{'Content-Type':'application/json','x-auth-token':TK},
+    body:JSON.stringify({step:step,error:String(error),details:details||''})}).catch(()=>{});}catch(x){}
+}
+
 document.getElementById('photo-file-input').addEventListener('change',async function(e){
   const file=e.target.files[0];
   if(!file)return;
 
-  // Show decode overlay on scanner screen
+  reportError('photo-start','file selected','size='+file.size+' type='+file.type);
+
+  // Show decode overlay
   showS('s-scanner');
   document.getElementById('scanner-region').innerHTML='';
   const overlay=document.getElementById('decode-overlay');
   overlay.style.display='flex';
   document.getElementById('decode-status-text').textContent='Decoding barcode...';
-  document.getElementById('decode-step-text').textContent='Step 1/3: Client-side decode (Dynamsoft)...';
+  document.getElementById('decode-step-text').textContent='Uploading photo to server...';
   document.getElementById('scanner-header-text').textContent='Processing photo...';
 
-  let decoded=null;
-  let decodeEngine='';
-
-  // ATTEMPT 1: Client-side Dynamsoft decode on the photo
+  // GO STRAIGHT TO SERVER — most reliable path
   try{
-    document.getElementById('decode-step-text').textContent='Step 1/3: Client-side decode (Dynamsoft)...';
-    const reader=await getDynamsoftReader();
-    const img=new Image();
-    const url=URL.createObjectURL(file);
-    await new Promise((res,rej)=>{img.onload=res;img.onerror=rej;img.src=url;});
-    const canvas=document.createElement('canvas');
-    canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;
-    canvas.getContext('2d').drawImage(img,0,0);
-    URL.revokeObjectURL(url);
-    const results=await reader.decode(canvas);
-    if(results&&results.length>0&&results[0].barcodeText.length>20){
-      decoded=results[0].barcodeText;
-      decodeEngine='dynamsoft-photo';
-      console.log('[PHOTO] Dynamsoft decoded! len='+decoded.length);
-    }
-  }catch(e){console.log('[PHOTO] Dynamsoft failed:',e.message||e);}
+    const formData=new FormData();
+    formData.append('photo',file);
+    reportError('photo-upload','starting fetch','size='+file.size);
+    const res=await fetch('/api/barcode/decode',{
+      method:'POST',
+      headers:{'x-auth-token':TK},
+      body:formData
+    });
+    const result=await res.json();
+    reportError('photo-result','server responded',JSON.stringify({success:result.success,elapsed:result.elapsed,error:result.error,fieldCount:result.fields?Object.keys(result.fields).length:0}));
 
-  // ATTEMPT 2: Client-side html5-qrcode scanFile
-  if(!decoded){
-    try{
-      document.getElementById('decode-step-text').textContent='Step 2/3: Client-side decode (html5-qrcode)...';
-      const tempDiv=document.createElement('div');
-      tempDiv.id='temp-scan-div';tempDiv.style.display='none';
-      document.body.appendChild(tempDiv);
-      const tempQr=new Html5Qrcode("temp-scan-div");
-      decoded=await tempQr.scanFile(file,true);
-      tempQr.clear();
-      tempDiv.remove();
-      if(decoded&&decoded.length>20){
-        decodeEngine='html5-qrcode-photo';
-        console.log('[PHOTO] html5-qrcode decoded! len='+decoded.length);
-      }else{decoded=null;}
-    }catch(e){
-      console.log('[PHOTO] html5-qrcode failed:',e.message||e);
-      try{document.getElementById('temp-scan-div')?.remove();}catch(x){}
+    if(result.success&&result.fields){
+      overlay.style.display='none';
+      onDecodeSuccess(result.fields,'server-zxing');
+      return;
     }
-  }
-
-  // ATTEMPT 3: Server-side decode (upload photo)
-  if(!decoded){
+    if(result.success&&result.raw&&result.raw.length>20){
+      overlay.style.display='none';
+      const parsed=parsePDF417(result.raw);
+      onDecodeSuccess(parsed,'server-zxing');
+      return;
+    }
+    // Server decode failed — try Dynamsoft client-side on the photo
+    document.getElementById('decode-step-text').textContent='Trying client-side decode...';
     try{
-      document.getElementById('decode-step-text').textContent='Step 3/3: Server-side decode (uploading photo)...';
-      const formData=new FormData();
-      formData.append('photo',file);
-      const res=await fetch('/api/barcode/decode',{
-        method:'POST',
-        headers:{'x-auth-token':TK},
-        body:formData
-      });
-      const result=await res.json();
-      if(result.success&&result.raw&&result.raw.length>20){
-        decoded=result.raw;
-        decodeEngine='server-zxing';
-        console.log('[PHOTO] Server decoded! len='+decoded.length+' elapsed='+result.elapsed+'ms');
-        // Server already parsed — use server's fields directly
-        if(result.fields){
-          overlay.style.display='none';
-          onDecodeSuccess(result.fields,decodeEngine);
-          return;
-        }
-      }else{
-        console.log('[PHOTO] Server failed:',result.error||'no barcode');
+      const reader=await Promise.race([getDynamsoftReader(),new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),5000))]);
+      const img=new Image();
+      const url=URL.createObjectURL(file);
+      await new Promise((res,rej)=>{img.onload=res;img.onerror=rej;img.src=url;});
+      const canvas=document.createElement('canvas');
+      canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;
+      canvas.getContext('2d').drawImage(img,0,0);
+      URL.revokeObjectURL(url);
+      const results=await reader.decode(canvas);
+      if(results&&results.length>0&&results[0].barcodeText.length>20){
+        overlay.style.display='none';
+        const parsed=parsePDF417(results[0].barcodeText);
+        onDecodeSuccess(parsed,'dynamsoft-photo');
+        return;
       }
-    }catch(e){console.log('[PHOTO] Server upload error:',e.message);}
-  }
+    }catch(dynErr){reportError('photo-dynamsoft','failed',String(dynErr));}
 
-  overlay.style.display='none';
-
-  if(decoded&&decoded.length>20){
-    // Client-side decode succeeded — parse locally
-    const parsed=parsePDF417(decoded);
-    onDecodeSuccess(parsed,decodeEngine);
-  }else{
+    overlay.style.display='none';
     toast('Could not read barcode — try again or Manual Entry','error');
+    showS('s-scan');
+  }catch(e){
+    reportError('photo-fetch-error','fetch failed',e.message);
+    overlay.style.display='none';
+    toast('Upload failed: '+e.message,'error');
     showS('s-scan');
   }
 });

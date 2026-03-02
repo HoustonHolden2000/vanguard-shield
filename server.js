@@ -67,6 +67,18 @@ db.exec(`
     guard_id TEXT, guard_name TEXT,
     created_at TEXT DEFAULT (datetime('now'))
   );
+  CREATE TABLE IF NOT EXISTS decode_attempts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    photo_size INTEGER, success INTEGER, result TEXT,
+    elapsed INTEGER, error TEXT,
+    guard_name TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS client_errors (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    step TEXT, error TEXT, details TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
 `);
 
 function seedUsers() {
@@ -263,7 +275,8 @@ app.post('/api/logout', (req, res) => {
 app.post('/api/barcode/decode', auth, upload.single('photo'), async (req, res) => {
   if (!req.file) return res.status(400).json({ success: false, error: 'No photo provided' });
 
-  console.log(`  [DECODE] Photo received: ${(req.file.size/1024).toFixed(0)}KB from ${req.user.display_name}`);
+  const photoKB = (req.file.size/1024).toFixed(0);
+  console.log(`  [DECODE] Photo received: ${photoKB}KB from ${req.user.display_name}`);
   const startTime = Date.now();
 
   try {
@@ -274,16 +287,39 @@ app.post('/api/barcode/decode', auth, upload.single('photo'), async (req, res) =
       console.log(`  [DECODE] SUCCESS in ${elapsed}ms, raw length: ${raw.length}`);
       db.prepare('INSERT INTO raw_decodes (raw, engine, length, guard_id, guard_name) VALUES (?, ?, ?, ?, ?)')
         .run(raw, 'server-zxing', raw.length, req.user.id, req.user.display_name);
+      db.prepare('INSERT INTO decode_attempts (photo_size,success,result,elapsed,guard_name) VALUES (?,1,?,?,?)')
+        .run(req.file.size, 'decoded ' + raw.length + ' chars', elapsed, req.user.display_name);
       const fields = parseAAMVA(raw);
       res.json({ success: true, raw, fields, elapsed });
     } else {
       console.log(`  [DECODE] FAILED after ${elapsed}ms — no barcode found`);
+      db.prepare('INSERT INTO decode_attempts (photo_size,success,result,elapsed,guard_name) VALUES (?,0,?,?,?)')
+        .run(req.file.size, 'no barcode found', elapsed, req.user.display_name);
       res.json({ success: false, error: 'Could not decode barcode from photo', elapsed });
     }
   } catch (e) {
+    const elapsed = Date.now() - startTime;
     console.error(`  [DECODE] ERROR: ${e.message}`);
+    db.prepare('INSERT INTO decode_attempts (photo_size,success,error,elapsed,guard_name) VALUES (?,0,?,?,?)')
+      .run(req.file.size, e.message, elapsed, req.user.display_name);
     res.json({ success: false, error: e.message });
   }
+});
+
+// --- Client error reporting ---
+app.post('/api/debug/client-error', auth, (req, res) => {
+  const { step, error, details } = req.body;
+  db.prepare('INSERT INTO client_errors (step, error, details) VALUES (?, ?, ?)')
+    .run(step || '', error || '', details || '');
+  res.json({ ok: true });
+});
+
+app.get('/api/debug/decode-attempts', auth, (req, res) => {
+  res.json(db.prepare('SELECT * FROM decode_attempts ORDER BY created_at DESC LIMIT 20').all());
+});
+
+app.get('/api/debug/client-errors', auth, (req, res) => {
+  res.json(db.prepare('SELECT * FROM client_errors ORDER BY created_at DESC LIMIT 20').all());
 });
 
 // --- Scans ---
