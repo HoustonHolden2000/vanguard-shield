@@ -1,7 +1,7 @@
 {
-  "name": "vanguard-shield",
-  "version": "3.0.0",
-  "description": "Vanguard Shield — Loading Dock Security",
+  "name": "iron-halo-verify",
+  "version": "3.1.0",
+  "description": "Iron Halo Verify — Guard Verification System",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

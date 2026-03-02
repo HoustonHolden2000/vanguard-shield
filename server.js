@@ -1,10 +1,54 @@
 /**
- * VANGUARD SHIELD v3.0 — Production Server
+ * IRON HALO VERIFY v3.1 — Production Server
  * Server-side PDF417 decoding | AAMVA parsing | Photo capture
  *
  * Decode engine: zxing-wasm (ZXing C++ via WebAssembly)
- * Image preprocessing: sharp (resize, grayscale, sharpen, contrast)
- * No browser barcode libraries. All decode happens here.
+ * Image preprocessing: sharp (7-pass pipeline)
+ * Stack: Node 18+, Express 4, SQLite, Sharp, zxing-wasm, bcryptjs
+ *
+ * ═══════════════════════════════════════════════════════════════
+ * DEMO CHECKLIST — Normandy Park & Gardens Field Test
+ * ═══════════════════════════════════════════════════════════════
+ *
+ * BEFORE DEMO:
+ *   [ ] Render health check: GET /api/health → {"status":"ok","version":"3.1.0","decoder":"zxing-wasm"}
+ *   [ ] Login on iPhone Safari: admin / vanguard2026
+ *   [ ] Login on Android Chrome: guard / guard123
+ *   [ ] Confirm bottom nav shows: Scan | History | Dashboard
+ *
+ * SCAN FLOW (the money demo):
+ *   [ ] Tap big camera button → iPhone native camera opens
+ *   [ ] Photo of TN DL barcode (back side, steady, good light)
+ *   [ ] "Reading barcode..." overlay appears
+ *   [ ] Confirm screen shows: First Name, Last Name, DL#, DOB, Exp, Address
+ *   [ ] Tap "CONFIRM & SAVE" → risk score result
+ *   [ ] Green CLEARED (score < 30), Amber CAUTION (30-69), Red FLAGGED (70+)
+ *
+ * MANUAL ENTRY FALLBACK:
+ *   [ ] From scan screen → "Manual Entry" button
+ *   [ ] Enter name, DL#, DOB, state → Submit
+ *   [ ] Risk score displays correctly
+ *
+ * RISK SCORING:
+ *   [ ] Watchlist hit = +50
+ *   [ ] Name match = +30
+ *   [ ] Expired license = +25
+ *   [ ] Repeat scan (24h) = +20
+ *   [ ] Out of state = +10
+ *   [ ] Late night (10pm-5am) = +10
+ *
+ * DASHBOARD:
+ *   [ ] Stats show: Today, Flagged, All Time, Watchlist count
+ *   [ ] Decode engine stats: success rate, avg ms
+ *   [ ] Add to watchlist → shows in list
+ *
+ * IF BARCODE FAILS:
+ *   → Try closer, better light, hold steady 2 sec
+ *   → If still fails, use Manual Entry — the fallback always works
+ *
+ * Logins: admin/vanguard2026 | guard/guard123 | demo/demo
+ * Live: vanguard-shield.onrender.com
+ * ═══════════════════════════════════════════════════════════════
  */
 
 const express = require('express');
@@ -40,7 +84,7 @@ async function initDecoder() {
 
 /**
  * Decode PDF417 from an image buffer.
- * Tries multiple preprocessing passes for robustness against
+ * 7-pass preprocessing pipeline for robustness against
  * blurry, off-angle, indoor-lighting phone photos.
  */
 async function decodePdf417FromBuffer(imageBuffer) {
@@ -48,8 +92,6 @@ async function decodePdf417FromBuffer(imageBuffer) {
     throw new Error('Barcode decoder not initialized');
   }
 
-  // Preprocessing pipeline — each pass tries different image treatment
-  // Ordered from fastest/lightest to most aggressive
   const passes = [
     { name: 'grayscale', fn: buf => sharp(buf).grayscale().png().toBuffer() },
     { name: 'gray+sharp', fn: buf => sharp(buf).grayscale().sharpen({ sigma: 2.0 }).png().toBuffer() },
@@ -119,7 +161,6 @@ function parseAAMVA(raw) {
   // Method 1: Line-delimited extraction (handles most AAMVA formats)
   const lines = raw.split(/[\r\n]+/);
   for (const line of lines) {
-    // Find ALL field codes on each line (some lines contain multiple)
     const allMatches = [...line.matchAll(/(D[A-Z]{2})([^D]*?)(?=D[A-Z]{2}|$)/g)];
     if (allMatches.length > 0) {
       for (const m of allMatches) {
@@ -129,7 +170,6 @@ function parseAAMVA(raw) {
         }
       }
     } else {
-      // Single field code per line
       const match = line.match(/(D[A-Z]{2})(.*)/);
       if (match) {
         const code = match[1], value = match[2].trim();
@@ -150,7 +190,6 @@ function parseAAMVA(raw) {
     }
   }
 
-  // Format MMDDYYYY → MM/DD/YYYY
   function fmtDate(val) {
     if (!val) return '';
     const d = val.replace(/[^0-9]/g, '');
@@ -158,14 +197,12 @@ function parseAAMVA(raw) {
     return val;
   }
 
-  // Clean postal (strip trailing 0000)
   function fmtPostal(val) {
     if (!val) return '';
     const c = val.replace(/\s+/g, '').replace(/0{4,}$/, '');
     return c;
   }
 
-  // Sex code → letter
   function fmtSex(val) {
     if (val === '1') return 'M';
     if (val === '2') return 'F';
@@ -228,7 +265,6 @@ db.exec(`
   );
 `);
 
-// Seed / refresh users every startup
 function seedUsers() {
   const users = [
     { id: uuidv4(), username: 'admin', password: 'vanguard2026', role: 'admin', display_name: 'Admin' },
@@ -425,7 +461,7 @@ app.get('/api/dashboard', auth, (req, res) => {
 
 // --- Health ---
 app.get('/api/health', (req, res) => {
-  res.json({ status:'ok', version:'3.0.0', decoder:decoderReady?'zxing-wasm':'unavailable', uptime:Math.round(process.uptime()) });
+  res.json({ status:'ok', version:'3.1.0', decoder:decoderReady?'zxing-wasm':'unavailable', uptime:Math.round(process.uptime()) });
 });
 
 // ═══════════════════════════════════════════════════════════════
@@ -434,7 +470,7 @@ app.get('/api/health', (req, res) => {
 
 async function start() {
   console.log('\n╔══════════════════════════════════════════╗');
-  console.log('║  VANGUARD SHIELD v3.0                    ║');
+  console.log('║  IRON HALO VERIFY v3.1                   ║');
   console.log('║  Server-Side PDF417 | Production Build    ║');
   console.log('╚══════════════════════════════════════════╝\n');
   await initDecoder();

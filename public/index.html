@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Vanguard Shield</title>
+<title>Iron Halo Verify</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-:root{--bg:#0a0a0f;--surface:#14141f;--card:#1a1a2e;--border:#2a2a3e;--blue:#0066cc;--green:#00c853;--red:#ff3d3d;--amber:#ffab00;--text:#e8e8f0;--muted:#8888a0;--radius:12px}
+:root{--bg:#0a0a0f;--surface:#14141f;--card:#1a1a2e;--border:#2a2a3e;--blue:#0056A0;--green:#00c853;--red:#ff3d3d;--amber:#ffab00;--text:#e8e8f0;--muted:#8888a0;--radius:12px}
 html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent;overflow:hidden}
 input,button,select,textarea{font-family:inherit;font-size:inherit}
 #app{height:100%;display:flex;flex-direction:column}
@@ -40,7 +40,7 @@ input,button,select,textarea{font-family:inherit;font-size:inherit}
 .risk-med{background:#3a3a1a;color:var(--amber)}
 .risk-high{background:#3a1a1a;color:var(--red)}
 .scan-hero{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:20px;padding:40px 20px}
-.scan-btn-big{width:160px;height:160px;border-radius:50%;background:var(--blue);border:4px solid rgba(0,102,204,.3);display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 0 40px rgba(0,102,204,.2);transition:transform .15s}
+.scan-btn-big{width:160px;height:160px;border-radius:50%;background:var(--blue);border:4px solid rgba(0,86,160,.3);display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 0 40px rgba(0,86,160,.2);transition:transform .15s}
 .scan-btn-big:active{transform:scale(.95)}
 .scan-btn-big svg{width:64px;height:64px;fill:#fff}
 .confirm-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
@@ -65,14 +65,14 @@ input,button,select,textarea{font-family:inherit;font-size:inherit}
 .photo-preview{width:100%;max-height:200px;object-fit:contain;border-radius:8px;border:1px solid var(--border);margin-bottom:12px}
 .login-box{max-width:340px;margin:auto;width:100%}
 .login-logo{text-align:center;margin-bottom:32px}
-.login-logo h2{font-size:24px;color:var(--blue);margin-bottom:4px}
+.login-logo h2{font-size:22px;color:var(--blue);margin-bottom:4px;letter-spacing:1px}
 .login-logo p{font-size:13px;color:var(--muted)}
 </style>
 </head>
 <body>
 <div id="app">
   <div class="header" id="hdr" style="display:none">
-    <h1>VANGUARD SHIELD</h1>
+    <h1>IRON HALO VERIFY</h1>
     <span class="ub" id="ubadge"></span>
   </div>
 
@@ -80,7 +80,7 @@ input,button,select,textarea{font-family:inherit;font-size:inherit}
   <div class="screen active" id="s-login">
     <div style="flex:1;display:flex;align-items:center;justify-content:center">
       <div class="login-box">
-        <div class="login-logo"><h2>VANGUARD SHIELD</h2><p>Guard Verification System v3.0</p></div>
+        <div class="login-logo"><h2>IRON HALO VERIFY</h2><p>Guard Verification System v3.1</p></div>
         <div class="field"><label>Username</label><input type="text" id="l-user" autocapitalize="none" autocomplete="username"></div>
         <div class="field"><label>Password</label><input type="password" id="l-pass" autocomplete="current-password"></div>
         <button class="btn btn-primary" onclick="doLogin()" id="l-btn">Sign In</button>
@@ -246,7 +246,7 @@ async function handlePhoto(input){
 
 // CONFIRM
 function showConfirm(data,decoded){
-  document.getElementById('c-src').textContent=decoded?'✓ Auto-decoded from barcode':'Photo captured — tap Edit to enter details';
+  document.getElementById('c-src').textContent=decoded?'Auto-decoded from barcode':'Photo captured — tap Edit to enter details';
   const img=document.getElementById('c-photo');if(cPhoto){img.src=cPhoto;img.style.display='block';}else{img.style.display='none';}
   const fs=[{k:'first_name',l:'First Name'},{k:'last_name',l:'Last Name'},{k:'dl_number',l:'DL Number',f:1},{k:'dob',l:'Date of Birth'},{k:'expiration',l:'Expiration'},{k:'address',l:'Address',f:1},{k:'city',l:'City'},{k:'state',l:'State'}];
   document.getElementById('c-fields').innerHTML=fs.map(f=>`<div class="card ${f.f?'full':''}"><div class="card-label">${f.l}</div><div class="card-value" style="${!data[f.k]?'color:var(--muted);font-style:italic':''}">${data[f.k]||(decoded?'—':'Tap Edit')}</div></div>`).join('');
@@ -276,12 +276,12 @@ async function submitManual(){
 }
 function showResult(d){
   const icon=document.getElementById('r-icon'),st=document.getElementById('r-status'),sc=document.getElementById('r-score'),fl=document.getElementById('r-flags');
-  if(d.risk_score>=70){icon.textContent='⚠️';st.textContent='FLAGGED';st.style.color='var(--red)';}
-  else if(d.risk_score>=30){icon.textContent='⚡';st.textContent='CAUTION';st.style.color='var(--amber)';}
-  else{icon.textContent='✓';st.textContent='CLEARED';st.style.color='var(--green)';}
+  if(d.risk_score>=70){icon.textContent='!!!';st.textContent='FLAGGED';st.style.color='var(--red)';}
+  else if(d.risk_score>=30){icon.textContent='!!';st.textContent='CAUTION';st.style.color='var(--amber)';}
+  else{icon.textContent='OK';st.textContent='CLEARED';st.style.color='var(--green)';}
   const rc=d.risk_score>=70?'risk-high':d.risk_score>=30?'risk-med':'risk-low';
   sc.innerHTML=`<span class="risk-badge ${rc}">Risk: ${d.risk_score}</span>`;
-  fl.innerHTML=(d.risk_flags||[]).map(f=>`<div style="margin-top:4px">⚑ ${f}</div>`).join('');
+  fl.innerHTML=(d.risk_flags||[]).map(f=>`<div style="margin-top:4px">${f}</div>`).join('');
   document.getElementById('r-detail').innerHTML=`<div class="card-label">Driver</div><div class="card-value">${CD.first_name||''} ${CD.last_name||''}</div><div style="margin-top:8px;font-size:13px;color:var(--muted)">${CD.dl_number?'DL: '+CD.dl_number:''}</div>`;
   if(navigator.vibrate&&d.risk_score>=70)navigator.vibrate([300,100,300]);
   showS('s-result');cPhoto=null;cBlob=null;CD={};
@@ -299,7 +299,7 @@ async function loadDash(){try{const r=await fetch('/api/dashboard',{headers:{'x-
   document.getElementById('d-decode').innerHTML=d.decode?`ZXing-WASM · ${d.decode.rate}% success · ${d.decode.avg_ms}ms avg · ${d.decode.total} attempts`:'No decode data';
   loadWL();}catch(e){toast('Failed','error');}}
 async function loadWL(){try{const r=await fetch('/api/watchlist',{headers:{'x-auth-token':TK}});const items=await r.json();
-  document.getElementById('d-wl').innerHTML=items.length?items.map(w=>`<div class="scan-item"><div><div class="scan-item-name">${w.first_name||''} ${w.last_name||'—'}</div><div class="scan-item-meta">${w.dl_number||'No DL'} · ${w.reason||''}</div></div><button class="btn btn-red btn-sm" style="width:auto;padding:6px 12px;font-size:12px" onclick="rmWL('${w.id}')">✕</button></div>`).join(''):'<p style="color:var(--muted);font-size:13px">Empty</p>';}catch(_){}}
+  document.getElementById('d-wl').innerHTML=items.length?items.map(w=>`<div class="scan-item"><div><div class="scan-item-name">${w.first_name||''} ${w.last_name||'—'}</div><div class="scan-item-meta">${w.dl_number||'No DL'} · ${w.reason||''}</div></div><button class="btn btn-red btn-sm" style="width:auto;padding:6px 12px;font-size:12px" onclick="rmWL('${w.id}')">X</button></div>`).join(''):'<p style="color:var(--muted);font-size:13px">Empty</p>';}catch(_){}}
 function toggleWLForm(){const f=document.getElementById('wl-form');f.style.display=f.style.display==='none'?'block':'none';}
 async function addWL(){try{await fetch('/api/watchlist',{method:'POST',headers:{'Content-Type':'application/json','x-auth-token':TK},body:JSON.stringify({dl_number:document.getElementById('wl-dl').value,last_name:document.getElementById('wl-last').value,reason:document.getElementById('wl-reason').value})});['wl-dl','wl-last','wl-reason'].forEach(id=>document.getElementById(id).value='');document.getElementById('wl-form').style.display='none';loadWL();toast('Added','success');}catch(e){toast('Failed','error');}}
 async function rmWL(id){await fetch('/api/watchlist/'+id,{method:'DELETE',headers:{'x-auth-token':TK}});loadWL();}
