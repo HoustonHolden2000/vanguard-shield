@@ -423,7 +423,7 @@ app.get('/api/debug/raw-decode', auth, (req, res) => {
 
 // --- Health ---
 app.get('/api/health', (req, res) => {
-  res.json({ status:'ok', version:'5.1.0', scanner:'Dynamsoft BarcodeReader v9.6.42 (photo-only, self-hosted)', uptime:Math.round(process.uptime()) });
+  res.json({ status:'ok', version:'6.0.0', scanner:'Dynamsoft BarcodeReader v9.6.42 (photo-only)', uptime:Math.round(process.uptime()) });
 });
 
 

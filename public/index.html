@@ -70,16 +70,10 @@ input,button,select,textarea{font-family:inherit;font-size:inherit}
 .input-eye-wrap{position:relative}
 .input-eye-wrap input{width:100%;padding-right:52px}
 .eye-toggle{position:absolute;right:4px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;padding:8px;font-size:13px;font-weight:600}
-
-/* === SCANNER === */
-#s-scanner{background:#000;padding:0!important;padding-bottom:0!important;position:relative}
 .scan-success-flash{position:fixed;top:0;left:0;right:0;bottom:0;z-index:50;background:var(--green);pointer-events:none;animation:successFlash .6s ease-out forwards}
 @keyframes successFlash{0%{opacity:.8}100%{opacity:0}}
-
-/* Photo decode processing overlay */
-.decode-overlay{position:absolute;top:0;left:0;right:0;bottom:0;z-index:20;background:rgba(0,0,0,.9);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:#fff}
-.decode-spinner{width:48px;height:48px;border:4px solid rgba(255,255,255,.2);border-top-color:var(--blue);border-radius:50%;animation:spin 1s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
+#photo-status{text-align:center;font-size:13px;margin-top:8px;min-height:20px}
+input[type=file]{display:none}
 </style>
 </head>
 <body>
@@ -93,42 +87,32 @@ input,button,select,textarea{font-family:inherit;font-size:inherit}
   <div class="screen active" id="s-login">
     <div style="flex:1;display:flex;align-items:center;justify-content:center">
       <div class="login-box">
-        <div class="login-logo"><h2>IRON HALO VERIFY</h2><p>Guard Verification System v5.1</p></div>
+        <div class="login-logo"><h2>IRON HALO VERIFY</h2><p>Guard Verification System v6.0</p></div>
         <div class="field"><label>Username</label><input type="text" id="l-user" autocapitalize="none" autocomplete="username"></div>
         <div class="field"><label>Password</label>
           <div class="input-eye-wrap">
             <input type="password" id="l-pass" autocomplete="current-password">
-            <button type="button" class="eye-toggle" onclick="togglePwd()" id="eye-btn">Show</button>
+            <button type="button" class="eye-toggle" id="eye-btn">Show</button>
           </div>
         </div>
-        <button class="btn btn-primary" onclick="doLogin()" id="l-btn">Sign In</button>
+        <button type="button" class="btn btn-primary" id="l-btn">Sign In</button>
         <p id="l-err" style="color:var(--red);text-align:center;margin-top:12px;font-size:13px"></p>
       </div>
     </div>
   </div>
 
-  <!-- HOME / SCAN -->
+  <!-- HOME — PHOTO ONLY -->
   <div class="screen" id="s-scan">
     <div class="scan-hero">
-      <div class="scan-btn-big" onclick="takePhoto()">
+      <div class="scan-btn-big" id="big-photo-btn">
         <svg viewBox="0 0 24 24"><path d="M12 15.2a3.2 3.2 0 100-6.4 3.2 3.2 0 000 6.4z"/><path d="M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/></svg>
       </div>
-      <div style="font-size:18px;font-weight:700">SCAN LICENSE</div>
       <div style="font-size:13px;color:var(--muted);text-align:center;max-width:260px">Tap to take photo of barcode on <strong>back</strong> of license</div>
-      <button class="btn btn-primary" onclick="takePhoto()" style="margin-top:8px;font-size:16px;padding:14px 20px;">
-        &#128247; TAKE PHOTO OF BARCODE
-      </button>
+      <button type="button" class="btn btn-primary" id="take-photo-btn" style="margin-top:8px;font-size:16px;padding:14px 20px;">TAKE PHOTO OF BARCODE</button>
+      <div id="photo-status"></div>
     </div>
-    <button class="btn btn-outline btn-sm" onclick="goManual()" style="margin-top:auto">Manual Entry</button>
-  </div>
-
-  <!-- DECODE PROCESSING -->
-  <div class="screen" id="s-scanner">
-    <div class="decode-overlay" id="decode-overlay" style="display:flex">
-      <div class="decode-spinner"></div>
-      <div style="font-size:18px;font-weight:700" id="decode-status-text">Decoding barcode...</div>
-      <div style="font-size:13px;color:var(--muted)" id="decode-step-text">Reading photo...</div>
-    </div>
+    <input type="file" id="photo-input" accept="image/*" capture="environment">
+    <button type="button" class="btn btn-outline btn-sm" id="manual-btn" style="margin-top:auto">Manual Entry</button>
   </div>
 
   <!-- CONFIRM -->
@@ -137,10 +121,10 @@ input,button,select,textarea{font-family:inherit;font-size:inherit}
     <p style="font-size:12px;color:var(--muted);margin-bottom:14px" id="c-src"></p>
     <div class="confirm-grid" id="c-fields"></div>
     <div style="margin-top:16px;display:flex;flex-direction:column;gap:10px">
-      <button class="btn btn-green" onclick="confirmScan()">CONFIRM &amp; SAVE</button>
+      <button type="button" class="btn btn-green" id="confirm-btn">CONFIRM &amp; SAVE</button>
       <div style="display:flex;gap:10px">
-        <button class="btn btn-outline btn-sm" onclick="editConfirm()" style="flex:1">Edit</button>
-        <button class="btn btn-outline btn-sm" onclick="takePhoto()" style="flex:1">Re-scan</button>
+        <button type="button" class="btn btn-outline btn-sm" id="edit-btn" style="flex:1">Edit</button>
+        <button type="button" class="btn btn-outline btn-sm" id="rescan-btn" style="flex:1">Re-scan</button>
       </div>
     </div>
   </div>
@@ -150,8 +134,8 @@ input,button,select,textarea{font-family:inherit;font-size:inherit}
     <h2 style="margin-bottom:14px;font-size:18px">Edit Details</h2>
     <div id="e-fields"></div>
     <div style="display:flex;gap:10px;margin-top:12px">
-      <button class="btn btn-green" onclick="saveEdit()" style="flex:1">Save</button>
-      <button class="btn btn-outline btn-sm" onclick="backConfirm()" style="flex:1">Cancel</button>
+      <button type="button" class="btn btn-green" id="save-edit-btn" style="flex:1">Save</button>
+      <button type="button" class="btn btn-outline btn-sm" id="cancel-edit-btn" style="flex:1">Cancel</button>
     </div>
   </div>
 
@@ -168,8 +152,8 @@ input,button,select,textarea{font-family:inherit;font-size:inherit}
     <div class="field"><label>Expiration</label><input id="m-exp" inputmode="numeric"></div>
     <div class="field"><label>State</label><input id="m-state" maxlength="2" autocapitalize="characters" value="TN"></div>
     <div class="field"><label>Notes</label><textarea id="m-notes" rows="2"></textarea></div>
-    <button class="btn btn-green" onclick="submitManual()">Submit</button>
-    <button class="btn btn-outline btn-sm" onclick="showS('s-scan')" style="margin-top:10px">Back to Scan</button>
+    <button type="button" class="btn btn-green" id="submit-manual-btn">Submit</button>
+    <button type="button" class="btn btn-outline btn-sm" id="back-to-scan-btn" style="margin-top:10px">Back</button>
   </div>
 
   <!-- RESULT -->
@@ -181,7 +165,7 @@ input,button,select,textarea{font-family:inherit;font-size:inherit}
       <div id="r-flags" style="margin-top:12px;font-size:13px;color:var(--amber)"></div>
     </div>
     <div id="r-detail" class="card" style="margin-bottom:16px"></div>
-    <button class="btn btn-primary" onclick="showS('s-scan')">Next Scan</button>
+    <button type="button" class="btn btn-primary" id="next-scan-btn">Next Scan</button>
   </div>
 
   <!-- HISTORY -->
@@ -194,345 +178,520 @@ input,button,select,textarea{font-family:inherit;font-size:inherit}
   <div class="screen" id="s-dash">
     <h2 style="margin-bottom:14px;font-size:18px">Dashboard</h2>
     <div class="stat-grid" id="d-stats"></div>
-    <div class="card"><div class="card-label">Decode Engine</div><div id="d-decode" style="font-size:14px;margin-top:4px">Dynamsoft BarcodeReader v9.6.42 (self-hosted)</div></div>
+    <div class="card"><div class="card-label">Decode Engine</div><div style="font-size:14px;margin-top:4px">Dynamsoft v9.6.42 (photo decode)</div></div>
     <h3 style="font-size:14px;margin:14px 0 8px;color:var(--muted)">Watchlist</h3>
     <div id="d-wl"></div>
-    <button class="btn btn-outline btn-sm" onclick="toggleWLForm()" style="margin-top:10px">+ Add to Watchlist</button>
+    <button type="button" class="btn btn-outline btn-sm" id="toggle-wl-btn" style="margin-top:10px">+ Add to Watchlist</button>
     <div id="wl-form" style="display:none;margin-top:12px" class="card">
       <div class="field"><label>DL Number</label><input id="wl-dl"></div>
       <div class="field"><label>Last Name</label><input id="wl-last"></div>
       <div class="field"><label>Reason</label><input id="wl-reason"></div>
-      <button class="btn btn-primary btn-sm" onclick="addWL()">Add</button>
+      <button type="button" class="btn btn-primary btn-sm" id="add-wl-btn">Add</button>
     </div>
   </div>
 
   <!-- NAV -->
   <div class="nav" id="nav" style="display:none">
-    <button onclick="showS('s-scan')" id="n-scan">
+    <button type="button" id="n-scan">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>Scan</button>
-    <button onclick="showS('s-history');loadHistory()" id="n-hist">
+    <button type="button" id="n-hist">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/></svg>History</button>
-    <button onclick="showS('s-dash');loadDash()" id="n-dash">
+    <button type="button" id="n-dash">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Dashboard</button>
   </div>
 </div>
 <div class="toast" id="toast"></div>
-<input type="file" id="photo-file-input" accept="image/*" capture="environment" style="display:none">
 
 <script>
-// ═══════════════════════════════════════════════════════════
-// STATE
-// ═══════════════════════════════════════════════════════════
-let TK=localStorage.getItem('stk')||'',US=JSON.parse(localStorage.getItem('sus')||'null'),CD={};
-let dynamsoftReader=null,dynamsoftReady=false;
+// ═══════════════════════════════════════════════
+// IRON HALO VERIFY v6.0 — REBUILT FROM FIRST PRINCIPLES
+// Photo-only decode using EXACT pattern from test_scanner.html
+// ═══════════════════════════════════════════════
 
-// ═══════════════════════════════════════════════════════════
-// HELPERS
-// ═══════════════════════════════════════════════════════════
-function showS(id){
-  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+// --- GLOBALS (same var style as working test_scanner.html) ---
+var TK = localStorage.getItem('stk') || '';
+var US = JSON.parse(localStorage.getItem('sus') || 'null');
+var CD = {};
+var reader = null;
+var sdkLoaded = false;
+var photoStatus = document.getElementById('photo-status');
+
+// --- SCREEN SWITCHING ---
+function showS(id) {
+  var screens = document.querySelectorAll('.screen');
+  for (var i = 0; i < screens.length; i++) screens[i].classList.remove('active');
   document.getElementById(id).classList.add('active');
-  document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));
-  const m={'s-scan':'n-scan','s-history':'n-hist','s-dash':'n-dash'};
-  if(m[id])document.getElementById(m[id])?.classList.add('active');
-  if(TK){
-    const vis=id!=='s-scanner'&&id!=='s-login';
-    document.getElementById('hdr').style.display=vis?'flex':'none';
-    document.getElementById('nav').style.display=vis?'flex':'none';
+  var navMap = {'s-scan':'n-scan','s-history':'n-hist','s-dash':'n-dash'};
+  var navBtns = document.querySelectorAll('.nav button');
+  for (var j = 0; j < navBtns.length; j++) navBtns[j].classList.remove('active');
+  if (navMap[id]) document.getElementById(navMap[id]).classList.add('active');
+  if (TK) {
+    var showChrome = (id !== 's-login');
+    document.getElementById('hdr').style.display = showChrome ? 'flex' : 'none';
+    document.getElementById('nav').style.display = showChrome ? 'flex' : 'none';
   }
 }
-function showApp(){
-  document.getElementById('hdr').style.display='flex';
-  document.getElementById('nav').style.display='flex';
-  document.getElementById('ubadge').textContent=US?.display_name||'';
+
+function showApp() {
+  document.getElementById('hdr').style.display = 'flex';
+  document.getElementById('nav').style.display = 'flex';
+  document.getElementById('ubadge').textContent = US ? (US.display_name || '') : '';
   showS('s-scan');
 }
 
-// ═══════════════════════════════════════════════════════════
-// AUTH
-// ═══════════════════════════════════════════════════════════
-function togglePwd(){
-  const i=document.getElementById('l-pass'),b=document.getElementById('eye-btn');
-  if(i.type==='password'){i.type='text';b.textContent='Hide';}
-  else{i.type='password';b.textContent='Show';}
+function toast(msg, type) {
+  var t = document.getElementById('toast');
+  t.className = 'toast toast-' + (type || 'info') + ' show';
+  t.textContent = msg;
+  setTimeout(function() { t.classList.remove('show'); }, 3500);
 }
-async function doLogin(){
-  const u=document.getElementById('l-user').value.trim(),p=document.getElementById('l-pass').value;
-  document.getElementById('l-err').textContent='';
-  document.getElementById('l-btn').textContent='Signing in...';
-  try{
-    const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
-    const d=await r.json();if(!r.ok)throw new Error(d.error);
-    TK=d.token;US=d;localStorage.setItem('stk',TK);localStorage.setItem('sus',JSON.stringify(US));
+
+// --- AUTH ---
+document.getElementById('eye-btn').addEventListener('click', function() {
+  var inp = document.getElementById('l-pass');
+  var btn = document.getElementById('eye-btn');
+  if (inp.type === 'password') { inp.type = 'text'; btn.textContent = 'Hide'; }
+  else { inp.type = 'password'; btn.textContent = 'Show'; }
+});
+
+document.getElementById('l-btn').addEventListener('click', function() {
+  var u = document.getElementById('l-user').value.trim();
+  var p = document.getElementById('l-pass').value;
+  document.getElementById('l-err').textContent = '';
+  document.getElementById('l-btn').textContent = 'Signing in...';
+  fetch('/api/login', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username:u, password:p})})
+  .then(function(r) { return r.json().then(function(d) { if (!r.ok) throw new Error(d.error); return d; }); })
+  .then(function(d) {
+    TK = d.token; US = d;
+    localStorage.setItem('stk', TK);
+    localStorage.setItem('sus', JSON.stringify(US));
     showApp();
-    // Preload Dynamsoft reader in background
-    getDynamsoftReader().catch(()=>{});
-  }catch(e){document.getElementById('l-err').textContent=e.message||'Login failed';}
-  document.getElementById('l-btn').textContent='Sign In';
+  })
+  .catch(function(e) { document.getElementById('l-err').textContent = e.message || 'Login failed'; })
+  .finally(function() { document.getElementById('l-btn').textContent = 'Sign In'; });
+});
+
+document.getElementById('l-pass').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') document.getElementById('l-btn').click();
+});
+
+// Auto-login if token exists
+if (TK && US) {
+  fetch('/api/dashboard', {headers:{'x-auth-token':TK}})
+  .then(function(r) { if (r.ok) { showApp(); } else { throw new Error('expired'); } })
+  .catch(function() { TK = ''; US = null; localStorage.clear(); });
 }
-if(TK&&US){fetch('/api/dashboard',{headers:{'x-auth-token':TK}}).then(r=>{if(r.ok){showApp();getDynamsoftReader().catch(()=>{});}else throw 0;}).catch(()=>{TK='';US=null;localStorage.clear();});}
-document.getElementById('l-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 
-// ═══════════════════════════════════════════════════════════
-// DYNAMSOFT SDK (self-hosted from /dbr/, loaded dynamically)
-// engineResourcePath + license MUST be set before createInstance
-// ═══════════════════════════════════════════════════════════
-let sdkLoaded=false,readerInitPromise=null;
-
-function loadSDK(){
-  return new Promise(function(resolve,reject){
-    if(sdkLoaded&&window.Dynamsoft){resolve();return;}
-    console.log('[DYN] Loading SDK from /dbr/dbr.js...');
-    var s=document.createElement('script');
-    s.src='/dbr/dbr.js';
-    s.onload=function(){
-      sdkLoaded=true;
-      // Configure IMMEDIATELY on load, BEFORE any createInstance/loadWasm
-      Dynamsoft.DBR.BarcodeReader.engineResourcePath='/dbr/';
-      Dynamsoft.DBR.BarcodeReader.license='DLS2eyJvcmdhbml6YXRpb25JRCI6IjIwMDAwMSJ9';
-      console.log('[DYN] SDK loaded + configured');
-      resolve();
-    };
-    s.onerror=function(){reject(new Error('Failed to load Dynamsoft SDK'));};
+// ═══════════════════════════════════════════════
+// DYNAMSOFT SDK — EXACT PATTERN FROM test_scanner.html
+// ═══════════════════════════════════════════════
+function loadScript(url) {
+  return new Promise(function(resolve, reject) {
+    var s = document.createElement('script');
+    s.src = url;
+    s.onload = function() { resolve(url); };
+    s.onerror = function() { reject(new Error('Script load failed: ' + url)); };
     document.head.appendChild(s);
   });
 }
 
-function getDynamsoftReader(){
-  if(dynamsoftReader)return Promise.resolve(dynamsoftReader);
-  // Single shared promise — prevents concurrent createInstance race
-  if(readerInitPromise)return readerInitPromise;
-  readerInitPromise=loadSDK().then(function(){
-    console.log('[DYN] Creating reader instance...');
-    return Dynamsoft.DBR.BarcodeReader.createInstance();
-  }).then(function(reader){
-    dynamsoftReader=reader;
-    return reader.getRuntimeSettings();
-  }).then(function(settings){
-    settings.barcodeFormatIds=Dynamsoft.DBR.EnumBarcodeFormat.BF_PDF417;
-    settings.expectedBarcodesCount=1;
-    settings.deblurLevel=5;
-    return dynamsoftReader.updateRuntimeSettings(settings);
-  }).then(function(){
-    dynamsoftReady=true;
-    console.log('[DYN] Reader ready: PDF417, deblurLevel=5');
-    return dynamsoftReader;
-  }).catch(function(err){
-    readerInitPromise=null; // allow retry on failure
-    throw err;
-  });
-  return readerInitPromise;
+async function loadSDK() {
+  if (sdkLoaded && window.Dynamsoft) return;
+  await loadScript('/dbr/dbr.js');
+  if (!window.Dynamsoft) throw new Error('Dynamsoft global not found');
+  sdkLoaded = true;
 }
 
-// ═══════════════════════════════════════════════════════════
-// PHOTO CAPTURE → CLIENT-SIDE DYNAMSOFT DECODE
-// ═══════════════════════════════════════════════════════════
-function takePhoto(){
-  const input=document.getElementById('photo-file-input');
-  input.value='';
-  input.click();
+async function initDynamsoft() {
+  await loadSDK();
+  Dynamsoft.DBR.BarcodeReader.engineResourcePath = '/dbr/';
+  Dynamsoft.DBR.BarcodeReader.license = 'DLS2eyJvcmdhbml6YXRpb25JRCI6IjIwMDAwMSJ9';
+  reader = await Dynamsoft.DBR.BarcodeReader.createInstance();
+  var settings = await reader.getRuntimeSettings();
+  settings.barcodeFormatIds = Dynamsoft.DBR.EnumBarcodeFormat.BF_PDF417;
+  settings.expectedBarcodesCount = 1;
+  settings.deblurLevel = 5;
+  await reader.updateRuntimeSettings(settings);
 }
-document.getElementById('photo-file-input').addEventListener('change',async function(e){
-  const file=e.target.files[0];
-  if(!file)return;
 
-  // Show decode overlay
-  showS('s-scanner');
-  const overlay=document.getElementById('decode-overlay');
-  overlay.style.display='flex';
-  document.getElementById('decode-status-text').textContent='Decoding barcode...';
-  document.getElementById('decode-step-text').textContent='Reading photo...';
-
-  try{
-    // Init Dynamsoft reader if needed
-    const reader=await getDynamsoftReader();
-
-    // Load photo into canvas
-    const img=new Image();
-    const url=URL.createObjectURL(file);
-    await new Promise((res,rej)=>{img.onload=res;img.onerror=rej;img.src=url;});
-    const canvas=document.createElement('canvas');
-    canvas.width=img.naturalWidth;
-    canvas.height=img.naturalHeight;
-    canvas.getContext('2d').drawImage(img,0,0);
-    URL.revokeObjectURL(url);
-
-    document.getElementById('decode-step-text').textContent='Decoding '+img.naturalWidth+'x'+img.naturalHeight+' image...';
-    const t0=Date.now();
-    const results=await reader.decode(canvas);
-    const elapsed=Date.now()-t0;
-
-    if(results&&results.length>0&&results[0].barcodeText&&results[0].barcodeText.length>20){
-      console.log('[PHOTO] Dynamsoft decoded in '+elapsed+'ms, len='+results[0].barcodeText.length);
-      overlay.style.display='none';
-      const parsed=parsePDF417(results[0].barcodeText);
-      onDecodeSuccess(parsed,'dynamsoft-photo');
-      return;
-    }
-    overlay.style.display='none';
-    toast('Could not read barcode — try again or Manual Entry','error');
-    showS('s-scan');
-  }catch(err){
-    console.error('[PHOTO] Decode error:',err);
-    overlay.style.display='none';
-    toast('Could not read barcode. Try again or use Manual Entry.','error');
-    showS('s-scan');
-  }
-  e.target.value='';
+// ═══════════════════════════════════════════════
+// PHOTO BUTTON — EXACT PATTERN FROM test_scanner.html
+// Both the big circle and the TAKE PHOTO button trigger the file input
+// ═══════════════════════════════════════════════
+document.getElementById('big-photo-btn').addEventListener('click', function() {
+  document.getElementById('photo-input').click();
 });
 
-// Unified decode success handler
-function onDecodeSuccess(fields,engine){
-  if(navigator.vibrate)navigator.vibrate([200,100,200,100,200]);
-  const flash=document.createElement('div');
-  flash.className='scan-success-flash';
-  document.body.appendChild(flash);
-  flash.addEventListener('animationend',()=>flash.remove());
+document.getElementById('take-photo-btn').addEventListener('click', function() {
+  document.getElementById('photo-input').click();
+});
 
-  CD=fields;
-  const fieldCount=Object.values(CD).filter(v=>v&&v.length>0).length;
-  console.log('[SUCCESS] Engine:',engine,'Fields:',fieldCount,JSON.stringify(CD));
-  showConfirm(CD,true);
-  toast('Decoded via '+engine+'! '+fieldCount+' fields','success');
+// ═══════════════════════════════════════════════
+// PHOTO DECODE — EXACT PATTERN FROM test_scanner.html
+// ═══════════════════════════════════════════════
+document.getElementById('photo-input').addEventListener('change', async function(e) {
+  var file = e.target.files[0];
+  if (!file) return;
+
+  photoStatus.textContent = 'Decoding photo...';
+  photoStatus.style.color = '#aaa';
+
+  // Init Dynamsoft if needed (exact same as test_scanner.html)
+  if (!reader) {
+    try { await initDynamsoft(); }
+    catch(err) {
+      photoStatus.textContent = 'Could not load decoder. Try again.';
+      photoStatus.style.color = '#f44';
+      e.target.value = '';
+      return;
+    }
+  }
+
+  // Load photo into canvas (exact same as test_scanner.html)
+  try {
+    var img = new Image();
+    var url = URL.createObjectURL(file);
+    await new Promise(function(resolve, reject) { img.onload = resolve; img.onerror = reject; img.src = url; });
+    var canvas = document.createElement('canvas');
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    canvas.getContext('2d').drawImage(img, 0, 0);
+    URL.revokeObjectURL(url);
+
+    photoStatus.textContent = 'Decoding ' + img.naturalWidth + 'x' + img.naturalHeight + ' image...';
+    var t0 = Date.now();
+    var results = await reader.decode(canvas);
+    var elapsed = Date.now() - t0;
+
+    if (results && results.length > 0 && results[0].barcodeText && results[0].barcodeText.length > 20) {
+      photoStatus.textContent = 'Decoded in ' + elapsed + 'ms!';
+      photoStatus.style.color = '#0f0';
+      var parsed = parsePDF417(results[0].barcodeText);
+      onDecodeSuccess(parsed);
+    } else {
+      photoStatus.textContent = 'No barcode found. Try again with good lighting.';
+      photoStatus.style.color = '#f44';
+    }
+  } catch(err) {
+    photoStatus.textContent = 'Could not read barcode. Try again or use Manual Entry.';
+    photoStatus.style.color = '#f44';
+  }
+
+  e.target.value = '';
+});
+
+// ═══════════════════════════════════════════════
+// DECODE SUCCESS
+// ═══════════════════════════════════════════════
+function onDecodeSuccess(fields) {
+  if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
+  var flash = document.createElement('div');
+  flash.className = 'scan-success-flash';
+  document.body.appendChild(flash);
+  flash.addEventListener('animationend', function() { flash.remove(); });
+
+  CD = fields;
+  showConfirm(CD, true);
+  toast('Barcode decoded!', 'success');
 }
 
-// ═══════════════════════════════════════════════════════════
-// PDF417 AAMVA PARSER
-// ═══════════════════════════════════════════════════════════
-function parsePDF417(raw){
-  const fields={};
-  const map={
+// ═══════════════════════════════════════════════
+// AAMVA PARSER — EXACT PATTERN FROM test_scanner.html
+// ═══════════════════════════════════════════════
+function parsePDF417(raw) {
+  var fields = {};
+  var fieldMap = {
     'DCS':'last_name','DAB':'last_name','DAC':'first_name','DCT':'first_name',
-    'DAD':'middle_name','DBB':'dob','DBA':'expiration',
-    'DAQ':'dl_number','DAG':'address','DAI':'city',
-    'DAJ':'state','DAK':'postal_code','DBC':'sex',
+    'DAD':'middle_name','DBB':'dob','DBA':'expiration','DAQ':'dl_number',
+    'DAG':'address','DAI':'city','DAJ':'state','DAK':'postal_code','DBC':'sex'
   };
-  // Method 1: Split by delimiters
-  const lines=raw.split(/[\n\r\x1e\x1d]+/);
-  for(const line of lines){
-    const trimmed=line.trim();
-    for(const[code,field]of Object.entries(map)){
-      if(trimmed.startsWith(code)){
-        let val=trimmed.substring(code.length).trim();
-        if(field==='first_name'&&fields.first_name&&code==='DCT')continue;
-        if(val)fields[field]=val;
+
+  // Method 1: line split
+  var lines = raw.split(/[\r\n\x1e\x1d]+/);
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i].trim();
+    for (var code in fieldMap) {
+      if (line.indexOf(code) === 0) {
+        var val = line.substring(code.length).trim();
+        if (code === 'DCT' && fields.first_name) continue;
+        if (code === 'DAB' && fields.last_name) continue;
+        if (val) fields[fieldMap[code]] = val;
       }
     }
   }
-  // Method 2: Regex fallback
-  for(const[code,field]of Object.entries(map)){
-    if(fields[field])continue;
-    const re=new RegExp(code+'([^\\n\\r\\x1e\\x1d]{1,120}?)(?=D[A-Z]{2}|[\\n\\r\\x1e\\x1d]|$)');
-    const m=re.exec(raw);
-    if(m&&m[1]&&m[1].trim())fields[field]=m[1].trim();
-  }
-  // Method 3: Aggressive matchAll
-  if(Object.keys(fields).length<3){
-    const allMatches=[...raw.matchAll(/(D[A-Z]{2})([\s\S]*?)(?=D[A-Z]{2}|$)/g)];
-    for(const m of allMatches){
-      const code=m[1],val=m[2].trim();
-      if(map[code]&&val&&!fields[map[code]])fields[map[code]]=val;
+
+  // Method 2: regex fallback
+  for (var code in fieldMap) {
+    if (!fields[fieldMap[code]]) {
+      var re = new RegExp(code + '([^\\r\\n\\x1e\\x1d]{1,120}?)(?=D[A-Z]{2}|[\\r\\n\\x1e\\x1d]|$)');
+      var m = re.exec(raw);
+      if (m && m[1] && m[1].trim()) fields[fieldMap[code]] = m[1].trim();
     }
   }
+
+  // Method 3: aggressive matchAll
+  if (Object.keys(fields).length < 3) {
+    var allMatches = raw.match(/(D[A-Z]{2})([\s\S]*?)(?=D[A-Z]{2}|$)/g);
+    if (allMatches) {
+      for (var k = 0; k < allMatches.length; k++) {
+        var mc = allMatches[k].substring(0, 3);
+        var mv = allMatches[k].substring(3).trim();
+        if (fieldMap[mc] && mv && !fields[fieldMap[mc]]) fields[fieldMap[mc]] = mv;
+      }
+    }
+  }
+
   // Format dates
-  for(const df of['dob','expiration']){
-    if(fields[df]&&fields[df].length>=8){
-      const d=fields[df].replace(/[^0-9]/g,'');
-      if(d.length===8){
-        const f2=parseInt(d.slice(0,2));
-        if(f2>12)fields[df]=d.slice(4,6)+'/'+d.slice(6,8)+'/'+d.slice(0,4);
-        else fields[df]=d.slice(0,2)+'/'+d.slice(2,4)+'/'+d.slice(4,8);
+  var dateFields = ['dob', 'expiration'];
+  for (var d = 0; d < dateFields.length; d++) {
+    var df = dateFields[d];
+    if (fields[df] && fields[df].length >= 8) {
+      var digits = fields[df].replace(/[^0-9]/g, '');
+      if (digits.length === 8) {
+        var first2 = parseInt(digits.slice(0, 2));
+        if (first2 > 12) fields[df] = digits.slice(4,6) + '/' + digits.slice(6,8) + '/' + digits.slice(0,4);
+        else fields[df] = digits.slice(0,2) + '/' + digits.slice(2,4) + '/' + digits.slice(4,8);
       }
     }
   }
-  if(fields.sex==='1')fields.sex='M';
-  else if(fields.sex==='2')fields.sex='F';
-  if(fields.postal_code)fields.postal_code=fields.postal_code.replace(/\s+/g,'').substring(0,5);
-  for(const nf of['first_name','last_name','middle_name','city']){
-    if(fields[nf])fields[nf]=fields[nf].charAt(0).toUpperCase()+fields[nf].slice(1).toLowerCase();
+
+  if (fields.sex === '1') fields.sex = 'M';
+  else if (fields.sex === '2') fields.sex = 'F';
+  if (fields.postal_code) fields.postal_code = fields.postal_code.replace(/\s+/g, '').substring(0, 5);
+
+  // Title case names
+  var nameFields = ['first_name', 'last_name', 'middle_name', 'city'];
+  for (var n = 0; n < nameFields.length; n++) {
+    if (fields[nameFields[n]]) {
+      fields[nameFields[n]] = fields[nameFields[n]].charAt(0).toUpperCase() + fields[nameFields[n]].slice(1).toLowerCase();
+    }
   }
+
   return fields;
 }
 
-// ═══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════
 // CONFIRM / EDIT
-// ═══════════════════════════════════════════════════════════
-function showConfirm(data,decoded){
-  document.getElementById('c-src').textContent=decoded?'Auto-decoded from barcode':'Tap Edit to enter details';
-  const fs=[{k:'first_name',l:'First Name'},{k:'last_name',l:'Last Name'},{k:'dl_number',l:'DL Number',f:1},{k:'dob',l:'Date of Birth'},{k:'expiration',l:'Expiration'},{k:'address',l:'Address',f:1},{k:'city',l:'City'},{k:'state',l:'State'}];
-  document.getElementById('c-fields').innerHTML=fs.map(f=>`<div class="card ${f.f?'full':''} ${decoded&&data[f.k]?'green-flash':''}"><div class="card-label">${f.l}</div><div class="card-value" style="${!data[f.k]?'color:var(--muted);font-style:italic':''}">${data[f.k]||(decoded?'\u2014':'Tap Edit')}</div></div>`).join('');
+// ═══════════════════════════════════════════════
+function showConfirm(data, decoded) {
+  document.getElementById('c-src').textContent = decoded ? 'Auto-decoded from barcode' : 'Tap Edit to enter details';
+  var fs = [
+    {k:'first_name',l:'First Name'},{k:'last_name',l:'Last Name'},
+    {k:'dl_number',l:'DL Number',f:1},{k:'dob',l:'Date of Birth'},
+    {k:'expiration',l:'Expiration'},{k:'address',l:'Address',f:1},
+    {k:'city',l:'City'},{k:'state',l:'State'}
+  ];
+  var html = '';
+  for (var i = 0; i < fs.length; i++) {
+    var f = fs[i];
+    var val = data[f.k] || '';
+    var cls = f.f ? 'card full' : 'card';
+    if (decoded && val) cls += ' green-flash';
+    var style = val ? '' : 'color:var(--muted);font-style:italic';
+    html += '<div class="' + cls + '"><div class="card-label">' + f.l + '</div><div class="card-value" style="' + style + '">' + (val || (decoded ? '\u2014' : 'Tap Edit')) + '</div></div>';
+  }
+  document.getElementById('c-fields').innerHTML = html;
   showS('s-confirm');
 }
-function editConfirm(){
-  const fs=[{k:'first_name',l:'First Name'},{k:'last_name',l:'Last Name'},{k:'middle_name',l:'Middle Name'},{k:'dl_number',l:'DL Number'},{k:'dob',l:'DOB (MM/DD/YYYY)'},{k:'expiration',l:'Expiration'},{k:'address',l:'Address'},{k:'city',l:'City'},{k:'state',l:'State'},{k:'postal_code',l:'ZIP'}];
-  document.getElementById('e-fields').innerHTML=fs.map(f=>`<div class="field"><label>${f.l}</label><input id="e-${f.k}" value="${CD[f.k]||''}" autocapitalize="${f.k==='state'?'characters':'words'}"></div>`).join('');
+
+document.getElementById('confirm-btn').addEventListener('click', function() {
+  var form = new FormData();
+  for (var k in CD) { if (k !== 'raw') form.append(k, CD[k]); }
+  fetch('/api/scans', {method:'POST', headers:{'x-auth-token':TK}, body:form})
+  .then(function(r) { return r.json(); })
+  .then(function(d) { showResult(d); })
+  .catch(function() { toast('Failed to save', 'error'); });
+});
+
+document.getElementById('edit-btn').addEventListener('click', function() {
+  var fs = [
+    {k:'first_name',l:'First Name'},{k:'last_name',l:'Last Name'},{k:'middle_name',l:'Middle Name'},
+    {k:'dl_number',l:'DL Number'},{k:'dob',l:'DOB (MM/DD/YYYY)'},{k:'expiration',l:'Expiration'},
+    {k:'address',l:'Address'},{k:'city',l:'City'},{k:'state',l:'State'},{k:'postal_code',l:'ZIP'}
+  ];
+  var html = '';
+  for (var i = 0; i < fs.length; i++) {
+    var f = fs[i];
+    var cap = f.k === 'state' ? 'characters' : 'words';
+    html += '<div class="field"><label>' + f.l + '</label><input id="e-' + f.k + '" value="' + (CD[f.k] || '') + '" autocapitalize="' + cap + '"></div>';
+  }
+  document.getElementById('e-fields').innerHTML = html;
   showS('s-edit');
-}
-function saveEdit(){const ks=['first_name','last_name','middle_name','dl_number','dob','expiration','address','city','state','postal_code'];ks.forEach(k=>{CD[k]=document.getElementById('e-'+k)?.value||'';});showConfirm(CD,Object.values(CD).some(v=>v));}
-function backConfirm(){showConfirm(CD,Object.values(CD).some(v=>v));}
+});
 
-// ═══════════════════════════════════════════════════════════
-// SUBMIT
-// ═══════════════════════════════════════════════════════════
-async function confirmScan(){
-  const form=new FormData();Object.entries(CD).forEach(([k,v])=>{if(k!=='raw')form.append(k,v);});
-  try{const r=await fetch('/api/scans',{method:'POST',headers:{'x-auth-token':TK},body:form});const d=await r.json();showResult(d);}
-  catch(e){toast('Failed to save','error');}
-}
+document.getElementById('save-edit-btn').addEventListener('click', function() {
+  var ks = ['first_name','last_name','middle_name','dl_number','dob','expiration','address','city','state','postal_code'];
+  for (var i = 0; i < ks.length; i++) {
+    var el = document.getElementById('e-' + ks[i]);
+    CD[ks[i]] = el ? el.value : '';
+  }
+  showConfirm(CD, true);
+});
 
-// ═══════════════════════════════════════════════════════════
+document.getElementById('cancel-edit-btn').addEventListener('click', function() {
+  showConfirm(CD, true);
+});
+
+document.getElementById('rescan-btn').addEventListener('click', function() {
+  document.getElementById('photo-input').click();
+});
+
+// ═══════════════════════════════════════════════
 // MANUAL ENTRY
-// ═══════════════════════════════════════════════════════════
-function goManual(){
-  document.getElementById('manual-hdr').innerHTML='<h2>Enter License Details</h2><p>Record driver information manually</p>';
-  clearManualFields();document.getElementById('m-notes').value='';
-  showS('s-manual');setTimeout(()=>document.getElementById('m-first').focus(),100);
-}
-function clearManualFields(){['m-first','m-last','m-dl','m-dob','m-exp'].forEach(id=>document.getElementById(id).value='');document.getElementById('m-state').value='TN';}
-async function submitManual(){
-  const data={first_name:document.getElementById('m-first').value,last_name:document.getElementById('m-last').value,dl_number:document.getElementById('m-dl').value,dob:document.getElementById('m-dob').value,expiration:document.getElementById('m-exp').value,state:document.getElementById('m-state').value,notes:document.getElementById('m-notes').value};
-  if(!data.first_name&&!data.last_name){toast('Enter at least a name','error');return;}
-  try{const r=await fetch('/api/scans',{method:'POST',headers:{'Content-Type':'application/json','x-auth-token':TK},body:JSON.stringify(data)});const d=await r.json();
-  clearManualFields();document.getElementById('m-notes').value='';showResult(d);}
-  catch(e){toast('Failed','error');}
+// ═══════════════════════════════════════════════
+document.getElementById('manual-btn').addEventListener('click', function() {
+  document.getElementById('manual-hdr').innerHTML = '<h2>Enter License Details</h2><p>Record driver information manually</p>';
+  clearManualFields();
+  document.getElementById('m-notes').value = '';
+  showS('s-manual');
+  setTimeout(function() { document.getElementById('m-first').focus(); }, 100);
+});
+
+function clearManualFields() {
+  var ids = ['m-first','m-last','m-dl','m-dob','m-exp'];
+  for (var i = 0; i < ids.length; i++) document.getElementById(ids[i]).value = '';
+  document.getElementById('m-state').value = 'TN';
 }
 
-// ═══════════════════════════════════════════════════════════
+document.getElementById('submit-manual-btn').addEventListener('click', function() {
+  var data = {
+    first_name: document.getElementById('m-first').value,
+    last_name: document.getElementById('m-last').value,
+    dl_number: document.getElementById('m-dl').value,
+    dob: document.getElementById('m-dob').value,
+    expiration: document.getElementById('m-exp').value,
+    state: document.getElementById('m-state').value,
+    notes: document.getElementById('m-notes').value
+  };
+  if (!data.first_name && !data.last_name) { toast('Enter at least a name', 'error'); return; }
+  fetch('/api/scans', {method:'POST', headers:{'Content-Type':'application/json','x-auth-token':TK}, body:JSON.stringify(data)})
+  .then(function(r) { return r.json(); })
+  .then(function(d) { clearManualFields(); document.getElementById('m-notes').value = ''; showResult(d); })
+  .catch(function() { toast('Failed', 'error'); });
+});
+
+document.getElementById('back-to-scan-btn').addEventListener('click', function() { showS('s-scan'); });
+
+// ═══════════════════════════════════════════════
 // RESULT
-// ═══════════════════════════════════════════════════════════
-function showResult(d){
-  const icon=document.getElementById('r-icon'),st=document.getElementById('r-status'),sc=document.getElementById('r-score'),fl=document.getElementById('r-flags');
-  if(d.risk_score>=70){icon.textContent='!!!';st.textContent='FLAGGED';st.style.color='var(--red)';}
-  else if(d.risk_score>=30){icon.textContent='!!';st.textContent='CAUTION';st.style.color='var(--amber)';}
-  else{icon.textContent='OK';st.textContent='CLEARED';st.style.color='var(--green)';}
-  const rc=d.risk_score>=70?'risk-high':d.risk_score>=30?'risk-med':'risk-low';
-  sc.innerHTML=`<span class="risk-badge ${rc}">Risk: ${d.risk_score}</span>`;
-  fl.innerHTML=(d.risk_flags||[]).map(f=>`<div style="margin-top:4px">${f}</div>`).join('');
-  document.getElementById('r-detail').innerHTML=`<div class="card-label">Driver</div><div class="card-value">${CD.first_name||''} ${CD.last_name||''}</div><div style="margin-top:8px;font-size:13px;color:var(--muted)">${CD.dl_number?'DL: '+CD.dl_number:''}</div>`;
-  if(navigator.vibrate&&d.risk_score>=70)navigator.vibrate([300,100,300]);
-  showS('s-result');CD={};
+// ═══════════════════════════════════════════════
+function showResult(d) {
+  var icon = document.getElementById('r-icon');
+  var st = document.getElementById('r-status');
+  var sc = document.getElementById('r-score');
+  var fl = document.getElementById('r-flags');
+  if (d.risk_score >= 70) { icon.textContent = '!!!'; st.textContent = 'FLAGGED'; st.style.color = 'var(--red)'; }
+  else if (d.risk_score >= 30) { icon.textContent = '!!'; st.textContent = 'CAUTION'; st.style.color = 'var(--amber)'; }
+  else { icon.textContent = 'OK'; st.textContent = 'CLEARED'; st.style.color = 'var(--green)'; }
+  var rc = d.risk_score >= 70 ? 'risk-high' : d.risk_score >= 30 ? 'risk-med' : 'risk-low';
+  sc.innerHTML = '<span class="risk-badge ' + rc + '">Risk: ' + d.risk_score + '</span>';
+  var flagHtml = '';
+  if (d.risk_flags) { for (var i = 0; i < d.risk_flags.length; i++) flagHtml += '<div style="margin-top:4px">' + d.risk_flags[i] + '</div>'; }
+  fl.innerHTML = flagHtml;
+  document.getElementById('r-detail').innerHTML = '<div class="card-label">Driver</div><div class="card-value">' + (CD.first_name||'') + ' ' + (CD.last_name||'') + '</div><div style="margin-top:8px;font-size:13px;color:var(--muted)">' + (CD.dl_number ? 'DL: ' + CD.dl_number : '') + '</div>';
+  if (navigator.vibrate && d.risk_score >= 70) navigator.vibrate([300, 100, 300]);
+  showS('s-result');
+  CD = {};
 }
 
-// ═══════════════════════════════════════════════════════════
-// HISTORY
-// ═══════════════════════════════════════════════════════════
-async function loadHistory(){try{const r=await fetch('/api/scans?limit=30',{headers:{'x-auth-token':TK}});const s=await r.json();const l=document.getElementById('h-list');
-  if(!s.length){l.innerHTML='<p style="color:var(--muted);text-align:center;padding:40px">No scans yet</p>';return;}
-  l.innerHTML=s.map(s=>{const rc=s.risk_score>=70?'risk-high':s.risk_score>=30?'risk-med':'risk-low';const t=new Date(s.created_at+'Z').toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
-  return`<div class="scan-item"><div><div class="scan-item-name">${s.first_name||''} ${s.last_name||'Unknown'}</div><div class="scan-item-meta">${s.dl_number||'No DL'} \u00b7 ${t}</div></div><span class="risk-badge ${rc}">${s.risk_score}</span></div>`;}).join('');}catch(e){toast('Failed','error');}}
+document.getElementById('next-scan-btn').addEventListener('click', function() { showS('s-scan'); });
 
-// ═══════════════════════════════════════════════════════════
-// DASHBOARD
-// ═══════════════════════════════════════════════════════════
-async function loadDash(){try{const r=await fetch('/api/dashboard',{headers:{'x-auth-token':TK}});const d=await r.json();
-  document.getElementById('d-stats').innerHTML=`<div class="stat-card"><div class="stat-num" style="color:var(--blue)">${d.today}</div><div class="stat-label">Today</div></div><div class="stat-card"><div class="stat-num" style="color:var(--red)">${d.flagged}</div><div class="stat-label">Flagged</div></div><div class="stat-card"><div class="stat-num">${d.total}</div><div class="stat-label">All Time</div></div><div class="stat-card"><div class="stat-num" style="color:var(--amber)">${d.watchlist}</div><div class="stat-label">Watchlist</div></div>`;
-  loadWL();}catch(e){toast('Failed','error');}}
-async function loadWL(){try{const r=await fetch('/api/watchlist',{headers:{'x-auth-token':TK}});const items=await r.json();
-  document.getElementById('d-wl').innerHTML=items.length?items.map(w=>`<div class="scan-item"><div><div class="scan-item-name">${w.first_name||''} ${w.last_name||'\u2014'}</div><div class="scan-item-meta">${w.dl_number||'No DL'} \u00b7 ${w.reason||''}</div></div><button class="btn btn-red btn-sm" style="width:auto;padding:6px 12px;font-size:12px" onclick="rmWL('${w.id}')">X</button></div>`).join(''):'<p style="color:var(--muted);font-size:13px">Empty</p>';}catch(_){}}
-function toggleWLForm(){const f=document.getElementById('wl-form');f.style.display=f.style.display==='none'?'block':'none';}
-async function addWL(){try{await fetch('/api/watchlist',{method:'POST',headers:{'Content-Type':'application/json','x-auth-token':TK},body:JSON.stringify({dl_number:document.getElementById('wl-dl').value,last_name:document.getElementById('wl-last').value,reason:document.getElementById('wl-reason').value})});['wl-dl','wl-last','wl-reason'].forEach(id=>document.getElementById(id).value='');document.getElementById('wl-form').style.display='none';loadWL();toast('Added','success');}catch(e){toast('Failed','error');}}
-async function rmWL(id){await fetch('/api/watchlist/'+id,{method:'DELETE',headers:{'x-auth-token':TK}});loadWL();}
-function toast(msg,type){const t=document.getElementById('toast');t.className=`toast toast-${type||'info'} show`;t.textContent=msg;setTimeout(()=>t.classList.remove('show'),3500);}
+// ═══════════════════════════════════════════════
+// NAV
+// ═══════════════════════════════════════════════
+document.getElementById('n-scan').addEventListener('click', function() { showS('s-scan'); });
+document.getElementById('n-hist').addEventListener('click', function() { showS('s-history'); loadHistory(); });
+document.getElementById('n-dash').addEventListener('click', function() { showS('s-dash'); loadDash(); });
+
+// ═══════════════════════════════════════════════
+// HISTORY
+// ═══════════════════════════════════════════════
+function loadHistory() {
+  fetch('/api/scans?limit=30', {headers:{'x-auth-token':TK}})
+  .then(function(r) { return r.json(); })
+  .then(function(scans) {
+    var el = document.getElementById('h-list');
+    if (!scans.length) { el.innerHTML = '<p style="color:var(--muted);text-align:center;padding:40px">No scans yet</p>'; return; }
+    var html = '';
+    for (var i = 0; i < scans.length; i++) {
+      var s = scans[i];
+      var rc = s.risk_score >= 70 ? 'risk-high' : s.risk_score >= 30 ? 'risk-med' : 'risk-low';
+      var t = new Date(s.created_at + 'Z').toLocaleString('en-US', {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+      html += '<div class="scan-item"><div><div class="scan-item-name">' + (s.first_name||'') + ' ' + (s.last_name||'Unknown') + '</div><div class="scan-item-meta">' + (s.dl_number||'No DL') + ' \u00b7 ' + t + '</div></div><span class="risk-badge ' + rc + '">' + s.risk_score + '</span></div>';
+    }
+    el.innerHTML = html;
+  }).catch(function() { toast('Failed', 'error'); });
+}
+
+// ═══════════════════════════════════════════════
+// DASHBOARD + WATCHLIST
+// ═══════════════════════════════════════════════
+function loadDash() {
+  fetch('/api/dashboard', {headers:{'x-auth-token':TK}})
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    document.getElementById('d-stats').innerHTML = '<div class="stat-card"><div class="stat-num" style="color:var(--blue)">' + d.today + '</div><div class="stat-label">Today</div></div><div class="stat-card"><div class="stat-num" style="color:var(--red)">' + d.flagged + '</div><div class="stat-label">Flagged</div></div><div class="stat-card"><div class="stat-num">' + d.total + '</div><div class="stat-label">All Time</div></div><div class="stat-card"><div class="stat-num" style="color:var(--amber)">' + d.watchlist + '</div><div class="stat-label">Watchlist</div></div>';
+    loadWL();
+  }).catch(function() { toast('Failed', 'error'); });
+}
+
+function loadWL() {
+  fetch('/api/watchlist', {headers:{'x-auth-token':TK}})
+  .then(function(r) { return r.json(); })
+  .then(function(items) {
+    var el = document.getElementById('d-wl');
+    if (!items.length) { el.innerHTML = '<p style="color:var(--muted);font-size:13px">Empty</p>'; return; }
+    var html = '';
+    for (var i = 0; i < items.length; i++) {
+      var w = items[i];
+      html += '<div class="scan-item"><div><div class="scan-item-name">' + (w.first_name||'') + ' ' + (w.last_name||'\u2014') + '</div><div class="scan-item-meta">' + (w.dl_number||'No DL') + ' \u00b7 ' + (w.reason||'') + '</div></div><button type="button" class="btn btn-red btn-sm" style="width:auto;padding:6px 12px;font-size:12px" data-wl-id="' + w.id + '">X</button></div>';
+    }
+    el.innerHTML = html;
+    // Attach delete handlers
+    var delBtns = el.querySelectorAll('[data-wl-id]');
+    for (var j = 0; j < delBtns.length; j++) {
+      delBtns[j].addEventListener('click', function() {
+        var id = this.getAttribute('data-wl-id');
+        fetch('/api/watchlist/' + id, {method:'DELETE', headers:{'x-auth-token':TK}}).then(function() { loadWL(); });
+      });
+    }
+  }).catch(function() {});
+}
+
+document.getElementById('toggle-wl-btn').addEventListener('click', function() {
+  var f = document.getElementById('wl-form');
+  f.style.display = f.style.display === 'none' ? 'block' : 'none';
+});
+
+document.getElementById('add-wl-btn').addEventListener('click', function() {
+  fetch('/api/watchlist', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','x-auth-token':TK},
+    body:JSON.stringify({
+      dl_number: document.getElementById('wl-dl').value,
+      last_name: document.getElementById('wl-last').value,
+      reason: document.getElementById('wl-reason').value
+    })
+  }).then(function() {
+    document.getElementById('wl-dl').value = '';
+    document.getElementById('wl-last').value = '';
+    document.getElementById('wl-reason').value = '';
+    document.getElementById('wl-form').style.display = 'none';
+    loadWL();
+    toast('Added', 'success');
+  }).catch(function() { toast('Failed', 'error'); });
+});
+
+// ═══════════════════════════════════════════════
+// PRELOAD SDK (non-blocking, same as test_scanner.html)
+// ═══════════════════════════════════════════════
+loadSDK().then(function() {
+  photoStatus.textContent = 'Ready';
+  photoStatus.style.color = '#0f0';
+  setTimeout(function() { photoStatus.textContent = ''; }, 2000);
+}).catch(function() {
+  // SDK will load on first photo attempt
+});
 </script>
 </body>
 </html>
