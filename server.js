@@ -381,7 +381,13 @@ app.post('/api/decode-dl', auth, upload.single('photo'), async (req, res) => {
   const start = Date.now();
   if (!req.file) return res.status(400).json({ success: false, error: 'No photo uploaded' });
 
-  console.log(`\n  → Decode: ${(req.file.size / 1024).toFixed(0)}KB ${req.file.mimetype}`);
+  // Log input image metadata for diagnostics
+  try {
+    const inputMeta = await sharp(req.file.buffer).metadata();
+    console.log(`\n  → Decode: ${(req.file.size / 1024).toFixed(0)}KB ${req.file.mimetype} ${inputMeta.width}x${inputMeta.height} ${inputMeta.format} ${inputMeta.channels}ch`);
+  } catch (_) {
+    console.log(`\n  → Decode: ${(req.file.size / 1024).toFixed(0)}KB ${req.file.mimetype}`);
+  }
 
   try {
     const result = await Promise.race([
@@ -472,6 +478,12 @@ app.get('/api/scans/:id', auth, (req, res) => {
   res.json(s);
 });
 
+// --- Debug (decode diagnostics) ---
+app.get('/api/debug/decode-log', auth, (req, res) => {
+  const rows = db.prepare('SELECT * FROM decode_log ORDER BY id DESC LIMIT 50').all();
+  res.json(rows);
+});
+
 // --- Watchlist ---
 app.get('/api/watchlist', auth, (req, res) => {
   res.json(db.prepare('SELECT * FROM watchlist WHERE active=1 ORDER BY created_at DESC').all());
@@ -504,7 +516,7 @@ app.get('/api/dashboard', auth, (req, res) => {
 
 // --- Health ---
 app.get('/api/health', (req, res) => {
-  res.json({ status:'ok', version:'3.3.0', decoder:decoderReady?'zxing-wasm':'unavailable', uptime:Math.round(process.uptime()) });
+  res.json({ status:'ok', version:'3.3.1', decoder:decoderReady?'zxing-wasm':'unavailable', uptime:Math.round(process.uptime()) });
 });
 
 // ═══════════════════════════════════════════════════════════════
