@@ -68,6 +68,9 @@ input,button,select,textarea{font-family:inherit;font-size:inherit}
 .manual-header p{font-size:12px;color:var(--muted)}
 .green-flash{animation:gflash .6s ease-out}
 @keyframes gflash{0%{background:rgba(0,200,83,.3)}100%{background:transparent}}
+.input-eye-wrap{position:relative}
+.input-eye-wrap input{width:100%;padding-right:52px}
+.eye-toggle{position:absolute;right:4px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;padding:8px;font-size:13px;font-weight:600}
 
 /* === SCANNER === */
 #s-scanner{background:#000;padding:0!important;padding-bottom:0!important;position:relative}
@@ -100,7 +103,12 @@ input,button,select,textarea{font-family:inherit;font-size:inherit}
       <div class="login-box">
         <div class="login-logo"><h2>IRON HALO VERIFY</h2><p>Guard Verification System v4.0</p></div>
         <div class="field"><label>Username</label><input type="text" id="l-user" autocapitalize="none" autocomplete="username"></div>
-        <div class="field"><label>Password</label><input type="password" id="l-pass" autocomplete="current-password"></div>
+        <div class="field"><label>Password</label>
+          <div class="input-eye-wrap">
+            <input type="password" id="l-pass" autocomplete="current-password">
+            <button type="button" class="eye-toggle" onclick="togglePwd()" id="eye-btn">Show</button>
+          </div>
+        </div>
         <button class="btn btn-primary" onclick="doLogin()" id="l-btn">Sign In</button>
         <p id="l-err" style="color:var(--red);text-align:center;margin-top:12px;font-size:13px"></p>
       </div>
@@ -122,7 +130,7 @@ input,button,select,textarea{font-family:inherit;font-size:inherit}
   <!-- LIVE SCANNER -->
   <div class="screen" id="s-scanner">
     <div class="scanner-header">
-      <span>Scanning...</span>
+      <span id="scanner-header-text">Scanning...</span>
       <button onclick="stopScanner()">Cancel</button>
     </div>
     <div class="scanner-status" id="scanner-status" style="display:none;"><span id="scanner-status-text"></span></div>
@@ -222,7 +230,6 @@ input,button,select,textarea{font-family:inherit;font-size:inherit}
   </div>
 </div>
 <div class="toast" id="toast"></div>
-<!-- Hidden file input for photo scan mode -->
 <input type="file" id="photo-scan-input" accept="image/*" capture="environment" style="display:none">
 
 <script>
@@ -230,11 +237,9 @@ input,button,select,textarea{font-family:inherit;font-size:inherit}
 // STATE
 // ═══════════════════════════════════════════════════════════
 let TK=localStorage.getItem('stk')||'',US=JSON.parse(localStorage.getItem('sus')||'null'),CD={},cPhoto=null,cBlob=null;
-
-// Scanner state
-let html5Qr=null,scannerTimeout=null,dynamsoftReader=null,dynamsoftLoaded=false;
+let html5Qr=null,scannerTimeout=null,manualTimeout=null,dynamsoftReader=null,dynamsoftLoaded=false;
 let dynamsoftFrameLoop=null,torchOn=false,scannerVideoTrack=null,scannerStream=null;
-let isPhotoScanMode=false,activeEngine='html5-qrcode';
+let isPhotoScanMode=false,activeEngine='html5-qrcode',dynFrameCount=0;
 
 // ═══════════════════════════════════════════════════════════
 // HELPERS
@@ -261,6 +266,11 @@ function showApp(){
 // ═══════════════════════════════════════════════════════════
 // AUTH
 // ═══════════════════════════════════════════════════════════
+function togglePwd(){
+  const i=document.getElementById('l-pass'),b=document.getElementById('eye-btn');
+  if(i.type==='password'){i.type='text';b.textContent='Hide';}
+  else{i.type='password';b.textContent='Show';}
+}
 async function doLogin(){
   const u=document.getElementById('l-user').value.trim(),p=document.getElementById('l-pass').value;
   document.getElementById('l-err').textContent='';
@@ -281,10 +291,11 @@ document.getElementById('l-pass').addEventListener('keydown',e=>{if(e.key==='Ent
 function loadDynamsoftSDK(){
   return new Promise((resolve,reject)=>{
     if(dynamsoftLoaded&&window.Dynamsoft){resolve();return;}
+    console.log('[DYN] Loading Dynamsoft SDK from CDN...');
     const s=document.createElement('script');
     s.src='https://cdn.jsdelivr.net/npm/dynamsoft-javascript-barcode@9.6.42/dist/dbr.js';
-    s.onload=()=>{dynamsoftLoaded=true;resolve();};
-    s.onerror=()=>reject(new Error('Failed to load Dynamsoft SDK'));
+    s.onload=()=>{dynamsoftLoaded=true;console.log('[DYN] SDK loaded');resolve();};
+    s.onerror=()=>{console.error('[DYN] SDK load FAILED');reject(new Error('Failed to load Dynamsoft SDK'));};
     document.head.appendChild(s);
   });
 }
@@ -292,12 +303,14 @@ function loadDynamsoftSDK(){
 async function getDynamsoftReader(){
   if(dynamsoftReader)return dynamsoftReader;
   await loadDynamsoftSDK();
+  console.log('[DYN] Creating reader instance...');
   Dynamsoft.DBR.BarcodeReader.license='DLS2eyJvcmdhbml6YXRpb25JRCI6IjIwMDAwMSJ9';
   dynamsoftReader=await Dynamsoft.DBR.BarcodeReader.createInstance();
   const settings=await dynamsoftReader.getRuntimeSettings();
   settings.barcodeFormatIds=Dynamsoft.DBR.EnumBarcodeFormat.BF_PDF417;
   settings.deblurLevel=5;
   await dynamsoftReader.updateRuntimeSettings(settings);
+  console.log('[DYN] Reader ready: PDF417, deblurLevel=5');
   return dynamsoftReader;
 }
 
@@ -306,8 +319,9 @@ async function getDynamsoftReader(){
 // ═══════════════════════════════════════════════════════════
 async function startScanner(){
   CD={};cPhoto=null;cBlob=null;
-  isPhotoScanMode=false;activeEngine='html5-qrcode';torchOn=false;
+  isPhotoScanMode=false;activeEngine='html5-qrcode';torchOn=false;dynFrameCount=0;
   showS('s-scanner');
+  document.getElementById('scanner-header-text').textContent='Scanning...';
 
   const statusEl=document.getElementById('scanner-status');
   statusEl.style.display='none';
@@ -323,13 +337,19 @@ async function startScanner(){
     const config={fps:10,qrbox:{width:qrW,height:qrH},aspectRatio:1.777};
     if(typeof Html5QrcodeSupportedFormats!=='undefined'&&Html5QrcodeSupportedFormats.PDF_417!==undefined){
       config.formatsToSupport=[Html5QrcodeSupportedFormats.PDF_417];
+      console.log('[SCAN] html5-qrcode: PDF_417 format only');
+    }else{
+      console.log('[SCAN] html5-qrcode: all formats (PDF_417 enum not found)');
     }
     await html5Qr.start(
       {facingMode:"environment"},config,
-      (decoded)=>{console.log('[SCAN] html5-qrcode decoded:',decoded.substring(0,80));onScanSuccess(decoded);},
+      (decoded)=>{
+        console.log('[SCAN] html5-qrcode decoded, length='+decoded.length);
+        if(decoded&&decoded.length>20){onScanSuccess(decoded,'html5-qrcode');}
+        else{console.log('[SCAN] Ignoring short decode: '+decoded);}
+      },
       (err)=>{/* scanning... */}
     );
-    // Grab video track for torch
     try{
       const videoEl=document.querySelector('#scanner-region video');
       if(videoEl&&videoEl.srcObject){
@@ -338,8 +358,12 @@ async function startScanner(){
         if(tracks.length>0)scannerVideoTrack=tracks[0];
       }
     }catch(e){}
-    // 10-second timer: switch to Dynamsoft
+    // 10s: switch to Dynamsoft
     scannerTimeout=setTimeout(()=>{switchToDynamsoft();},10000);
+    // 25s: suggest manual entry
+    manualTimeout=setTimeout(()=>{
+      toast('Tap Manual if barcode won\'t read','info');
+    },25000);
   }catch(e){
     console.error('[SCANNER ERROR]',e);
     toast('Camera error: '+(e.message||e),'error');
@@ -352,30 +376,24 @@ async function startScanner(){
 // ═══════════════════════════════════════════════════════════
 async function switchToDynamsoft(){
   if(activeEngine==='dynamsoft')return;
-  console.log('[SCAN] Switching to Dynamsoft enhanced scanner...');
+  console.log('[SCAN] Switching to Dynamsoft...');
   toast('Switching to enhanced scanner...','info');
   activeEngine='dynamsoft';
   const statusEl=document.getElementById('scanner-status');
   statusEl.style.display='';
   document.getElementById('scanner-status-text').textContent='Enhanced Scanning...';
 
-  // Grab stream from html5-qrcode video
   let stream=null;
   try{const videoEl=document.querySelector('#scanner-region video');if(videoEl&&videoEl.srcObject)stream=videoEl.srcObject;}catch(e){}
-
-  // Stop html5-qrcode but keep stream alive
   if(html5Qr){try{await html5Qr.stop();}catch(e){}try{html5Qr.clear();}catch(e){}html5Qr=null;}
-
-  // If no stream, open new one
   if(!stream){
     try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1920}}});}
-    catch(e){toast('Camera error','error');showS('s-scan');return;}
+    catch(e){console.error('[DYN] Camera error:',e);toast('Camera error','error');showS('s-scan');return;}
   }
   scannerStream=stream;
   const tracks=stream.getVideoTracks();
   if(tracks.length>0)scannerVideoTrack=tracks[0];
 
-  // Create fresh video in scanner-region
   const region=document.getElementById('scanner-region');
   region.innerHTML='';
   const video=document.createElement('video');
@@ -384,48 +402,66 @@ async function switchToDynamsoft(){
   video.srcObject=stream;
   region.appendChild(video);
   await video.play();
+  console.log('[DYN] Video playing, resolution:',video.videoWidth,'x',video.videoHeight);
 
-  // Load Dynamsoft
   let reader;
   try{reader=await getDynamsoftReader();}
-  catch(e){console.error('[DYNAMSOFT] Load error:',e);toast('Enhanced scanner unavailable','error');return;}
+  catch(e){console.error('[DYN] Reader init failed:',e);toast('Enhanced scanner unavailable','error');return;}
 
   const canvas=document.createElement('canvas');
   const ctx=canvas.getContext('2d');
+  dynFrameCount=0;
 
   function decodeFrame(){
     if(activeEngine!=='dynamsoft')return;
+    dynFrameCount++;
     if(video.readyState>=video.HAVE_CURRENT_DATA){
       canvas.width=video.videoWidth;canvas.height=video.videoHeight;
       ctx.drawImage(video,0,0);
       reader.decode(canvas).then(results=>{
         if(results&&results.length>0){
           const text=results[0].barcodeText;
-          if(text&&text.length>20){console.log('[SCAN] Dynamsoft decoded:',text.substring(0,80));onScanSuccess(text);return;}
+          if(dynFrameCount%30===0)console.log('[DYN] Frame',dynFrameCount,': found',results.length,'result(s), len=',text?.length);
+          if(text&&text.length>20){console.log('[DYN] DECODED! len='+text.length);onScanSuccess(text,'dynamsoft');return;}
         }
+        if(dynFrameCount%60===0)console.log('[DYN] Frame',dynFrameCount,': no barcode found');
         dynamsoftFrameLoop=requestAnimationFrame(decodeFrame);
-      }).catch(()=>{dynamsoftFrameLoop=requestAnimationFrame(decodeFrame);});
+      }).catch(err=>{
+        if(dynFrameCount%60===0)console.error('[DYN] Frame',dynFrameCount,'error:',err.message||err);
+        dynamsoftFrameLoop=requestAnimationFrame(decodeFrame);
+      });
     }else{dynamsoftFrameLoop=requestAnimationFrame(decodeFrame);}
   }
   dynamsoftFrameLoop=requestAnimationFrame(decodeFrame);
 }
 
 // ═══════════════════════════════════════════════════════════
-// SCAN SUCCESS
+// SCAN SUCCESS — send raw to server for debugging, then parse
 // ═══════════════════════════════════════════════════════════
-function onScanSuccess(decoded){
+function onScanSuccess(decoded,engine){
   cleanupScanner();
+  console.log('[SUCCESS] Engine:',engine,'Raw length:',decoded.length);
+  console.log('[SUCCESS] Raw data (first 200):',decoded.substring(0,200));
+
+  // Send raw data to server for debugging
+  try{
+    fetch('/api/debug/raw-decode',{method:'POST',headers:{'Content-Type':'application/json','x-auth-token':TK},
+      body:JSON.stringify({raw:decoded,engine:engine,length:decoded.length})
+    }).catch(()=>{});
+  }catch(e){}
+
   if(navigator.vibrate)navigator.vibrate([200,100,200,100,200]);
-  // Green flash
   const flash=document.createElement('div');
   flash.className='scan-success-flash';
   document.body.appendChild(flash);
   flash.addEventListener('animationend',()=>flash.remove());
-  // Parse and show
+
   const parsed=parsePDF417(decoded);
   CD=parsed;
+  const fieldCount=Object.values(parsed).filter(v=>v&&v.length>0).length;
+  console.log('[SUCCESS] Parsed fields:',fieldCount,JSON.stringify(parsed));
   showConfirm(CD,true);
-  toast('Barcode decoded!','success');
+  toast('Decoded! '+fieldCount+' fields extracted','success');
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -433,12 +469,12 @@ function onScanSuccess(decoded){
 // ═══════════════════════════════════════════════════════════
 function cleanupScanner(){
   if(scannerTimeout){clearTimeout(scannerTimeout);scannerTimeout=null;}
+  if(manualTimeout){clearTimeout(manualTimeout);manualTimeout=null;}
   if(dynamsoftFrameLoop){cancelAnimationFrame(dynamsoftFrameLoop);dynamsoftFrameLoop=null;}
   if(html5Qr){try{html5Qr.stop().catch(()=>{});}catch(e){}try{html5Qr.clear();}catch(e){}html5Qr=null;}
   if(scannerStream){try{scannerStream.getTracks().forEach(t=>t.stop());}catch(e){}scannerStream=null;}
   scannerVideoTrack=null;torchOn=false;activeEngine='html5-qrcode';isPhotoScanMode=false;
 }
-
 function stopScanner(){cleanupScanner();showS('s-scan');}
 
 // ═══════════════════════════════════════════════════════════
@@ -451,8 +487,7 @@ async function toggleTorch(){
     if(!cap.torch){toast('Torch not supported','info');return;}
     torchOn=!torchOn;
     await scannerVideoTrack.applyConstraints({advanced:[{torch:torchOn}]});
-    const btn=document.getElementById('torch-btn');
-    if(btn)btn.classList.toggle('torch-on',torchOn);
+    document.getElementById('torch-btn')?.classList.toggle('torch-on',torchOn);
   }catch(e){toast('Torch not supported','info');torchOn=false;}
 }
 
@@ -469,7 +504,7 @@ function enterPhotoMode(){
     if(!file){isPhotoScanMode=false;startScanner();return;}
     toast('Decoding photo...','info');
     let decoded=null;
-    // Try Dynamsoft on photo
+    // Try Dynamsoft
     try{
       const reader=await getDynamsoftReader();
       const img=new Image();
@@ -491,17 +526,17 @@ function enterPhotoMode(){
       }catch(e){console.log('[PHOTO] html5-qrcode failed:',e.message);}
     }
     isPhotoScanMode=false;
-    if(decoded&&decoded.length>20){onScanSuccess(decoded);}
+    if(decoded&&decoded.length>20){onScanSuccess(decoded,'photo');}
     else{toast('Could not read barcode. Try again or Manual Entry.','error');startScanner();}
   };
   input.click();
 }
 
 // ═══════════════════════════════════════════════════════════
-// PDF417 AAMVA PARSER (client-side)
-// Field names match server schema: dob, expiration, address, city, state, postal_code, sex
+// PDF417 AAMVA PARSER — 3-method extraction, server-compatible field names
 // ═══════════════════════════════════════════════════════════
 function parsePDF417(raw){
+  console.log('[PARSER] Input length:',raw.length);
   const fields={};
   const map={
     'DCS':'last_name','DAB':'last_name','DAC':'first_name','DCT':'first_name',
@@ -510,24 +545,46 @@ function parsePDF417(raw){
     'DAJ':'state','DAK':'postal_code','DBC':'sex',
     'DAY':'eye_color','DAU':'height','DBD':'issue_date'
   };
+
+  // METHOD 1: Split by line/record delimiters, check startsWith
   const lines=raw.split(/[\n\r\x1e\x1d]+/);
+  console.log('[PARSER] Method 1: split into',lines.length,'lines');
   for(const line of lines){
     const trimmed=line.trim();
     for(const[code,field]of Object.entries(map)){
       if(trimmed.startsWith(code)){
         let val=trimmed.substring(code.length).trim();
-        if(field==='first_name'&&fields.first_name&&trimmed.startsWith('DCT'))continue;
-        if(!fields[field])fields[field]=val;
+        if(field==='first_name'&&fields.first_name&&code==='DCT')continue;
+        if(val)fields[field]=val;
       }
     }
   }
-  // Also try full-string scan for missing fields
+  console.log('[PARSER] After method 1:',Object.keys(fields).length,'fields');
+
+  // METHOD 2: Regex scan for DXX codes with lookahead to next code
   for(const[code,field]of Object.entries(map)){
     if(fields[field])continue;
-    const regex=new RegExp(code+'([^\\n\\r\\x1e\\x0a\\x0d]{1,100}?)(?=D[A-Z]{2}|[\\n\\r\\x1e]|$)','g');
-    const m=regex.exec(raw);
-    if(m&&m[1])fields[field]=m[1].trim();
+    const re=new RegExp(code+'([^\\n\\r\\x1e\\x1d]{1,120}?)(?=D[A-Z]{2}|[\\n\\r\\x1e\\x1d]|$)');
+    const m=re.exec(raw);
+    if(m&&m[1]&&m[1].trim()){fields[field]=m[1].trim();}
   }
+  console.log('[PARSER] After method 2:',Object.keys(fields).length,'fields');
+
+  // METHOD 3: Aggressive — find ALL DXX+value patterns in raw string (no delimiter assumption)
+  if(Object.keys(fields).length<3){
+    console.log('[PARSER] Method 3: aggressive scan (few fields found so far)');
+    const allMatches=[...raw.matchAll(/(D[A-Z]{2})([\s\S]*?)(?=D[A-Z]{2}|$)/g)];
+    for(const m of allMatches){
+      const code=m[1],val=m[2].trim();
+      if(map[code]&&val){
+        const field=map[code];
+        if(field==='first_name'&&fields.first_name&&code==='DCT')continue;
+        if(!fields[field])fields[field]=val;
+      }
+    }
+    console.log('[PARSER] After method 3:',Object.keys(fields).length,'fields');
+  }
+
   // Format dates as MM/DD/YYYY
   for(const df of['dob','expiration','issue_date']){
     if(fields[df]&&fields[df].length>=8){
@@ -542,7 +599,6 @@ function parsePDF417(raw){
   if(fields.sex==='1')fields.sex='M';
   else if(fields.sex==='2')fields.sex='F';
   if(fields.postal_code)fields.postal_code=fields.postal_code.replace(/\s+/g,'').replace(/0{4,}$/,'');
-  // Capitalize names
   for(const nf of['first_name','last_name','middle_name','city']){
     if(fields[nf])fields[nf]=fields[nf].charAt(0).toUpperCase()+fields[nf].slice(1).toLowerCase();
   }
@@ -581,22 +637,17 @@ async function confirmScan(){
 // ═══════════════════════════════════════════════════════════
 function goManual(){
   document.getElementById('manual-hdr').innerHTML='<h2>Enter License Details</h2><p>Record driver information manually</p>';
-  clearManualFields();
-  document.getElementById('m-notes').value='';
-  showS('s-manual');
-  setTimeout(()=>document.getElementById('m-first').focus(),100);
+  clearManualFields();document.getElementById('m-notes').value='';
+  showS('s-manual');setTimeout(()=>document.getElementById('m-first').focus(),100);
 }
 function goManualFromScanner(){
   cleanupScanner();
   document.getElementById('manual-hdr').innerHTML='<h2>Enter License Details</h2><p>Scanner stopped \u2014 enter from the license</p>';
   clearManualFields();
-  const now=new Date();
-  document.getElementById('m-notes').value='Manual entry '+now.toLocaleDateString()+' by '+(US?.display_name||'guard');
-  showS('s-manual');
-  setTimeout(()=>document.getElementById('m-first').focus(),100);
+  document.getElementById('m-notes').value='Manual entry '+(new Date()).toLocaleDateString()+' by '+(US?.display_name||'guard');
+  showS('s-manual');setTimeout(()=>document.getElementById('m-first').focus(),100);
 }
 function clearManualFields(){['m-first','m-last','m-dl','m-dob','m-exp'].forEach(id=>document.getElementById(id).value='');document.getElementById('m-state').value='TN';}
-
 async function submitManual(){
   const data={first_name:document.getElementById('m-first').value,last_name:document.getElementById('m-last').value,dl_number:document.getElementById('m-dl').value,dob:document.getElementById('m-dob').value,expiration:document.getElementById('m-exp').value,state:document.getElementById('m-state').value,notes:document.getElementById('m-notes').value};
   if(!data.first_name&&!data.last_name){toast('Enter at least a name','error');return;}

@@ -1,5 +1,5 @@
 /**
- * IRON HALO VERIFY v4.0 — Live Camera Scanner
+ * IRON HALO VERIFY v4.0.1 — Live Camera Scanner
  *
  * Scanner architecture: CLIENT-SIDE decode via Dynamsoft + html5-qrcode
  * - html5-qrcode: live camera viewfinder, continuous PDF417 scan
@@ -75,6 +75,12 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS watchlist (
     id TEXT PRIMARY KEY, dl_number TEXT, last_name TEXT,
     first_name TEXT, reason TEXT, added_by TEXT, active INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS raw_decodes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    raw TEXT, engine TEXT, length INTEGER,
+    guard_id TEXT, guard_name TEXT,
     created_at TEXT DEFAULT (datetime('now'))
   );
 `);
@@ -242,9 +248,24 @@ app.get('/api/dashboard', auth, (req, res) => {
   res.json({ today:today.c, flagged:flagged.c, total:total.c, watchlist:wl.c, recent });
 });
 
+// --- Debug: raw barcode captures ---
+app.post('/api/debug/raw-decode', auth, (req, res) => {
+  const { raw, engine, length } = req.body;
+  if (!raw) return res.status(400).json({ error: 'No raw data' });
+  db.prepare('INSERT INTO raw_decodes (raw, engine, length, guard_id, guard_name) VALUES (?, ?, ?, ?, ?)')
+    .run(raw, engine || '', length || raw.length, req.user.id, req.user.display_name);
+  console.log(`  [RAW-DECODE] Captured ${raw.length} chars from ${engine} by ${req.user.display_name}`);
+  res.json({ ok: true, stored: raw.length });
+});
+
+app.get('/api/debug/raw-decode', auth, (req, res) => {
+  const rows = db.prepare('SELECT * FROM raw_decodes ORDER BY created_at DESC LIMIT 20').all();
+  res.json(rows);
+});
+
 // --- Health ---
 app.get('/api/health', (req, res) => {
-  res.json({ status:'ok', version:'4.0.0', scanner:'client-side (Dynamsoft + html5-qrcode)', uptime:Math.round(process.uptime()) });
+  res.json({ status:'ok', version:'4.0.1', scanner:'client-side (Dynamsoft + html5-qrcode)', uptime:Math.round(process.uptime()) });
 });
 
 
