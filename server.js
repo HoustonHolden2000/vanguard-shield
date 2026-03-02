@@ -306,7 +306,7 @@ app.post('/api/barcode/decode', auth, upload.single('photo'), async (req, res) =
 });
 
 // --- Client error reporting ---
-app.post('/api/debug/client-error', auth, (req, res) => {
+app.post('/api/client-error', express.json(), (req, res) => {
   const { step, error, details } = req.body;
   db.prepare('INSERT INTO client_errors (step, error, details) VALUES (?, ?, ?)')
     .run(step || '', error || '', details || '');
@@ -423,7 +423,7 @@ app.get('/api/debug/raw-decode', auth, (req, res) => {
 
 // --- Health ---
 app.get('/api/health', (req, res) => {
-  res.json({ status:'ok', version:'6.0.2', scanner:'Dynamsoft BarcodeReader v9.6.42 (photo-only)', uptime:Math.round(process.uptime()) });
+  res.json({ status:'ok', version:'6.1.0', scanner:'Dynamsoft BarcodeReader v9.6.42 (photo-only)', uptime:Math.round(process.uptime()) });
 });
 
 
