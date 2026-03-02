@@ -46,10 +46,13 @@ input,button,select,textarea{font-family:inherit;font-size:inherit}
 .confirm-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .confirm-grid .card{margin-bottom:0}
 .confirm-grid .full{grid-column:1/-1}
-.overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.85);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;gap:16px}
+.overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;gap:12px}
 .overlay.hidden{display:none}
 .spinner{width:48px;height:48px;border:4px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
+.ov-title{font-size:18px;font-weight:700}
+.ov-status{font-size:14px;color:var(--muted);transition:opacity .2s}
+.ov-pass{font-size:12px;color:var(--blue);font-family:monospace;margin-top:4px}
 .toast{position:fixed;top:20px;left:16px;right:16px;padding:14px 16px;border-radius:10px;font-size:14px;font-weight:600;z-index:1000;transform:translateY(-120%);transition:transform .3s;text-align:center}
 .toast.show{transform:translateY(0)}
 .toast-success{background:var(--green);color:#000}
@@ -67,6 +70,11 @@ input,button,select,textarea{font-family:inherit;font-size:inherit}
 .login-logo{text-align:center;margin-bottom:32px}
 .login-logo h2{font-size:22px;color:var(--blue);margin-bottom:4px;letter-spacing:1px}
 .login-logo p{font-size:13px;color:var(--muted)}
+.manual-header{text-align:center;margin-bottom:18px;padding:14px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius)}
+.manual-header h2{font-size:17px;margin-bottom:4px}
+.manual-header p{font-size:12px;color:var(--muted)}
+.green-flash{animation:gflash .6s ease-out}
+@keyframes gflash{0%{background:rgba(0,200,83,.3)}100%{background:transparent}}
 </style>
 </head>
 <body>
@@ -80,7 +88,7 @@ input,button,select,textarea{font-family:inherit;font-size:inherit}
   <div class="screen active" id="s-login">
     <div style="flex:1;display:flex;align-items:center;justify-content:center">
       <div class="login-box">
-        <div class="login-logo"><h2>IRON HALO VERIFY</h2><p>Guard Verification System v3.1</p></div>
+        <div class="login-logo"><h2>IRON HALO VERIFY</h2><p>Guard Verification System v3.2</p></div>
         <div class="field"><label>Username</label><input type="text" id="l-user" autocapitalize="none" autocomplete="username"></div>
         <div class="field"><label>Password</label><input type="password" id="l-pass" autocomplete="current-password"></div>
         <button class="btn btn-primary" onclick="doLogin()" id="l-btn">Sign In</button>
@@ -99,14 +107,15 @@ input,button,select,textarea{font-family:inherit;font-size:inherit}
       <div style="font-size:13px;color:var(--muted);text-align:center;max-width:260px">Take a photo of the <strong>back</strong> of the driver's license (barcode side)</div>
       <input type="file" id="cam" accept="image/*" capture="environment" style="display:none" onchange="handlePhoto(this)">
     </div>
-    <button class="btn btn-outline btn-sm" onclick="showS('s-manual')" style="margin-top:auto">Manual Entry</button>
+    <button class="btn btn-outline btn-sm" onclick="goManual()" style="margin-top:auto">Manual Entry</button>
   </div>
 
-  <!-- PROCESSING -->
+  <!-- PROCESSING OVERLAY -->
   <div class="overlay hidden" id="ov">
     <div class="spinner"></div>
-    <div style="font-size:16px;font-weight:600">Reading barcode...</div>
-    <div style="font-size:13px;color:var(--muted)">Analyzing photo server-side</div>
+    <div class="ov-title" id="ov-title">Analyzing license...</div>
+    <div class="ov-status" id="ov-status">Processing image</div>
+    <div class="ov-pass" id="ov-pass"></div>
   </div>
 
   <!-- CONFIRM -->
@@ -116,7 +125,7 @@ input,button,select,textarea{font-family:inherit;font-size:inherit}
     <img id="c-photo" class="photo-preview" style="display:none">
     <div class="confirm-grid" id="c-fields"></div>
     <div style="margin-top:16px;display:flex;flex-direction:column;gap:10px">
-      <button class="btn btn-green" onclick="confirmScan()">&#10003; CONFIRM &amp; SAVE</button>
+      <button class="btn btn-green" onclick="confirmScan()">CONFIRM &amp; SAVE</button>
       <div style="display:flex;gap:10px">
         <button class="btn btn-outline btn-sm" onclick="editConfirm()" style="flex:1">Edit</button>
         <button class="btn btn-outline btn-sm" onclick="showS('s-scan')" style="flex:1">Re-scan</button>
@@ -137,7 +146,10 @@ input,button,select,textarea{font-family:inherit;font-size:inherit}
 
   <!-- MANUAL -->
   <div class="screen" id="s-manual">
-    <h2 style="margin-bottom:14px;font-size:18px">Manual Entry</h2>
+    <div class="manual-header" id="manual-hdr">
+      <h2>Enter License Details</h2>
+      <p>Record driver information manually</p>
+    </div>
     <div class="field"><label>First Name</label><input id="m-first" autocapitalize="words"></div>
     <div class="field"><label>Last Name</label><input id="m-last" autocapitalize="words"></div>
     <div class="field"><label>DL Number</label><input id="m-dl" autocapitalize="characters"></div>
@@ -146,7 +158,7 @@ input,button,select,textarea{font-family:inherit;font-size:inherit}
     <div class="field"><label>State</label><input id="m-state" maxlength="2" autocapitalize="characters" value="TN"></div>
     <div class="field"><label>Notes</label><textarea id="m-notes" rows="2"></textarea></div>
     <button class="btn btn-green" onclick="submitManual()">Submit</button>
-    <button class="btn btn-outline btn-sm" onclick="showS('s-scan')" style="margin-top:10px">Cancel</button>
+    <button class="btn btn-outline btn-sm" onclick="showS('s-scan')" style="margin-top:10px">Back to Scan</button>
   </div>
 
   <!-- RESULT -->
@@ -197,6 +209,7 @@ input,button,select,textarea{font-family:inherit;font-size:inherit}
 
 <script>
 let TK=localStorage.getItem('stk')||'',US=JSON.parse(localStorage.getItem('sus')||'null'),CD={},cPhoto=null,cBlob=null;
+const PASS_NAMES=['Resize','Sharpen','Normalize','Contrast','Threshold 1','Threshold 2','Threshold 3','Upscale','Downscale','HD Threshold','Rotation','Edge Crop'];
 
 function showS(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
@@ -227,21 +240,94 @@ async function doLogin(){
 if(TK&&US){fetch('/api/dashboard',{headers:{'x-auth-token':TK}}).then(r=>{if(r.ok)showApp();else throw 0;}).catch(()=>{TK='';US=null;localStorage.clear();});}
 document.getElementById('l-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 
-// PHOTO CAPTURE
+// PHOTO CAPTURE + DECODE
+let progressInterval=null;
 async function handlePhoto(input){
   const file=input.files[0];if(!file)return;input.value='';
   cBlob=file;
   const reader=new FileReader();reader.onload=()=>{cPhoto=reader.result;};reader.readAsDataURL(file);
-  document.getElementById('ov').classList.remove('hidden');
+
+  // Show progress overlay
+  const ov=document.getElementById('ov');
+  ov.classList.remove('hidden');
+  document.getElementById('ov-title').textContent='Analyzing license...';
+  document.getElementById('ov-status').textContent='Processing image';
+  document.getElementById('ov-pass').textContent='';
+
+  // Simulate pass progress while waiting for server
+  let passNum=1;
+  progressInterval=setInterval(()=>{
+    if(passNum<=12){
+      document.getElementById('ov-status').textContent=`Running analysis pass ${passNum} of 12`;
+      document.getElementById('ov-pass').textContent=PASS_NAMES[passNum-1]||'';
+      passNum++;
+    }
+  },2000);
+
   try{
     const form=new FormData();form.append('photo',file);
     const resp=await fetch('/api/decode-dl',{method:'POST',headers:{'x-auth-token':TK},body:form});
     const result=await resp.json();
-    document.getElementById('ov').classList.add('hidden');
+    clearInterval(progressInterval);progressInterval=null;
+
     if(result.success&&result.data){
-      CD=result.data;showConfirm(result.data,true);toast('Barcode decoded','success');if(navigator.vibrate)navigator.vibrate(200);
-    }else{CD={};showConfirm({},false);toast(result.error||'Could not read barcode. Enter details from photo.','info');}
-  }catch(err){document.getElementById('ov').classList.add('hidden');CD={};showConfirm({},false);toast('Connection error','error');}
+      // Success — green flash + vibrate
+      document.getElementById('ov-title').textContent='License verified!';
+      document.getElementById('ov-title').style.color='var(--green)';
+      document.getElementById('ov-status').textContent=`Decoded on pass ${result.meta?.passIndex||'?'} of ${result.meta?.totalPasses||12}`;
+      document.getElementById('ov-pass').textContent=result.meta?.pass||'';
+      if(navigator.vibrate)navigator.vibrate(200);
+      // Brief pause to show success, then transition
+      setTimeout(()=>{
+        ov.classList.add('hidden');
+        document.getElementById('ov-title').style.color='';
+        CD=result.data;
+        showConfirm(result.data,true);
+        toast('Barcode decoded — '+((result.meta?.decode_ms||0)/1000).toFixed(1)+'s','success');
+      },800);
+    }else{
+      // Failed — smooth transition to manual entry
+      document.getElementById('ov-title').textContent='Switching to manual entry';
+      document.getElementById('ov-status').textContent=result.error||'Barcode not readable';
+      document.getElementById('ov-pass').textContent='';
+      setTimeout(()=>{
+        ov.classList.add('hidden');
+        CD={};
+        goManualFromScan();
+      },1200);
+    }
+  }catch(err){
+    clearInterval(progressInterval);progressInterval=null;
+    ov.classList.add('hidden');
+    CD={};
+    goManualFromScan();
+    toast('Connection error — use manual entry','error');
+  }
+}
+
+// MANUAL ENTRY — intentional, not a failure state
+function goManual(){
+  document.getElementById('manual-hdr').innerHTML='<h2>Enter License Details</h2><p>Record driver information manually</p>';
+  clearManualFields();
+  document.getElementById('m-notes').value='';
+  showS('s-manual');
+  setTimeout(()=>document.getElementById('m-first').focus(),100);
+}
+
+function goManualFromScan(){
+  // Transition from failed scan — feels intentional
+  document.getElementById('manual-hdr').innerHTML='<h2>Enter License Details</h2><p>Barcode not readable — enter from the license</p>';
+  clearManualFields();
+  const now=new Date();
+  const dateStr=`${now.getMonth()+1}/${now.getDate()}/${now.getFullYear()}`;
+  document.getElementById('m-notes').value=`Scanned ${dateStr} by ${US?.display_name||'guard'}`;
+  showS('s-manual');
+  setTimeout(()=>document.getElementById('m-first').focus(),100);
+}
+
+function clearManualFields(){
+  ['m-first','m-last','m-dl','m-dob','m-exp'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('m-state').value='TN';
 }
 
 // CONFIRM
@@ -249,7 +335,7 @@ function showConfirm(data,decoded){
   document.getElementById('c-src').textContent=decoded?'Auto-decoded from barcode':'Photo captured — tap Edit to enter details';
   const img=document.getElementById('c-photo');if(cPhoto){img.src=cPhoto;img.style.display='block';}else{img.style.display='none';}
   const fs=[{k:'first_name',l:'First Name'},{k:'last_name',l:'Last Name'},{k:'dl_number',l:'DL Number',f:1},{k:'dob',l:'Date of Birth'},{k:'expiration',l:'Expiration'},{k:'address',l:'Address',f:1},{k:'city',l:'City'},{k:'state',l:'State'}];
-  document.getElementById('c-fields').innerHTML=fs.map(f=>`<div class="card ${f.f?'full':''}"><div class="card-label">${f.l}</div><div class="card-value" style="${!data[f.k]?'color:var(--muted);font-style:italic':''}">${data[f.k]||(decoded?'—':'Tap Edit')}</div></div>`).join('');
+  document.getElementById('c-fields').innerHTML=fs.map(f=>`<div class="card ${f.f?'full':''} ${decoded&&data[f.k]?'green-flash':''}"><div class="card-label">${f.l}</div><div class="card-value" style="${!data[f.k]?'color:var(--muted);font-style:italic':''}">${data[f.k]||(decoded?'—':'Tap Edit')}</div></div>`).join('');
   showS('s-confirm');
 }
 function editConfirm(){
@@ -270,8 +356,9 @@ async function confirmScan(){
 }
 async function submitManual(){
   const data={first_name:document.getElementById('m-first').value,last_name:document.getElementById('m-last').value,dl_number:document.getElementById('m-dl').value,dob:document.getElementById('m-dob').value,expiration:document.getElementById('m-exp').value,state:document.getElementById('m-state').value,notes:document.getElementById('m-notes').value};
+  if(!data.first_name&&!data.last_name){toast('Enter at least a name','error');return;}
   try{const r=await fetch('/api/scans',{method:'POST',headers:{'Content-Type':'application/json','x-auth-token':TK},body:JSON.stringify(data)});const d=await r.json();
-  ['m-first','m-last','m-dl','m-dob','m-exp','m-notes'].forEach(id=>document.getElementById(id).value='');document.getElementById('m-state').value='TN';showResult(d);}
+  clearManualFields();document.getElementById('m-notes').value='';showResult(d);}
   catch(e){toast('Failed','error');}
 }
 function showResult(d){
@@ -296,7 +383,7 @@ async function loadHistory(){try{const r=await fetch('/api/scans?limit=30',{head
 // DASHBOARD
 async function loadDash(){try{const r=await fetch('/api/dashboard',{headers:{'x-auth-token':TK}});const d=await r.json();
   document.getElementById('d-stats').innerHTML=`<div class="stat-card"><div class="stat-num" style="color:var(--blue)">${d.today}</div><div class="stat-label">Today</div></div><div class="stat-card"><div class="stat-num" style="color:var(--red)">${d.flagged}</div><div class="stat-label">Flagged</div></div><div class="stat-card"><div class="stat-num">${d.total}</div><div class="stat-label">All Time</div></div><div class="stat-card"><div class="stat-num" style="color:var(--amber)">${d.watchlist}</div><div class="stat-label">Watchlist</div></div>`;
-  document.getElementById('d-decode').innerHTML=d.decode?`ZXing-WASM · ${d.decode.rate}% success · ${d.decode.avg_ms}ms avg · ${d.decode.total} attempts`:'No decode data';
+  document.getElementById('d-decode').innerHTML=d.decode?`ZXing-WASM 12-pass · ${d.decode.rate}% success · ${d.decode.avg_ms}ms avg · ${d.decode.total} attempts`:'No decode data';
   loadWL();}catch(e){toast('Failed','error');}}
 async function loadWL(){try{const r=await fetch('/api/watchlist',{headers:{'x-auth-token':TK}});const items=await r.json();
   document.getElementById('d-wl').innerHTML=items.length?items.map(w=>`<div class="scan-item"><div><div class="scan-item-name">${w.first_name||''} ${w.last_name||'—'}</div><div class="scan-item-meta">${w.dl_number||'No DL'} · ${w.reason||''}</div></div><button class="btn btn-red btn-sm" style="width:auto;padding:6px 12px;font-size:12px" onclick="rmWL('${w.id}')">X</button></div>`).join(''):'<p style="color:var(--muted);font-size:13px">Empty</p>';}catch(_){}}

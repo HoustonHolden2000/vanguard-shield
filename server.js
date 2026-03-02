@@ -1,9 +1,9 @@
 /**
- * IRON HALO VERIFY v3.1 — Production Server
+ * IRON HALO VERIFY v3.2 — Production Server
  * Server-side PDF417 decoding | AAMVA parsing | Photo capture
  *
  * Decode engine: zxing-wasm (ZXing C++ via WebAssembly)
- * Image preprocessing: sharp (7-pass pipeline)
+ * Image preprocessing: sharp (12-pass hardened pipeline)
  * Stack: Node 18+, Express 4, SQLite, Sharp, zxing-wasm, bcryptjs
  *
  * ═══════════════════════════════════════════════════════════════
@@ -11,43 +11,33 @@
  * ═══════════════════════════════════════════════════════════════
  *
  * BEFORE DEMO:
- *   [ ] Render health check: GET /api/health → {"status":"ok","version":"3.1.0","decoder":"zxing-wasm"}
+ *   [ ] Render health: GET /api/health → {"status":"ok","version":"3.2.0","decoder":"zxing-wasm"}
  *   [ ] Login on iPhone Safari: admin / vanguard2026
- *   [ ] Login on Android Chrome: guard / guard123
- *   [ ] Confirm bottom nav shows: Scan | History | Dashboard
+ *   [ ] Confirm bottom nav: Scan | History | Dashboard
  *
  * SCAN FLOW (the money demo):
- *   [ ] Tap big camera button → iPhone native camera opens
+ *   [ ] Tap big camera button → native camera opens
  *   [ ] Photo of TN DL barcode (back side, steady, good light)
- *   [ ] "Reading barcode..." overlay appears
- *   [ ] Confirm screen shows: First Name, Last Name, DL#, DOB, Exp, Address
+ *   [ ] "Analyzing license..." overlay with pass progress
+ *   [ ] If decode hits: green flash → confirm screen with fields auto-filled
+ *   [ ] If decode fails: smooth transition to manual entry (feels intentional)
  *   [ ] Tap "CONFIRM & SAVE" → risk score result
- *   [ ] Green CLEARED (score < 30), Amber CAUTION (30-69), Red FLAGGED (70+)
- *
- * MANUAL ENTRY FALLBACK:
- *   [ ] From scan screen → "Manual Entry" button
- *   [ ] Enter name, DL#, DOB, state → Submit
- *   [ ] Risk score displays correctly
- *
- * RISK SCORING:
- *   [ ] Watchlist hit = +50
- *   [ ] Name match = +30
- *   [ ] Expired license = +25
- *   [ ] Repeat scan (24h) = +20
- *   [ ] Out of state = +10
- *   [ ] Late night (10pm-5am) = +10
- *
- * DASHBOARD:
- *   [ ] Stats show: Today, Flagged, All Time, Watchlist count
- *   [ ] Decode engine stats: success rate, avg ms
- *   [ ] Add to watchlist → shows in list
  *
  * IF BARCODE FAILS:
- *   → Try closer, better light, hold steady 2 sec
- *   → If still fails, use Manual Entry — the fallback always works
+ *   → App automatically transitions to manual entry
+ *   → Guard name and date pre-populated
+ *   → Only needs: name, DL#, DOB — feels like part of the flow
+ *   → Try again: closer, better light, hold steady 2 sec
+ *
+ * 12-PASS DECODE PIPELINE:
+ *   1. resize-1600         7. threshold-160
+ *   2. gray-sharpen        8. resize-2000-sharpen
+ *   3. gray-norm-sharpen   9. resize-1200-norm
+ *   4. hi-contrast        10. resize-2400-threshold
+ *   5. threshold-128      11. rotate-180
+ *   6. threshold-100      12. center-crop-80
  *
  * Logins: admin/vanguard2026 | guard/guard123 | demo/demo
- * Live: vanguard-shield.onrender.com
  * ═══════════════════════════════════════════════════════════════
  */
 
@@ -75,36 +65,74 @@ async function initDecoder() {
     const zxingReader = await import('zxing-wasm/reader');
     readBarcodes = zxingReader.readBarcodes;
     decoderReady = true;
-    console.log('  ✓ ZXing-WASM PDF417 decoder initialized');
+    console.log('  ✓ zxing-wasm: ready');
   } catch (err) {
-    console.error('  ✗ Decoder init failed:', err.message);
+    console.error('  ✗ zxing-wasm init failed:', err.message);
     decoderReady = false;
   }
 }
 
 /**
  * Decode PDF417 from an image buffer.
- * 7-pass preprocessing pipeline for robustness against
- * blurry, off-angle, indoor-lighting phone photos.
+ * 12-pass hardened pipeline for real phone photos under field conditions:
+ * indoor lighting, granite surfaces, phone angle, motion blur, finger obstruction.
+ *
+ * Pre-resizes to 2400px max to cap memory usage (Render 512MB).
+ * 25-second timeout to stay under Render's 30s request limit.
  */
 async function decodePdf417FromBuffer(imageBuffer) {
   if (!decoderReady || !readBarcodes) {
     throw new Error('Barcode decoder not initialized');
   }
 
+  // Pre-resize to cap memory — Render free tier = 512MB RAM
+  const meta = await sharp(imageBuffer).metadata();
+  let inputBuffer = imageBuffer;
+  const maxDim = 2400;
+  if ((meta.width && meta.width > maxDim) || (meta.height && meta.height > maxDim)) {
+    inputBuffer = await sharp(imageBuffer)
+      .resize({ width: maxDim, height: maxDim, fit: 'inside', withoutEnlargement: true })
+      .toBuffer();
+    console.log(`  → Pre-resized: ${meta.width}x${meta.height} → max ${maxDim}`);
+  }
+
+  // 12-pass pipeline — ordered from fastest/cheapest to most aggressive
   const passes = [
-    { name: 'grayscale', fn: buf => sharp(buf).grayscale().png().toBuffer() },
-    { name: 'gray+sharp', fn: buf => sharp(buf).grayscale().sharpen({ sigma: 2.0 }).png().toBuffer() },
-    { name: 'normalize', fn: buf => sharp(buf).grayscale().normalize().sharpen({ sigma: 1.5 }).png().toBuffer() },
-    { name: 'upscale-2k', fn: buf => sharp(buf).resize({ width: 2000, withoutEnlargement: false }).grayscale().sharpen({ sigma: 2.0 }).png().toBuffer() },
-    { name: 'resize-1200', fn: buf => sharp(buf).resize({ width: 1200 }).grayscale().normalize().sharpen({ sigma: 1.5 }).png().toBuffer() },
-    { name: 'hi-contrast', fn: buf => sharp(buf).grayscale().linear(1.5, -30).sharpen({ sigma: 2.5 }).png().toBuffer() },
-    { name: 'threshold', fn: buf => sharp(buf).grayscale().threshold(128).png().toBuffer() },
+    { name: 'resize-1600', fn: buf => sharp(buf).resize({ width: 1600, withoutEnlargement: true }).png().toBuffer() },
+    { name: 'gray-sharpen', fn: buf => sharp(buf).grayscale().sharpen({ sigma: 1.5 }).png().toBuffer() },
+    { name: 'gray-norm-sharpen', fn: buf => sharp(buf).grayscale().normalize().sharpen({ sigma: 2.0 }).png().toBuffer() },
+    { name: 'hi-contrast', fn: buf => sharp(buf).grayscale().linear(1.5, -30).sharpen({ sigma: 2.0 }).png().toBuffer() },
+    { name: 'threshold-128', fn: buf => sharp(buf).grayscale().threshold(128).png().toBuffer() },
+    { name: 'threshold-100', fn: buf => sharp(buf).grayscale().threshold(100).png().toBuffer() },
+    { name: 'threshold-160', fn: buf => sharp(buf).grayscale().threshold(160).png().toBuffer() },
+    { name: 'resize-2000-sharpen', fn: buf => sharp(buf).resize({ width: 2000, withoutEnlargement: false }).grayscale().sharpen({ sigma: 2.0 }).png().toBuffer() },
+    { name: 'resize-1200-norm', fn: buf => sharp(buf).resize({ width: 1200, withoutEnlargement: true }).grayscale().normalize().sharpen({ sigma: 1.5 }).png().toBuffer() },
+    { name: 'resize-2400-threshold', fn: buf => sharp(buf).resize({ width: 2400, withoutEnlargement: false }).grayscale().threshold(128).png().toBuffer() },
+    { name: 'rotate-180', fn: buf => sharp(buf).rotate(180).grayscale().sharpen({ sigma: 1.5 }).png().toBuffer() },
+    { name: 'center-crop-80', fn: async buf => {
+      const m = await sharp(buf).metadata();
+      const w = m.width || 1600, h = m.height || 1200;
+      const cw = Math.round(w * 0.8), ch = Math.round(h * 0.8);
+      const left = Math.round((w - cw) / 2), top = Math.round((h - ch) / 2);
+      return sharp(buf).extract({ left, top, width: cw, height: ch }).grayscale().sharpen({ sigma: 1.5 }).png().toBuffer();
+    }},
   ];
 
-  for (const pass of passes) {
+  const startTime = Date.now();
+  const TIMEOUT_MS = 25000;
+
+  for (let i = 0; i < passes.length; i++) {
+    const pass = passes[i];
+
+    // Check timeout before each pass
+    if (Date.now() - startTime > TIMEOUT_MS) {
+      console.log(`  ✗ Timeout after ${i} passes (${Date.now() - startTime}ms)`);
+      return null;
+    }
+
+    const passStart = Date.now();
     try {
-      const processed = await pass.fn(imageBuffer);
+      const processed = await pass.fn(inputBuffer);
       const blob = new Blob([processed], { type: 'image/png' });
 
       const results = await readBarcodes(blob, {
@@ -113,20 +141,41 @@ async function decodePdf417FromBuffer(imageBuffer) {
         maxSymbols: 1,
       });
 
+      const passDuration = Date.now() - passStart;
+
       if (results && results.length > 0 && results[0].text) {
-        console.log(`  ✓ PDF417 decoded on pass: ${pass.name} (${results[0].text.length} chars)`);
+        console.log(`  ✓ PDF417 decoded on pass ${i+1}/${passes.length}: ${pass.name} (${results[0].text.length} chars, ${passDuration}ms)`);
+        // Log success
+        try {
+          db.prepare('INSERT INTO decode_log (success,pass_name,raw_length,fields_found,duration_ms) VALUES (?,?,?,?,?)')
+            .run(1, pass.name, results[0].text.length, 0, passDuration);
+        } catch (_) {}
         return {
           raw: results[0].text,
           format: results[0].format || 'PDF417',
           pass: pass.name,
+          passIndex: i + 1,
+          totalPasses: passes.length,
         };
       }
-    } catch (_) {
-      // Continue to next pass silently
+
+      // Log failed pass
+      try {
+        db.prepare('INSERT INTO decode_log (success,pass_name,raw_length,duration_ms,error) VALUES (?,?,?,?,?)')
+          .run(0, pass.name, 0, passDuration, 'No barcode found');
+      } catch (_) {}
+
+    } catch (err) {
+      const passDuration = Date.now() - passStart;
+      try {
+        db.prepare('INSERT INTO decode_log (success,pass_name,duration_ms,error) VALUES (?,?,?,?)')
+          .run(0, pass.name, passDuration, err.message);
+      } catch (_) {}
     }
   }
 
-  return null; // All passes exhausted
+  console.log(`  ✗ All ${passes.length} passes failed (${Date.now() - startTime}ms total)`);
+  return null;
 }
 
 
@@ -158,7 +207,7 @@ function parseAAMVA(raw) {
 
   const fields = {};
 
-  // Method 1: Line-delimited extraction (handles most AAMVA formats)
+  // Method 1: Line-delimited extraction
   const lines = raw.split(/[\r\n]+/);
   for (const line of lines) {
     const allMatches = [...line.matchAll(/(D[A-Z]{2})([^D]*?)(?=D[A-Z]{2}|$)/g)];
@@ -180,7 +229,7 @@ function parseAAMVA(raw) {
     }
   }
 
-  // Method 2: Full-string scan for any fields still missing
+  // Method 2: Full-string scan for missing fields
   for (const [code, fieldName] of Object.entries(fieldMap)) {
     if (fields[fieldName]) continue;
     const regex = new RegExp(code + '([^\\n\\r\\x1e\\x0a\\x0d]{1,100}?)(?=D[A-Z]{2}|[\\n\\r\\x1e]|$)', 'g');
@@ -199,8 +248,7 @@ function parseAAMVA(raw) {
 
   function fmtPostal(val) {
     if (!val) return '';
-    const c = val.replace(/\s+/g, '').replace(/0{4,}$/, '');
-    return c;
+    return val.replace(/\s+/g, '').replace(/0{4,}$/, '');
   }
 
   function fmtSex(val) {
@@ -292,8 +340,8 @@ seedUsers();
 // MIDDLEWARE
 // ═══════════════════════════════════════════════════════════════
 
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.json({ limit: '15mb' }));
+app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
@@ -301,7 +349,7 @@ app.use((req, res, next) => {
 });
 app.use(express.static(path.join(__dirname, 'public')));
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
 
 // Sessions (in-memory)
 const sessions = new Map();
@@ -315,7 +363,7 @@ function auth(req, res, next) {
 
 
 // ═══════════════════════════════════════════════════════════════
-// ROUTES
+// ROUTES — ALL defined BEFORE app.listen()
 // ═══════════════════════════════════════════════════════════════
 
 // --- Auth ---
@@ -336,7 +384,7 @@ app.post('/api/logout', (req, res) => {
   res.json({ ok: true });
 });
 
-// --- Decode DL (THE CORE) ---
+// --- Decode DL (THE CORE — 12-pass pipeline with 25s timeout) ---
 app.post('/api/decode-dl', auth, upload.single('photo'), async (req, res) => {
   const start = Date.now();
   if (!req.file) return res.status(400).json({ success: false, error: 'No photo uploaded' });
@@ -344,27 +392,26 @@ app.post('/api/decode-dl', auth, upload.single('photo'), async (req, res) => {
   console.log(`\n  → Decode: ${(req.file.size / 1024).toFixed(0)}KB ${req.file.mimetype}`);
 
   try {
-    const result = await decodePdf417FromBuffer(req.file.buffer);
+    // Race the decode against a 25-second timeout
+    const result = await Promise.race([
+      decodePdf417FromBuffer(req.file.buffer),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Decode timeout (25s)')), 25000)),
+    ]);
+
     const duration = Date.now() - start;
 
     if (result && result.raw) {
       const parsed = parseAAMVA(result.raw);
       const fc = parsed ? Object.entries(parsed).filter(([k,v]) => k !== 'raw' && v).length : 0;
-      db.prepare('INSERT INTO decode_log (success,pass_name,raw_length,fields_found,duration_ms) VALUES (?,?,?,?,?)')
-        .run(1, result.pass, result.raw.length, fc, duration);
-      console.log(`  ✓ Decoded ${duration}ms — ${fc} fields`);
-      return res.json({ success: true, data: parsed, meta: { decode_ms: duration, pass: result.pass } });
+      console.log(`  ✓ Decoded ${duration}ms — ${fc} fields via pass ${result.passIndex}/${result.totalPasses} (${result.pass})`);
+      return res.json({ success: true, data: parsed, meta: { decode_ms: duration, pass: result.pass, passIndex: result.passIndex, totalPasses: result.totalPasses } });
     }
 
-    db.prepare('INSERT INTO decode_log (success,error,duration_ms) VALUES (?,?,?)')
-      .run(0, 'All passes failed', Date.now() - start);
-    console.log(`  ✗ Failed ${Date.now() - start}ms`);
-    return res.json({ success: false, error: 'Unable to decode PDF417 from image. Hold phone closer, ensure good lighting, keep steady.' });
+    console.log(`  ✗ All passes failed ${Date.now() - start}ms`);
+    return res.json({ success: false, error: 'Barcode not readable. Entering manual mode.' });
   } catch (err) {
-    db.prepare('INSERT INTO decode_log (success,error,duration_ms) VALUES (?,?,?)')
-      .run(0, err.message, Date.now() - start);
-    console.error(`  ✗ Error: ${err.message}`);
-    return res.json({ success: false, error: 'Decode error. Please try again or enter details manually.' });
+    console.error(`  ✗ Error: ${err.message} (${Date.now() - start}ms)`);
+    return res.json({ success: false, error: err.message.includes('timeout') ? 'Analysis timed out. Entering manual mode.' : 'Decode error. Entering manual mode.' });
   }
 });
 
@@ -452,32 +499,41 @@ app.get('/api/dashboard', auth, (req, res) => {
   const total = db.prepare('SELECT COUNT(*) as c FROM scans').get();
   const wl = db.prepare('SELECT COUNT(*) as c FROM watchlist WHERE active=1').get();
   const recent = db.prepare('SELECT id,guard_name,first_name,last_name,dl_number,risk_score,status,created_at FROM scans ORDER BY created_at DESC LIMIT 10').all();
-  const ds = db.prepare('SELECT COUNT(*) as total, SUM(success) as ok, AVG(duration_ms) as avg_ms FROM decode_log').get();
+  const ds = db.prepare('SELECT COUNT(*) as total, SUM(CASE WHEN success=1 THEN 1 ELSE 0 END) as ok, AVG(CASE WHEN success=1 THEN duration_ms END) as avg_ms FROM decode_log').get();
   res.json({
     today:today.c, flagged:flagged.c, total:total.c, watchlist:wl.c, recent,
-    decode: { total:ds.total||0, rate:ds.total?Math.round((ds.ok/ds.total)*100):0, avg_ms:Math.round(ds.avg_ms||0) }
+    decode: { total:ds.total||0, rate:ds.total?Math.round(((ds.ok||0)/ds.total)*100):0, avg_ms:Math.round(ds.avg_ms||0) }
   });
 });
 
 // --- Health ---
 app.get('/api/health', (req, res) => {
-  res.json({ status:'ok', version:'3.1.0', decoder:decoderReady?'zxing-wasm':'unavailable', uptime:Math.round(process.uptime()) });
+  res.json({ status:'ok', version:'3.2.0', decoder:decoderReady?'zxing-wasm':'unavailable', uptime:Math.round(process.uptime()) });
 });
 
 // ═══════════════════════════════════════════════════════════════
-// START
+// START — all routes registered above, then listen
 // ═══════════════════════════════════════════════════════════════
 
 async function start() {
   console.log('\n╔══════════════════════════════════════════╗');
-  console.log('║  IRON HALO VERIFY v3.1                   ║');
-  console.log('║  Server-Side PDF417 | Production Build    ║');
+  console.log('║  IRON HALO VERIFY v3.2                   ║');
+  console.log('║  12-Pass PDF417 | Hardened Pipeline       ║');
   console.log('╚══════════════════════════════════════════╝\n');
   await initDecoder();
-  app.listen(PORT, () => {
+  app.listen(PORT, async () => {
     console.log(`\n  ▸ Server: http://localhost:${PORT}`);
-    console.log(`  ▸ Decoder: ${decoderReady ? 'ZXing-WASM (PDF417 only, 7-pass pipeline)' : 'UNAVAILABLE'}`);
+    console.log(`  ▸ Decoder: ${decoderReady ? 'ZXing-WASM (PDF417, 12-pass pipeline, 25s timeout)' : 'UNAVAILABLE — manual entry only'}`);
     console.log('  ▸ Logins: admin/vanguard2026 | guard/guard123 | demo/demo\n');
+
+    // Startup self-test
+    try {
+      const resp = await fetch(`http://localhost:${PORT}/api/health`);
+      const data = await resp.json();
+      console.log(`  ✓ Self-test passed: v${data.version} decoder=${data.decoder}`);
+    } catch (err) {
+      console.error(`  FATAL: routes not registered — ${err.message}`);
+    }
   });
 }
 
