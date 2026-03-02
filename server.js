@@ -147,7 +147,7 @@ async function decodeBarcode(imageBuffer) {
         .resize(attempt.resize, null, { withoutEnlargement: true });
       if (attempt.sharpen) pipeline = pipeline.sharpen();
       if (attempt.normalize) pipeline = pipeline.normalize();
-      pipeline = pipeline.ensureAlpha().raw();
+      pipeline = pipeline.grayscale().raw();
 
       const { data, info } = await pipeline.toBuffer({ resolveWithObject: true });
 
