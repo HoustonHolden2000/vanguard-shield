@@ -556,7 +556,7 @@ async function doLogin() {
   btn.textContent = 'SIGNING IN...';
   errEl.style.display = 'none';
   try {
-    const data = await api('POST', '/auth/login', { username, password }, true);
+    const data = await api('POST', '/login', { username, password }, true);
     if (data.error) { errEl.textContent = data.error; errEl.style.display = 'block'; return; }
     token = data.token;
     currentUser = data.user;

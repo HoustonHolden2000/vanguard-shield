@@ -273,7 +273,7 @@ app.post('/api/login', (req, res) => {
     return res.status(401).json({ error: 'Invalid credentials' });
   const token = uuidv4();
   sessions.set(token, { id: user.id, username: user.username, role: user.role, display_name: user.display_name });
-  res.json({ token, role: user.role, display_name: user.display_name });
+  res.json({ token, user: { role: user.role, full_name: user.display_name, site_name: '', username: user.username } });
 });
 
 app.post('/api/logout', (req, res) => {
