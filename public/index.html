@@ -610,16 +610,23 @@ async function loadSDK() {
   sdkLoaded = true;
 }
 
+var initPromise = null;
 async function initDynamsoft() {
-  await loadSDK();
-  Dynamsoft.DBR.BarcodeReader.engineResourcePath = '/dbr/';
-  Dynamsoft.DBR.BarcodeReader.license = 'DLS2eyJvcmdhbml6YXRpb25JRCI6IjIwMDAwMSJ9';
-  dynReader = await Dynamsoft.DBR.BarcodeReader.createInstance();
-  var settings = await dynReader.getRuntimeSettings();
-  settings.barcodeFormatIds = Dynamsoft.DBR.EnumBarcodeFormat.BF_PDF417;
-  settings.expectedBarcodesCount = 1;
-  settings.deblurLevel = 5;
-  await dynReader.updateRuntimeSettings(settings);
+  if (dynReader) return;
+  if (initPromise) return initPromise;
+  initPromise = (async function() {
+    await loadSDK();
+    Dynamsoft.DBR.BarcodeReader.engineResourcePath = '/dbr/';
+    Dynamsoft.DBR.BarcodeReader.license = 'DLS2eyJvcmdhbml6YXRpb25JRCI6IjIwMDAwMSJ9';
+    dynReader = await Dynamsoft.DBR.BarcodeReader.createInstance();
+    var settings = await dynReader.getRuntimeSettings();
+    settings.barcodeFormatIds = Dynamsoft.DBR.EnumBarcodeFormat.BF_PDF417;
+    settings.expectedBarcodesCount = 1;
+    settings.deblurLevel = 5;
+    await dynReader.updateRuntimeSettings(settings);
+  })();
+  await initPromise;
+  initPromise = null;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -639,11 +646,11 @@ document.getElementById('barcode-file-input').addEventListener('change', async f
   if (!file) return;
 
   var statusEl = document.getElementById('scan-status');
-  statusEl.textContent = 'Loading decoder...';
-  statusEl.style.color = 'var(--text2)';
 
   // Init Dynamsoft if needed (self-hosted /dbr/, same as test_scanner.html)
   if (!dynReader) {
+    statusEl.textContent = 'Loading decoder (first time)...';
+    statusEl.style.color = 'var(--text2)';
     try { await initDynamsoft(); }
     catch(err) {
       statusEl.textContent = 'Decoder error: ' + err.message;
@@ -1286,9 +1293,13 @@ function exportCSV() {
 }
 
 // ═══════════════════════════════════════════════════════════
-// PRELOAD SDK (non-blocking, same as test_scanner.html)
+// PRELOAD SDK + WASM (starts during login screen, ready by scan time)
 // ═══════════════════════════════════════════════════════════
-loadSDK().catch(function() {});
+initDynamsoft().then(function() {
+  console.log('[SDK] Dynamsoft ready (WASM loaded)');
+}).catch(function(e) {
+  console.log('[SDK] Preload failed:', e.message, '— will retry on first scan');
+});
 
 // ═══════════════════════════════════════════════════════════
 // PWA
