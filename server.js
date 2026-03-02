@@ -1,13 +1,18 @@
 /**
- * IRON HALO VERIFY v3.3 — regression fix — tuned PDF417 decode for phone photos
+ * IRON HALO VERIFY v3.4 — decode timing fix for Render free tier
  *
- * WHAT CHANGED (v3.2 → v3.3):
- * - REMOVED pre-resize to 2400px that was killing barcode detail
- * - RESTORED v3.0 proven passes with original sigma values
- * - REDUCED from 12 experimental passes to 6 proven passes
- * - Pass 1 is pure grayscale again (was resize-1600 with no grayscale)
- * - Sharpen sigmas restored: 2.0 (blur), 1.5 (normalize), 2.5 (contrast)
- * - Kept: 25s timeout, per-pass logging, startup self-test, Iron Halo branding
+ * ROOT CAUSE (from v3.3 decode_log):
+ * - Phone photos are ~4000x3000 (12MP). On Render free tier CPU,
+ *   each Sharp pass on full-res took 10-17 seconds.
+ * - Only 2 of 6 passes ran before 25s timeout — passes 3-6 NEVER executed.
+ * - Passes 3-6 (normalize, hi-contrast, threshold) are the most likely
+ *   to actually decode, but they never got a chance to run.
+ *
+ * FIX:
+ * - Pre-resize to 1600px wide + auto-EXIF-rotate BEFORE pipeline
+ * - Each pass now ~2s instead of ~12s — all 6 complete in ~12-15s total
+ * - Swapped upscale-2k for threshold-160 (no point upscaling pre-resized image)
+ * - Kept: proven sigma values, 25s timeout, per-pass logging, self-test
  *
  * Decode engine: zxing-wasm (ZXing C++ via WebAssembly)
  * Image preprocessing: sharp (6-pass tuned pipeline)
@@ -86,9 +91,17 @@ async function decodePdf417FromBuffer(imageBuffer) {
     throw new Error('Barcode decoder not initialized');
   }
 
-  // NO pre-resize. v3.2's pre-resize to 2400px killed barcode detail.
-  // Phone photos are 3000-4000px wide — that resolution helps decode.
-  // Sharp handles full-res images fine within Render's 512MB.
+  // Pre-resize: phone photos are ~4000x3000 (12MP). On Render free tier,
+  // each Sharp pass on full-res takes 10-17 seconds — only 2 of 6 passes
+  // run before the 25s timeout. Pre-resizing to 1600px drops each pass
+  // to ~2s so ALL 6 passes complete. Auto-rotate handles EXIF orientation.
+  // 1600px preserves barcode detail (barcode at ~40% of width = 640px, plenty).
+  const preResizeStart = Date.now();
+  const inputBuffer = await sharp(imageBuffer)
+    .rotate()  // auto-orient from EXIF
+    .resize({ width: 1600, withoutEnlargement: true })
+    .toBuffer();
+  console.log(`  → Pre-resize: ${Date.now() - preResizeStart}ms`);
 
   const passes = [
     // Pass 1: Pure grayscale — often enough for clean, well-lit photos
@@ -100,14 +113,14 @@ async function decodePdf417FromBuffer(imageBuffer) {
     // Pass 3: Grayscale + normalize + sharpen — handles uneven indoor lighting
     { name: 'gray+norm+sharp', fn: buf => sharp(buf).grayscale().normalize().sharpen({ sigma: 1.5 }).png().toBuffer() },
 
-    // Pass 4: Upscale to 2000px + grayscale + sharpen — for small/distant barcodes
-    { name: 'upscale-2k', fn: buf => sharp(buf).resize({ width: 2000, withoutEnlargement: false }).grayscale().sharpen({ sigma: 2.0 }).png().toBuffer() },
-
-    // Pass 5: High contrast + aggressive sharpen — low-light, washed-out photos
+    // Pass 4: High contrast + aggressive sharpen — low-light, washed-out photos
     { name: 'hi-contrast', fn: buf => sharp(buf).grayscale().linear(1.5, -30).sharpen({ sigma: 2.5 }).png().toBuffer() },
 
-    // Pass 6: Pure black & white threshold — last resort nuclear option
-    { name: 'threshold', fn: buf => sharp(buf).grayscale().threshold(128).png().toBuffer() },
+    // Pass 5: Pure black & white threshold — handles extreme conditions
+    { name: 'threshold-128', fn: buf => sharp(buf).grayscale().threshold(128).png().toBuffer() },
+
+    // Pass 6: Lighter threshold — catches faded/washed-out barcodes
+    { name: 'threshold-160', fn: buf => sharp(buf).grayscale().threshold(160).png().toBuffer() },
   ];
 
   const startTime = Date.now();
@@ -516,7 +529,7 @@ app.get('/api/dashboard', auth, (req, res) => {
 
 // --- Health ---
 app.get('/api/health', (req, res) => {
-  res.json({ status:'ok', version:'3.3.1', decoder:decoderReady?'zxing-wasm':'unavailable', uptime:Math.round(process.uptime()) });
+  res.json({ status:'ok', version:'3.4.0', decoder:decoderReady?'zxing-wasm':'unavailable', uptime:Math.round(process.uptime()) });
 });
 
 // ═══════════════════════════════════════════════════════════════
@@ -525,8 +538,8 @@ app.get('/api/health', (req, res) => {
 
 async function start() {
   console.log('\n╔══════════════════════════════════════════╗');
-  console.log('║  IRON HALO VERIFY v3.3                   ║');
-  console.log('║  6-Pass PDF417 | Regression Fix           ║');
+  console.log('║  IRON HALO VERIFY v3.4                   ║');
+  console.log('║  6-Pass PDF417 | Timing Fix               ║');
   console.log('╚══════════════════════════════════════════╝\n');
   await initDecoder();
   app.listen(PORT, async () => {
