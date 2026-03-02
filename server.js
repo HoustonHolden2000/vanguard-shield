@@ -91,36 +91,30 @@ async function decodePdf417FromBuffer(imageBuffer) {
     throw new Error('Barcode decoder not initialized');
   }
 
-  // Pre-resize: phone photos are ~4000x3000 (12MP). On Render free tier,
-  // each Sharp pass on full-res takes 10-17 seconds — only 2 of 6 passes
-  // run before the 25s timeout. Pre-resizing to 1600px drops each pass
-  // to ~2s so ALL 6 passes complete. Auto-rotate handles EXIF orientation.
-  // 1600px preserves barcode detail (barcode at ~40% of width = 640px, plenty).
+  // Step 1: Pre-resize + EXIF auto-rotate. Phone photos are ~4000x3000.
+  // We resize to 1200px wide — small enough for fast WASM decode,
+  // large enough to preserve barcode detail.
   const preResizeStart = Date.now();
   const inputBuffer = await sharp(imageBuffer)
     .rotate()  // auto-orient from EXIF
-    .resize({ width: 1600, withoutEnlargement: true })
+    .resize({ width: 1200, withoutEnlargement: true })
+    .jpeg({ quality: 90 })  // JPEG is 5-10x smaller than PNG = faster blob decode
     .toBuffer();
-  console.log(`  → Pre-resize: ${Date.now() - preResizeStart}ms`);
+  console.log(`  → Pre-resize: ${Date.now() - preResizeStart}ms → ${(inputBuffer.length/1024).toFixed(0)}KB`);
 
+  // Step 2: Run passes. Use JPEG output (much smaller blobs for zxing-wasm).
+  // tryHarder DISABLED on fast passes, ENABLED only on last 2 heavy passes.
+  // This should get each pass to ~1-3s instead of 9-16s.
   const passes = [
-    // Pass 1: Pure grayscale — often enough for clean, well-lit photos
-    { name: 'grayscale', fn: buf => sharp(buf).grayscale().png().toBuffer() },
+    // Fast passes (tryHarder OFF — ~1-2s each on Render free tier)
+    { name: 'grayscale', tryH: false, fn: buf => sharp(buf).grayscale().jpeg({ quality: 90 }).toBuffer() },
+    { name: 'gray+sharp', tryH: false, fn: buf => sharp(buf).grayscale().sharpen({ sigma: 2.0 }).jpeg({ quality: 90 }).toBuffer() },
+    { name: 'gray+norm+sharp', tryH: false, fn: buf => sharp(buf).grayscale().normalize().sharpen({ sigma: 1.5 }).jpeg({ quality: 90 }).toBuffer() },
+    { name: 'hi-contrast', tryH: false, fn: buf => sharp(buf).grayscale().linear(1.5, -30).sharpen({ sigma: 2.5 }).jpeg({ quality: 90 }).toBuffer() },
 
-    // Pass 2: Grayscale + strong sharpen — corrects camera blur / slight motion
-    { name: 'gray+sharp', fn: buf => sharp(buf).grayscale().sharpen({ sigma: 2.0 }).png().toBuffer() },
-
-    // Pass 3: Grayscale + normalize + sharpen — handles uneven indoor lighting
-    { name: 'gray+norm+sharp', fn: buf => sharp(buf).grayscale().normalize().sharpen({ sigma: 1.5 }).png().toBuffer() },
-
-    // Pass 4: High contrast + aggressive sharpen — low-light, washed-out photos
-    { name: 'hi-contrast', fn: buf => sharp(buf).grayscale().linear(1.5, -30).sharpen({ sigma: 2.5 }).png().toBuffer() },
-
-    // Pass 5: Pure black & white threshold — handles extreme conditions
-    { name: 'threshold-128', fn: buf => sharp(buf).grayscale().threshold(128).png().toBuffer() },
-
-    // Pass 6: Lighter threshold — catches faded/washed-out barcodes
-    { name: 'threshold-160', fn: buf => sharp(buf).grayscale().threshold(160).png().toBuffer() },
+    // Heavy passes (tryHarder ON — last resort, ~3-5s each)
+    { name: 'threshold-128', tryH: true, fn: buf => sharp(buf).grayscale().threshold(128).png().toBuffer() },
+    { name: 'threshold-160', tryH: true, fn: buf => sharp(buf).grayscale().threshold(160).png().toBuffer() },
   ];
 
   const startTime = Date.now();
@@ -137,23 +131,30 @@ async function decodePdf417FromBuffer(imageBuffer) {
 
     const passStart = Date.now();
     try {
-      const processed = await pass.fn(imageBuffer);
-      const blob = new Blob([processed], { type: 'image/png' });
+      const processed = await pass.fn(inputBuffer);
+      const mimeType = pass.name.startsWith('threshold') ? 'image/png' : 'image/jpeg';
+      const blob = new Blob([processed], { type: mimeType });
+
+      const sharpDone = Date.now();
 
       const results = await readBarcodes(blob, {
         formats: ['PDF417'],
-        tryHarder: true,
+        tryHarder: pass.tryH,
         maxSymbols: 1,
       });
 
       const passDuration = Date.now() - passStart;
 
+      const zxingDone = Date.now();
+      const passDuration = zxingDone - passStart;
+      const sharpMs = sharpDone - passStart;
+      const zxingMs = zxingDone - sharpDone;
+
       if (results && results.length > 0 && results[0].text) {
-        console.log(`  ✓ PDF417 decoded on pass ${i+1}/${passes.length}: ${pass.name} (${results[0].text.length} chars, ${passDuration}ms)`);
-        // Log successful pass
+        console.log(`  ✓ PDF417 decoded on pass ${i+1}/${passes.length}: ${pass.name} (${results[0].text.length} chars, sharp=${sharpMs}ms zxing=${zxingMs}ms)`);
         try {
-          db.prepare('INSERT INTO decode_log (success,pass_name,raw_length,fields_found,duration_ms) VALUES (?,?,?,?,?)')
-            .run(1, pass.name, results[0].text.length, 0, passDuration);
+          db.prepare('INSERT INTO decode_log (success,pass_name,raw_length,fields_found,duration_ms,error) VALUES (?,?,?,?,?,?)')
+            .run(1, pass.name, results[0].text.length, 0, passDuration, `sharp=${sharpMs}ms zxing=${zxingMs}ms`);
         } catch (_) {}
         return {
           raw: results[0].text,
@@ -164,14 +165,15 @@ async function decodePdf417FromBuffer(imageBuffer) {
         };
       }
 
-      // Log failed pass
+      console.log(`    pass ${i+1} ${pass.name}: no barcode (sharp=${sharpMs}ms zxing=${zxingMs}ms tryH=${pass.tryH})`);
       try {
         db.prepare('INSERT INTO decode_log (success,pass_name,raw_length,duration_ms,error) VALUES (?,?,?,?,?)')
-          .run(0, pass.name, 0, passDuration, 'No barcode found');
+          .run(0, pass.name, 0, passDuration, `sharp=${sharpMs}ms zxing=${zxingMs}ms`);
       } catch (_) {}
 
     } catch (err) {
       const passDuration = Date.now() - passStart;
+      console.log(`    pass ${i+1} ${pass.name}: ERROR ${err.message} (${passDuration}ms)`);
       try {
         db.prepare('INSERT INTO decode_log (success,pass_name,duration_ms,error) VALUES (?,?,?,?)')
           .run(0, pass.name, passDuration, err.message);
@@ -529,7 +531,7 @@ app.get('/api/dashboard', auth, (req, res) => {
 
 // --- Health ---
 app.get('/api/health', (req, res) => {
-  res.json({ status:'ok', version:'3.4.0', decoder:decoderReady?'zxing-wasm':'unavailable', uptime:Math.round(process.uptime()) });
+  res.json({ status:'ok', version:'3.4.1', decoder:decoderReady?'zxing-wasm':'unavailable', uptime:Math.round(process.uptime()) });
 });
 
 // ═══════════════════════════════════════════════════════════════
