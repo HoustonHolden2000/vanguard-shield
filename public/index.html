@@ -605,7 +605,7 @@ function loadScript(url) {
 
 async function loadSDK() {
   if (sdkLoaded && window.Dynamsoft) return;
-  await loadScript('/dbr/dbr.js');
+  await loadScript('https://cdn.jsdelivr.net/npm/dynamsoft-javascript-barcode@9.6.42/dist/dbr.js');
   if (!window.Dynamsoft) throw new Error('Dynamsoft global not found');
   sdkLoaded = true;
 }
@@ -613,7 +613,7 @@ async function loadSDK() {
 async function initDynamsoft() {
   if (dynReader) return;
   await loadSDK();
-  Dynamsoft.DBR.BarcodeReader.engineResourcePath = '/dbr/';
+  Dynamsoft.DBR.BarcodeReader.engineResourcePath = 'https://cdn.jsdelivr.net/npm/dynamsoft-javascript-barcode@9.6.42/dist/';
   Dynamsoft.DBR.BarcodeReader.license = 'DLS2eyJvcmdhbml6YXRpb25JRCI6IjIwMDAwMSJ9';
   // createInstance loads the 3MB WASM — timeout after 30s
   dynReader = await Promise.race([
@@ -647,7 +647,7 @@ document.getElementById('barcode-file-input').addEventListener('change', async f
 
   var statusEl = document.getElementById('scan-status');
 
-  // Init Dynamsoft if needed (self-hosted /dbr/, same as test_scanner.html)
+  // Init Dynamsoft if needed (CDN)
   if (!dynReader) {
     statusEl.textContent = 'Loading decoder (first time)...';
     statusEl.style.color = 'var(--text2)';
