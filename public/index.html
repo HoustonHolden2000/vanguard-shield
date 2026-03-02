@@ -610,23 +610,17 @@ async function loadSDK() {
   sdkLoaded = true;
 }
 
-var initPromise = null;
 async function initDynamsoft() {
   if (dynReader) return;
-  if (initPromise) return initPromise;
-  initPromise = (async function() {
-    await loadSDK();
-    Dynamsoft.DBR.BarcodeReader.engineResourcePath = '/dbr/';
-    Dynamsoft.DBR.BarcodeReader.license = 'DLS2eyJvcmdhbml6YXRpb25JRCI6IjIwMDAwMSJ9';
-    dynReader = await Dynamsoft.DBR.BarcodeReader.createInstance();
-    var settings = await dynReader.getRuntimeSettings();
-    settings.barcodeFormatIds = Dynamsoft.DBR.EnumBarcodeFormat.BF_PDF417;
-    settings.expectedBarcodesCount = 1;
-    settings.deblurLevel = 5;
-    await dynReader.updateRuntimeSettings(settings);
-  })();
-  await initPromise;
-  initPromise = null;
+  await loadSDK();
+  Dynamsoft.DBR.BarcodeReader.engineResourcePath = '/dbr/';
+  Dynamsoft.DBR.BarcodeReader.license = 'DLS2eyJvcmdhbml6YXRpb25JRCI6IjIwMDAwMSJ9';
+  dynReader = await Dynamsoft.DBR.BarcodeReader.createInstance();
+  var settings = await dynReader.getRuntimeSettings();
+  settings.barcodeFormatIds = Dynamsoft.DBR.EnumBarcodeFormat.BF_PDF417;
+  settings.expectedBarcodesCount = 1;
+  settings.deblurLevel = 5;
+  await dynReader.updateRuntimeSettings(settings);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1293,13 +1287,9 @@ function exportCSV() {
 }
 
 // ═══════════════════════════════════════════════════════════
-// PRELOAD SDK + WASM (starts during login screen, ready by scan time)
+// PRELOAD SDK SCRIPT ONLY (WASM loads after photo, matching test_scanner.html)
 // ═══════════════════════════════════════════════════════════
-initDynamsoft().then(function() {
-  console.log('[SDK] Dynamsoft ready (WASM loaded)');
-}).catch(function(e) {
-  console.log('[SDK] Preload failed:', e.message, '— will retry on first scan');
-});
+loadSDK().catch(function() {});
 
 // ═══════════════════════════════════════════════════════════
 // PWA
