@@ -168,8 +168,8 @@ label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); 
 #camera-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #000; z-index: 100; flex-direction: column; }
 #camera-overlay.active { display: flex; }
 #camera-overlay video { flex: 1; object-fit: cover; }
-.camera-controls { display: flex; align-items: center; justify-content: center; gap: 24px; padding: 20px; background: rgba(0,0,0,0.9); }
-.shutter-btn { width: 72px; height: 72px; border-radius: 50%; border: 4px solid white; background: transparent; cursor: pointer; position: relative; }
+.camera-controls { position: absolute; bottom: 0; left: 0; right: 0; z-index: 10; display: flex; align-items: center; justify-content: center; gap: 24px; padding: 20px 20px 40px; background: linear-gradient(to top, rgba(0,0,0,0.6), transparent); }
+.shutter-btn { width: 70px; height: 70px; border-radius: 50%; border: 4px solid white; background: transparent; cursor: pointer; position: relative; }
 .shutter-btn::after { content: ''; position: absolute; top: 6px; left: 6px; right: 6px; bottom: 6px; border-radius: 50%; background: white; transition: transform 0.1s; }
 .shutter-btn:active::after { transform: scale(0.9); }
 
@@ -486,6 +486,7 @@ let cameraStream = null;
 
 // Scanner upgrade state
 let scannerTimeout = null;
+let scannerMasterTimeout = null;
 let dynamsoftReader = null;
 let dynamsoftLoaded = false;
 let dynamsoftFrameLoop = null;
@@ -668,6 +669,8 @@ async function startScanner() {
   activeEngine = 'html5-qrcode';
   torchOn = false;
   showScreen('scanner-screen');
+  var hintEl = document.querySelector('.scanner-hint');
+  if (hintEl) hintEl.style.display = '';
 
   // Reset UI
   const statusEl = document.getElementById('scanner-status');
@@ -717,6 +720,27 @@ async function startScanner() {
     scannerTimeout = setTimeout(() => {
       switchToDynamsoft();
     }, 10000);
+
+    // 15-second master timeout: if no decode, stop and prompt for photo
+    scannerMasterTimeout = setTimeout(() => {
+      if (scannerTimeout) { clearTimeout(scannerTimeout); scannerTimeout = null; }
+      if (dynamsoftFrameLoop) { cancelAnimationFrame(dynamsoftFrameLoop); dynamsoftFrameLoop = null; }
+      if (html5Qr) {
+        try { html5Qr.stop().catch(() => {}); } catch (e) { /* */ }
+        try { html5Qr.clear(); } catch (e) { /* */ }
+        html5Qr = null;
+      }
+      if (scannerStream) {
+        try { scannerStream.getTracks().forEach(t => t.stop()); } catch (e) { /* */ }
+        scannerStream = null;
+        scannerVideoTrack = null;
+      }
+      activeEngine = '';
+      document.getElementById('scanner-region').innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:60vh;text-align:center;padding:24px;"><div style="font-size:18px;font-weight:700;color:white;margin-bottom:12px;">Scan didn\'t catch it</div><div style="color:#999;font-size:14px;">Tap Photo below to try manually</div></div>';
+      var hintEl = document.querySelector('.scanner-hint');
+      if (hintEl) hintEl.style.display = 'none';
+      document.getElementById('scanner-status').style.display = 'none';
+    }, 15000);
 
   } catch (e) {
     console.error('[SCANNER ERROR]', e);
@@ -847,6 +871,7 @@ function onScanSuccess(decoded) {
 function cleanupScanner() {
   // Clear timers
   if (scannerTimeout) { clearTimeout(scannerTimeout); scannerTimeout = null; }
+  if (scannerMasterTimeout) { clearTimeout(scannerMasterTimeout); scannerMasterTimeout = null; }
   if (dynamsoftFrameLoop) { cancelAnimationFrame(dynamsoftFrameLoop); dynamsoftFrameLoop = null; }
 
   // Stop html5-qrcode
