@@ -625,7 +625,7 @@ async function initDynamsoft() {
   var settings = await dynReader.getRuntimeSettings();
   settings.barcodeFormatIds = Dynamsoft.DBR.EnumBarcodeFormat.BF_PDF417;
   settings.expectedBarcodesCount = 1;
-  settings.deblurLevel = 5;
+  settings.deblurLevel = 9;
   await dynReader.updateRuntimeSettings(settings);
 }
 
@@ -741,7 +741,16 @@ function parsePDF417(raw) {
       }
     }
   }
-  
+
+  // Regex fallback: find fields embedded in multi-field lines without delimiters
+  for (const [code, field] of Object.entries(map)) {
+    if (!fields[field]) {
+      var re = new RegExp(code + '([^\\n\\r\\x1e\\x1d]*?)(?=[A-Z]{2}[A-Z0-9]|\\n|\\r|$)');
+      var m = raw.match(re);
+      if (m && m[1].trim()) fields[field] = m[1].trim();
+    }
+  }
+
   // Also try to extract state from header (ANSI line)
   const ansiMatch = raw.match(/\bDL(\w{2})/);
   if (ansiMatch && !fields.address_state) {
