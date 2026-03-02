@@ -6,6 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Iron Halo Verify</title>
+<script src="/html5-qrcode.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--bg:#0a0a0f;--surface:#14141f;--card:#1a1a2e;--border:#2a2a3e;--blue:#0056A0;--green:#00c853;--red:#ff3d3d;--amber:#ffab00;--text:#e8e8f0;--muted:#8888a0;--radius:12px}
@@ -46,13 +47,6 @@ input,button,select,textarea{font-family:inherit;font-size:inherit}
 .confirm-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .confirm-grid .card{margin-bottom:0}
 .confirm-grid .full{grid-column:1/-1}
-.overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;gap:12px}
-.overlay.hidden{display:none}
-.spinner{width:48px;height:48px;border:4px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-.ov-title{font-size:18px;font-weight:700}
-.ov-status{font-size:14px;color:var(--muted);transition:opacity .2s}
-.ov-pass{font-size:12px;color:var(--blue);font-family:monospace;margin-top:4px}
 .toast{position:fixed;top:20px;left:16px;right:16px;padding:14px 16px;border-radius:10px;font-size:14px;font-weight:600;z-index:1000;transform:translateY(-120%);transition:transform .3s;text-align:center}
 .toast.show{transform:translateY(0)}
 .toast-success{background:var(--green);color:#000}
@@ -65,7 +59,6 @@ input,button,select,textarea{font-family:inherit;font-size:inherit}
 .scan-item{display:flex;align-items:center;justify-content:space-between;padding:12px;background:var(--card);border:1px solid var(--border);border-radius:8px;margin-bottom:8px}
 .scan-item-name{font-size:15px;font-weight:600}
 .scan-item-meta{font-size:12px;color:var(--muted)}
-.photo-preview{width:100%;max-height:200px;object-fit:contain;border-radius:8px;border:1px solid var(--border);margin-bottom:12px}
 .login-box{max-width:340px;margin:auto;width:100%}
 .login-logo{text-align:center;margin-bottom:32px}
 .login-logo h2{font-size:22px;color:var(--blue);margin-bottom:4px;letter-spacing:1px}
@@ -75,6 +68,23 @@ input,button,select,textarea{font-family:inherit;font-size:inherit}
 .manual-header p{font-size:12px;color:var(--muted)}
 .green-flash{animation:gflash .6s ease-out}
 @keyframes gflash{0%{background:rgba(0,200,83,.3)}100%{background:transparent}}
+
+/* === SCANNER === */
+#s-scanner{background:#000;padding:0!important;padding-bottom:0!important;position:relative}
+#scanner-region{width:100%;height:100vh}
+#scanner-region video{object-fit:cover}
+.scanner-header{position:absolute;top:0;left:0;right:0;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:linear-gradient(to bottom,rgba(0,0,0,.8),transparent)}
+.scanner-header span{color:#fff;font-weight:600;font-size:14px}
+.scanner-header button{background:rgba(255,255,255,.15);border:none;color:#fff;padding:8px 16px;border-radius:20px;font-size:14px;font-weight:600;cursor:pointer}
+.scanner-toolbar{position:absolute;bottom:0;left:0;right:0;z-index:15;display:flex;align-items:center;justify-content:center;gap:12px;padding:16px 16px 28px;background:linear-gradient(to top,rgba(0,0,0,.85),transparent)}
+.scanner-toolbar button{display:flex;flex-direction:column;align-items:center;gap:4px;background:rgba(255,255,255,.12);border:none;color:#fff;padding:12px 16px;border-radius:12px;font-size:11px;font-weight:600;cursor:pointer;min-width:64px}
+.scanner-toolbar button:active{background:rgba(255,255,255,.25)}
+.scanner-toolbar button.torch-on{background:rgba(255,214,0,.3);color:#FFD600}
+.scanner-status{position:absolute;top:56px;left:0;right:0;z-index:10;text-align:center;padding:6px 16px}
+.scanner-status span{display:inline-block;padding:4px 12px;background:rgba(0,86,160,.7);border-radius:12px;font-size:12px;font-weight:600;color:#fff}
+.scanner-hint{position:absolute;bottom:120px;left:0;right:0;text-align:center;color:#fff;font-size:14px;font-weight:600;z-index:10;text-shadow:0 1px 4px rgba(0,0,0,.8)}
+.scan-success-flash{position:fixed;top:0;left:0;right:0;bottom:0;z-index:50;background:var(--green);pointer-events:none;animation:successFlash .6s ease-out forwards}
+@keyframes successFlash{0%{opacity:.8}100%{opacity:0}}
 </style>
 </head>
 <body>
@@ -88,7 +98,7 @@ input,button,select,textarea{font-family:inherit;font-size:inherit}
   <div class="screen active" id="s-login">
     <div style="flex:1;display:flex;align-items:center;justify-content:center">
       <div class="login-box">
-        <div class="login-logo"><h2>IRON HALO VERIFY</h2><p>Guard Verification System v3.2</p></div>
+        <div class="login-logo"><h2>IRON HALO VERIFY</h2><p>Guard Verification System v4.0</p></div>
         <div class="field"><label>Username</label><input type="text" id="l-user" autocapitalize="none" autocomplete="username"></div>
         <div class="field"><label>Password</label><input type="password" id="l-pass" autocomplete="current-password"></div>
         <button class="btn btn-primary" onclick="doLogin()" id="l-btn">Sign In</button>
@@ -97,38 +107,45 @@ input,button,select,textarea{font-family:inherit;font-size:inherit}
     </div>
   </div>
 
-  <!-- SCAN -->
+  <!-- HOME / SCAN -->
   <div class="screen" id="s-scan">
     <div class="scan-hero">
-      <div class="scan-btn-big" onclick="document.getElementById('cam').click()">
+      <div class="scan-btn-big" onclick="startScanner()">
         <svg viewBox="0 0 24 24"><path d="M12 15.2a3.2 3.2 0 100-6.4 3.2 3.2 0 000 6.4z"/><path d="M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/></svg>
       </div>
       <div style="font-size:20px;font-weight:700">SCAN LICENSE</div>
-      <div style="font-size:13px;color:var(--muted);text-align:center;max-width:260px">Take a photo of the <strong>back</strong> of the driver's license (barcode side)</div>
-      <input type="file" id="cam" accept="image/*" capture="environment" style="display:none" onchange="handlePhoto(this)">
+      <div style="font-size:13px;color:var(--muted);text-align:center;max-width:260px">Tap to open <strong>live camera scanner</strong> — point at barcode on back of license</div>
     </div>
     <button class="btn btn-outline btn-sm" onclick="goManual()" style="margin-top:auto">Manual Entry</button>
   </div>
 
-  <!-- PROCESSING OVERLAY -->
-  <div class="overlay hidden" id="ov">
-    <div class="spinner"></div>
-    <div class="ov-title" id="ov-title">Analyzing license...</div>
-    <div class="ov-status" id="ov-status">Processing image</div>
-    <div class="ov-pass" id="ov-pass"></div>
+  <!-- LIVE SCANNER -->
+  <div class="screen" id="s-scanner">
+    <div class="scanner-header">
+      <span>Scanning...</span>
+      <button onclick="stopScanner()">Cancel</button>
+    </div>
+    <div class="scanner-status" id="scanner-status" style="display:none;"><span id="scanner-status-text"></span></div>
+    <div id="scanner-region"></div>
+    <div class="scanner-hint">Position barcode on back of license in frame</div>
+    <div class="scanner-toolbar">
+      <button id="torch-btn" onclick="toggleTorch()">&#128294; Torch</button>
+      <button onclick="enterPhotoMode()">&#128247; Photo</button>
+      <button onclick="goManualFromScanner()">&#9997; Manual</button>
+      <button onclick="stopScanner()">&#10005; Cancel</button>
+    </div>
   </div>
 
   <!-- CONFIRM -->
   <div class="screen" id="s-confirm">
     <h2 style="margin-bottom:4px;font-size:18px">Verify Details</h2>
     <p style="font-size:12px;color:var(--muted);margin-bottom:14px" id="c-src"></p>
-    <img id="c-photo" class="photo-preview" style="display:none">
     <div class="confirm-grid" id="c-fields"></div>
     <div style="margin-top:16px;display:flex;flex-direction:column;gap:10px">
       <button class="btn btn-green" onclick="confirmScan()">CONFIRM &amp; SAVE</button>
       <div style="display:flex;gap:10px">
         <button class="btn btn-outline btn-sm" onclick="editConfirm()" style="flex:1">Edit</button>
-        <button class="btn btn-outline btn-sm" onclick="showS('s-scan')" style="flex:1">Re-scan</button>
+        <button class="btn btn-outline btn-sm" onclick="startScanner()" style="flex:1">Re-scan</button>
       </div>
     </div>
   </div>
@@ -136,7 +153,6 @@ input,button,select,textarea{font-family:inherit;font-size:inherit}
   <!-- EDIT -->
   <div class="screen" id="s-edit">
     <h2 style="margin-bottom:14px;font-size:18px">Edit Details</h2>
-    <img id="e-photo" class="photo-preview" style="display:none">
     <div id="e-fields"></div>
     <div style="display:flex;gap:10px;margin-top:12px">
       <button class="btn btn-green" onclick="saveEdit()" style="flex:1">Save</button>
@@ -183,7 +199,7 @@ input,button,select,textarea{font-family:inherit;font-size:inherit}
   <div class="screen" id="s-dash">
     <h2 style="margin-bottom:14px;font-size:18px">Dashboard</h2>
     <div class="stat-grid" id="d-stats"></div>
-    <div class="card"><div class="card-label">Decode Engine</div><div id="d-decode" style="font-size:14px;margin-top:4px"></div></div>
+    <div class="card"><div class="card-label">Decode Engine</div><div id="d-decode" style="font-size:14px;margin-top:4px">Dynamsoft + html5-qrcode (client-side live scan)</div></div>
     <h3 style="font-size:14px;margin:14px 0 8px;color:var(--muted)">Watchlist</h3>
     <div id="d-wl"></div>
     <button class="btn btn-outline btn-sm" onclick="toggleWLForm()" style="margin-top:10px">+ Add to Watchlist</button>
@@ -206,17 +222,34 @@ input,button,select,textarea{font-family:inherit;font-size:inherit}
   </div>
 </div>
 <div class="toast" id="toast"></div>
+<!-- Hidden file input for photo scan mode -->
+<input type="file" id="photo-scan-input" accept="image/*" capture="environment" style="display:none">
 
 <script>
+// ═══════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════
 let TK=localStorage.getItem('stk')||'',US=JSON.parse(localStorage.getItem('sus')||'null'),CD={},cPhoto=null,cBlob=null;
-const PASS_NAMES=['Resize','Sharpen','Normalize','Contrast','Threshold 1','Threshold 2','Threshold 3','Upscale','Downscale','HD Threshold','Rotation','Edge Crop'];
 
+// Scanner state
+let html5Qr=null,scannerTimeout=null,dynamsoftReader=null,dynamsoftLoaded=false;
+let dynamsoftFrameLoop=null,torchOn=false,scannerVideoTrack=null,scannerStream=null;
+let isPhotoScanMode=false,activeEngine='html5-qrcode';
+
+// ═══════════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════════
 function showS(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));
   const m={'s-scan':'n-scan','s-history':'n-hist','s-dash':'n-dash'};
   if(m[id])document.getElementById(m[id])?.classList.add('active');
+  if(TK){
+    const vis=id!=='s-scanner'&&id!=='s-login';
+    document.getElementById('hdr').style.display=vis?'flex':'none';
+    document.getElementById('nav').style.display=vis?'flex':'none';
+  }
 }
 function showApp(){
   document.getElementById('hdr').style.display='flex';
@@ -225,7 +258,9 @@ function showApp(){
   showS('s-scan');
 }
 
+// ═══════════════════════════════════════════════════════════
 // AUTH
+// ═══════════════════════════════════════════════════════════
 async function doLogin(){
   const u=document.getElementById('l-user').value.trim(),p=document.getElementById('l-pass').value;
   document.getElementById('l-err').textContent='';
@@ -240,72 +275,310 @@ async function doLogin(){
 if(TK&&US){fetch('/api/dashboard',{headers:{'x-auth-token':TK}}).then(r=>{if(r.ok)showApp();else throw 0;}).catch(()=>{TK='';US=null;localStorage.clear();});}
 document.getElementById('l-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 
-// PHOTO CAPTURE + DECODE
-let progressInterval=null;
-async function handlePhoto(input){
-  const file=input.files[0];if(!file)return;input.value='';
-  cBlob=file;
-  const reader=new FileReader();reader.onload=()=>{cPhoto=reader.result;};reader.readAsDataURL(file);
+// ═══════════════════════════════════════════════════════════
+// DYNAMSOFT SDK LOADER
+// ═══════════════════════════════════════════════════════════
+function loadDynamsoftSDK(){
+  return new Promise((resolve,reject)=>{
+    if(dynamsoftLoaded&&window.Dynamsoft){resolve();return;}
+    const s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/dynamsoft-javascript-barcode@9.6.42/dist/dbr.js';
+    s.onload=()=>{dynamsoftLoaded=true;resolve();};
+    s.onerror=()=>reject(new Error('Failed to load Dynamsoft SDK'));
+    document.head.appendChild(s);
+  });
+}
 
-  // Show progress overlay
-  const ov=document.getElementById('ov');
-  ov.classList.remove('hidden');
-  document.getElementById('ov-title').textContent='Analyzing license...';
-  document.getElementById('ov-status').textContent='Processing image';
-  document.getElementById('ov-pass').textContent='';
+async function getDynamsoftReader(){
+  if(dynamsoftReader)return dynamsoftReader;
+  await loadDynamsoftSDK();
+  Dynamsoft.DBR.BarcodeReader.license='DLS2eyJvcmdhbml6YXRpb25JRCI6IjIwMDAwMSJ9';
+  dynamsoftReader=await Dynamsoft.DBR.BarcodeReader.createInstance();
+  const settings=await dynamsoftReader.getRuntimeSettings();
+  settings.barcodeFormatIds=Dynamsoft.DBR.EnumBarcodeFormat.BF_PDF417;
+  settings.deblurLevel=5;
+  await dynamsoftReader.updateRuntimeSettings(settings);
+  return dynamsoftReader;
+}
 
-  // Simulate pass progress while waiting for server
-  let passNum=1;
-  progressInterval=setInterval(()=>{
-    if(passNum<=12){
-      document.getElementById('ov-status').textContent=`Running analysis pass ${passNum} of 12`;
-      document.getElementById('ov-pass').textContent=PASS_NAMES[passNum-1]||'';
-      passNum++;
-    }
-  },2000);
+// ═══════════════════════════════════════════════════════════
+// LIVE BARCODE SCANNER
+// ═══════════════════════════════════════════════════════════
+async function startScanner(){
+  CD={};cPhoto=null;cBlob=null;
+  isPhotoScanMode=false;activeEngine='html5-qrcode';torchOn=false;
+  showS('s-scanner');
+
+  const statusEl=document.getElementById('scanner-status');
+  statusEl.style.display='none';
+  const torchBtn=document.getElementById('torch-btn');
+  if(torchBtn)torchBtn.classList.remove('torch-on');
+
+  const vw=Math.max(document.documentElement.clientWidth||0,window.innerWidth||0);
+  const qrW=Math.min(Math.floor(vw*0.85),480);
+  const qrH=Math.floor(qrW*0.6);
 
   try{
-    const form=new FormData();form.append('photo',file);
-    const resp=await fetch('/api/decode-dl',{method:'POST',headers:{'x-auth-token':TK},body:form});
-    const result=await resp.json();
-    clearInterval(progressInterval);progressInterval=null;
-
-    if(result.success&&result.data){
-      // Success — green flash + vibrate
-      document.getElementById('ov-title').textContent='License verified!';
-      document.getElementById('ov-title').style.color='var(--green)';
-      document.getElementById('ov-status').textContent=`Decoded on pass ${result.meta?.passIndex||'?'} of ${result.meta?.totalPasses||12}`;
-      document.getElementById('ov-pass').textContent=result.meta?.pass||'';
-      if(navigator.vibrate)navigator.vibrate(200);
-      // Brief pause to show success, then transition
-      setTimeout(()=>{
-        ov.classList.add('hidden');
-        document.getElementById('ov-title').style.color='';
-        CD=result.data;
-        showConfirm(result.data,true);
-        toast('Barcode decoded — '+((result.meta?.decode_ms||0)/1000).toFixed(1)+'s','success');
-      },800);
-    }else{
-      // Failed — smooth transition to manual entry
-      document.getElementById('ov-title').textContent='Switching to manual entry';
-      document.getElementById('ov-status').textContent=result.error||'Barcode not readable';
-      document.getElementById('ov-pass').textContent='';
-      setTimeout(()=>{
-        ov.classList.add('hidden');
-        CD={};
-        goManualFromScan();
-      },1200);
+    html5Qr=new Html5Qrcode("scanner-region");
+    const config={fps:10,qrbox:{width:qrW,height:qrH},aspectRatio:1.777};
+    if(typeof Html5QrcodeSupportedFormats!=='undefined'&&Html5QrcodeSupportedFormats.PDF_417!==undefined){
+      config.formatsToSupport=[Html5QrcodeSupportedFormats.PDF_417];
     }
-  }catch(err){
-    clearInterval(progressInterval);progressInterval=null;
-    ov.classList.add('hidden');
-    CD={};
-    goManualFromScan();
-    toast('Connection error — use manual entry','error');
+    await html5Qr.start(
+      {facingMode:"environment"},config,
+      (decoded)=>{console.log('[SCAN] html5-qrcode decoded:',decoded.substring(0,80));onScanSuccess(decoded);},
+      (err)=>{/* scanning... */}
+    );
+    // Grab video track for torch
+    try{
+      const videoEl=document.querySelector('#scanner-region video');
+      if(videoEl&&videoEl.srcObject){
+        scannerStream=videoEl.srcObject;
+        const tracks=scannerStream.getVideoTracks();
+        if(tracks.length>0)scannerVideoTrack=tracks[0];
+      }
+    }catch(e){}
+    // 10-second timer: switch to Dynamsoft
+    scannerTimeout=setTimeout(()=>{switchToDynamsoft();},10000);
+  }catch(e){
+    console.error('[SCANNER ERROR]',e);
+    toast('Camera error: '+(e.message||e),'error');
+    showS('s-scan');
   }
 }
 
-// MANUAL ENTRY — intentional, not a failure state
+// ═══════════════════════════════════════════════════════════
+// DYNAMSOFT AUTO-SWITCH (10-second fallback)
+// ═══════════════════════════════════════════════════════════
+async function switchToDynamsoft(){
+  if(activeEngine==='dynamsoft')return;
+  console.log('[SCAN] Switching to Dynamsoft enhanced scanner...');
+  toast('Switching to enhanced scanner...','info');
+  activeEngine='dynamsoft';
+  const statusEl=document.getElementById('scanner-status');
+  statusEl.style.display='';
+  document.getElementById('scanner-status-text').textContent='Enhanced Scanning...';
+
+  // Grab stream from html5-qrcode video
+  let stream=null;
+  try{const videoEl=document.querySelector('#scanner-region video');if(videoEl&&videoEl.srcObject)stream=videoEl.srcObject;}catch(e){}
+
+  // Stop html5-qrcode but keep stream alive
+  if(html5Qr){try{await html5Qr.stop();}catch(e){}try{html5Qr.clear();}catch(e){}html5Qr=null;}
+
+  // If no stream, open new one
+  if(!stream){
+    try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1920}}});}
+    catch(e){toast('Camera error','error');showS('s-scan');return;}
+  }
+  scannerStream=stream;
+  const tracks=stream.getVideoTracks();
+  if(tracks.length>0)scannerVideoTrack=tracks[0];
+
+  // Create fresh video in scanner-region
+  const region=document.getElementById('scanner-region');
+  region.innerHTML='';
+  const video=document.createElement('video');
+  video.autoplay=true;video.playsInline=true;video.muted=true;
+  video.style.cssText='width:100%;height:100vh;object-fit:cover;';
+  video.srcObject=stream;
+  region.appendChild(video);
+  await video.play();
+
+  // Load Dynamsoft
+  let reader;
+  try{reader=await getDynamsoftReader();}
+  catch(e){console.error('[DYNAMSOFT] Load error:',e);toast('Enhanced scanner unavailable','error');return;}
+
+  const canvas=document.createElement('canvas');
+  const ctx=canvas.getContext('2d');
+
+  function decodeFrame(){
+    if(activeEngine!=='dynamsoft')return;
+    if(video.readyState>=video.HAVE_CURRENT_DATA){
+      canvas.width=video.videoWidth;canvas.height=video.videoHeight;
+      ctx.drawImage(video,0,0);
+      reader.decode(canvas).then(results=>{
+        if(results&&results.length>0){
+          const text=results[0].barcodeText;
+          if(text&&text.length>20){console.log('[SCAN] Dynamsoft decoded:',text.substring(0,80));onScanSuccess(text);return;}
+        }
+        dynamsoftFrameLoop=requestAnimationFrame(decodeFrame);
+      }).catch(()=>{dynamsoftFrameLoop=requestAnimationFrame(decodeFrame);});
+    }else{dynamsoftFrameLoop=requestAnimationFrame(decodeFrame);}
+  }
+  dynamsoftFrameLoop=requestAnimationFrame(decodeFrame);
+}
+
+// ═══════════════════════════════════════════════════════════
+// SCAN SUCCESS
+// ═══════════════════════════════════════════════════════════
+function onScanSuccess(decoded){
+  cleanupScanner();
+  if(navigator.vibrate)navigator.vibrate([200,100,200,100,200]);
+  // Green flash
+  const flash=document.createElement('div');
+  flash.className='scan-success-flash';
+  document.body.appendChild(flash);
+  flash.addEventListener('animationend',()=>flash.remove());
+  // Parse and show
+  const parsed=parsePDF417(decoded);
+  CD=parsed;
+  showConfirm(CD,true);
+  toast('Barcode decoded!','success');
+}
+
+// ═══════════════════════════════════════════════════════════
+// CLEANUP SCANNER
+// ═══════════════════════════════════════════════════════════
+function cleanupScanner(){
+  if(scannerTimeout){clearTimeout(scannerTimeout);scannerTimeout=null;}
+  if(dynamsoftFrameLoop){cancelAnimationFrame(dynamsoftFrameLoop);dynamsoftFrameLoop=null;}
+  if(html5Qr){try{html5Qr.stop().catch(()=>{});}catch(e){}try{html5Qr.clear();}catch(e){}html5Qr=null;}
+  if(scannerStream){try{scannerStream.getTracks().forEach(t=>t.stop());}catch(e){}scannerStream=null;}
+  scannerVideoTrack=null;torchOn=false;activeEngine='html5-qrcode';isPhotoScanMode=false;
+}
+
+function stopScanner(){cleanupScanner();showS('s-scan');}
+
+// ═══════════════════════════════════════════════════════════
+// TORCH
+// ═══════════════════════════════════════════════════════════
+async function toggleTorch(){
+  if(!scannerVideoTrack){toast('Torch not available','info');return;}
+  try{
+    const cap=scannerVideoTrack.getCapabilities();
+    if(!cap.torch){toast('Torch not supported','info');return;}
+    torchOn=!torchOn;
+    await scannerVideoTrack.applyConstraints({advanced:[{torch:torchOn}]});
+    const btn=document.getElementById('torch-btn');
+    if(btn)btn.classList.toggle('torch-on',torchOn);
+  }catch(e){toast('Torch not supported','info');torchOn=false;}
+}
+
+// ═══════════════════════════════════════════════════════════
+// PHOTO SCAN MODE
+// ═══════════════════════════════════════════════════════════
+function enterPhotoMode(){
+  isPhotoScanMode=true;
+  cleanupScanner();
+  const input=document.getElementById('photo-scan-input');
+  input.value='';
+  input.onchange=async function(e){
+    const file=e.target.files[0];
+    if(!file){isPhotoScanMode=false;startScanner();return;}
+    toast('Decoding photo...','info');
+    let decoded=null;
+    // Try Dynamsoft on photo
+    try{
+      const reader=await getDynamsoftReader();
+      const img=new Image();
+      const url=URL.createObjectURL(file);
+      await new Promise((res,rej)=>{img.onload=res;img.onerror=rej;img.src=url;});
+      const canvas=document.createElement('canvas');
+      canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;
+      canvas.getContext('2d').drawImage(img,0,0);
+      URL.revokeObjectURL(url);
+      const results=await reader.decode(canvas);
+      if(results&&results.length>0&&results[0].barcodeText.length>20)decoded=results[0].barcodeText;
+    }catch(e){console.log('[PHOTO] Dynamsoft failed:',e.message);}
+    // Fallback: html5-qrcode scanFile
+    if(!decoded){
+      try{
+        const tempQr=new Html5Qrcode("scanner-region");
+        decoded=await tempQr.scanFile(file,true);
+        tempQr.clear();
+      }catch(e){console.log('[PHOTO] html5-qrcode failed:',e.message);}
+    }
+    isPhotoScanMode=false;
+    if(decoded&&decoded.length>20){onScanSuccess(decoded);}
+    else{toast('Could not read barcode. Try again or Manual Entry.','error');startScanner();}
+  };
+  input.click();
+}
+
+// ═══════════════════════════════════════════════════════════
+// PDF417 AAMVA PARSER (client-side)
+// Field names match server schema: dob, expiration, address, city, state, postal_code, sex
+// ═══════════════════════════════════════════════════════════
+function parsePDF417(raw){
+  const fields={};
+  const map={
+    'DCS':'last_name','DAB':'last_name','DAC':'first_name','DCT':'first_name',
+    'DAD':'middle_name','DBB':'dob','DBA':'expiration',
+    'DAQ':'dl_number','DAG':'address','DAI':'city',
+    'DAJ':'state','DAK':'postal_code','DBC':'sex',
+    'DAY':'eye_color','DAU':'height','DBD':'issue_date'
+  };
+  const lines=raw.split(/[\n\r\x1e\x1d]+/);
+  for(const line of lines){
+    const trimmed=line.trim();
+    for(const[code,field]of Object.entries(map)){
+      if(trimmed.startsWith(code)){
+        let val=trimmed.substring(code.length).trim();
+        if(field==='first_name'&&fields.first_name&&trimmed.startsWith('DCT'))continue;
+        if(!fields[field])fields[field]=val;
+      }
+    }
+  }
+  // Also try full-string scan for missing fields
+  for(const[code,field]of Object.entries(map)){
+    if(fields[field])continue;
+    const regex=new RegExp(code+'([^\\n\\r\\x1e\\x0a\\x0d]{1,100}?)(?=D[A-Z]{2}|[\\n\\r\\x1e]|$)','g');
+    const m=regex.exec(raw);
+    if(m&&m[1])fields[field]=m[1].trim();
+  }
+  // Format dates as MM/DD/YYYY
+  for(const df of['dob','expiration','issue_date']){
+    if(fields[df]&&fields[df].length>=8){
+      const d=fields[df].replace(/[^0-9]/g,'');
+      if(d.length===8){
+        const f2=parseInt(d.slice(0,2));
+        if(f2>12)fields[df]=d.slice(4,6)+'/'+d.slice(6,8)+'/'+d.slice(0,4);
+        else fields[df]=d.slice(0,2)+'/'+d.slice(2,4)+'/'+d.slice(4,8);
+      }
+    }
+  }
+  if(fields.sex==='1')fields.sex='M';
+  else if(fields.sex==='2')fields.sex='F';
+  if(fields.postal_code)fields.postal_code=fields.postal_code.replace(/\s+/g,'').replace(/0{4,}$/,'');
+  // Capitalize names
+  for(const nf of['first_name','last_name','middle_name','city']){
+    if(fields[nf])fields[nf]=fields[nf].charAt(0).toUpperCase()+fields[nf].slice(1).toLowerCase();
+  }
+  return fields;
+}
+
+// ═══════════════════════════════════════════════════════════
+// CONFIRM / EDIT
+// ═══════════════════════════════════════════════════════════
+function showConfirm(data,decoded){
+  document.getElementById('c-src').textContent=decoded?'Auto-decoded from barcode':'Tap Edit to enter details';
+  const fs=[{k:'first_name',l:'First Name'},{k:'last_name',l:'Last Name'},{k:'dl_number',l:'DL Number',f:1},{k:'dob',l:'Date of Birth'},{k:'expiration',l:'Expiration'},{k:'address',l:'Address',f:1},{k:'city',l:'City'},{k:'state',l:'State'}];
+  document.getElementById('c-fields').innerHTML=fs.map(f=>`<div class="card ${f.f?'full':''} ${decoded&&data[f.k]?'green-flash':''}"><div class="card-label">${f.l}</div><div class="card-value" style="${!data[f.k]?'color:var(--muted);font-style:italic':''}">${data[f.k]||(decoded?'\u2014':'Tap Edit')}</div></div>`).join('');
+  showS('s-confirm');
+}
+function editConfirm(){
+  const fs=[{k:'first_name',l:'First Name'},{k:'last_name',l:'Last Name'},{k:'middle_name',l:'Middle Name'},{k:'dl_number',l:'DL Number'},{k:'dob',l:'DOB (MM/DD/YYYY)'},{k:'expiration',l:'Expiration'},{k:'address',l:'Address'},{k:'city',l:'City'},{k:'state',l:'State'},{k:'postal_code',l:'ZIP'}];
+  document.getElementById('e-fields').innerHTML=fs.map(f=>`<div class="field"><label>${f.l}</label><input id="e-${f.k}" value="${CD[f.k]||''}" autocapitalize="${f.k==='state'?'characters':'words'}"></div>`).join('');
+  showS('s-edit');
+}
+function saveEdit(){const ks=['first_name','last_name','middle_name','dl_number','dob','expiration','address','city','state','postal_code'];ks.forEach(k=>{CD[k]=document.getElementById('e-'+k)?.value||'';});showConfirm(CD,Object.values(CD).some(v=>v));}
+function backConfirm(){showConfirm(CD,Object.values(CD).some(v=>v));}
+
+// ═══════════════════════════════════════════════════════════
+// SUBMIT
+// ═══════════════════════════════════════════════════════════
+async function confirmScan(){
+  const form=new FormData();Object.entries(CD).forEach(([k,v])=>{if(k!=='raw')form.append(k,v);});
+  if(cBlob)form.append('dl_photo',cBlob);
+  try{const r=await fetch('/api/scans',{method:'POST',headers:{'x-auth-token':TK},body:form});const d=await r.json();showResult(d);}
+  catch(e){toast('Failed to save','error');}
+}
+
+// ═══════════════════════════════════════════════════════════
+// MANUAL ENTRY
+// ═══════════════════════════════════════════════════════════
 function goManual(){
   document.getElementById('manual-hdr').innerHTML='<h2>Enter License Details</h2><p>Record driver information manually</p>';
   clearManualFields();
@@ -313,47 +586,17 @@ function goManual(){
   showS('s-manual');
   setTimeout(()=>document.getElementById('m-first').focus(),100);
 }
-
-function goManualFromScan(){
-  // Transition from failed scan — feels intentional
-  document.getElementById('manual-hdr').innerHTML='<h2>Enter License Details</h2><p>Barcode not readable — enter from the license</p>';
+function goManualFromScanner(){
+  cleanupScanner();
+  document.getElementById('manual-hdr').innerHTML='<h2>Enter License Details</h2><p>Scanner stopped \u2014 enter from the license</p>';
   clearManualFields();
   const now=new Date();
-  const dateStr=`${now.getMonth()+1}/${now.getDate()}/${now.getFullYear()}`;
-  document.getElementById('m-notes').value=`Scanned ${dateStr} by ${US?.display_name||'guard'}`;
+  document.getElementById('m-notes').value='Manual entry '+now.toLocaleDateString()+' by '+(US?.display_name||'guard');
   showS('s-manual');
   setTimeout(()=>document.getElementById('m-first').focus(),100);
 }
+function clearManualFields(){['m-first','m-last','m-dl','m-dob','m-exp'].forEach(id=>document.getElementById(id).value='');document.getElementById('m-state').value='TN';}
 
-function clearManualFields(){
-  ['m-first','m-last','m-dl','m-dob','m-exp'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('m-state').value='TN';
-}
-
-// CONFIRM
-function showConfirm(data,decoded){
-  document.getElementById('c-src').textContent=decoded?'Auto-decoded from barcode':'Photo captured — tap Edit to enter details';
-  const img=document.getElementById('c-photo');if(cPhoto){img.src=cPhoto;img.style.display='block';}else{img.style.display='none';}
-  const fs=[{k:'first_name',l:'First Name'},{k:'last_name',l:'Last Name'},{k:'dl_number',l:'DL Number',f:1},{k:'dob',l:'Date of Birth'},{k:'expiration',l:'Expiration'},{k:'address',l:'Address',f:1},{k:'city',l:'City'},{k:'state',l:'State'}];
-  document.getElementById('c-fields').innerHTML=fs.map(f=>`<div class="card ${f.f?'full':''} ${decoded&&data[f.k]?'green-flash':''}"><div class="card-label">${f.l}</div><div class="card-value" style="${!data[f.k]?'color:var(--muted);font-style:italic':''}">${data[f.k]||(decoded?'—':'Tap Edit')}</div></div>`).join('');
-  showS('s-confirm');
-}
-function editConfirm(){
-  const fs=[{k:'first_name',l:'First Name'},{k:'last_name',l:'Last Name'},{k:'middle_name',l:'Middle Name'},{k:'dl_number',l:'DL Number'},{k:'dob',l:'DOB (MM/DD/YYYY)'},{k:'expiration',l:'Expiration'},{k:'address',l:'Address'},{k:'city',l:'City'},{k:'state',l:'State'},{k:'postal_code',l:'ZIP'}];
-  const img=document.getElementById('e-photo');if(cPhoto){img.src=cPhoto;img.style.display='block';}else{img.style.display='none';}
-  document.getElementById('e-fields').innerHTML=fs.map(f=>`<div class="field"><label>${f.l}</label><input id="e-${f.k}" value="${CD[f.k]||''}" autocapitalize="${f.k==='state'?'characters':'words'}"></div>`).join('');
-  showS('s-edit');
-}
-function saveEdit(){const ks=['first_name','last_name','middle_name','dl_number','dob','expiration','address','city','state','postal_code'];ks.forEach(k=>{CD[k]=document.getElementById('e-'+k)?.value||'';});showConfirm(CD,Object.values(CD).some(v=>v));}
-function backConfirm(){showConfirm(CD,Object.values(CD).some(v=>v));}
-
-// SUBMIT
-async function confirmScan(){
-  const form=new FormData();Object.entries(CD).forEach(([k,v])=>{if(k!=='raw')form.append(k,v);});
-  if(cBlob)form.append('dl_photo',cBlob);
-  try{const r=await fetch('/api/scans',{method:'POST',headers:{'x-auth-token':TK},body:form});const d=await r.json();showResult(d);}
-  catch(e){toast('Failed to save','error');}
-}
 async function submitManual(){
   const data={first_name:document.getElementById('m-first').value,last_name:document.getElementById('m-last').value,dl_number:document.getElementById('m-dl').value,dob:document.getElementById('m-dob').value,expiration:document.getElementById('m-exp').value,state:document.getElementById('m-state').value,notes:document.getElementById('m-notes').value};
   if(!data.first_name&&!data.last_name){toast('Enter at least a name','error');return;}
@@ -361,6 +604,10 @@ async function submitManual(){
   clearManualFields();document.getElementById('m-notes').value='';showResult(d);}
   catch(e){toast('Failed','error');}
 }
+
+// ═══════════════════════════════════════════════════════════
+// RESULT
+// ═══════════════════════════════════════════════════════════
 function showResult(d){
   const icon=document.getElementById('r-icon'),st=document.getElementById('r-status'),sc=document.getElementById('r-score'),fl=document.getElementById('r-flags');
   if(d.risk_score>=70){icon.textContent='!!!';st.textContent='FLAGGED';st.style.color='var(--red)';}
@@ -371,22 +618,25 @@ function showResult(d){
   fl.innerHTML=(d.risk_flags||[]).map(f=>`<div style="margin-top:4px">${f}</div>`).join('');
   document.getElementById('r-detail').innerHTML=`<div class="card-label">Driver</div><div class="card-value">${CD.first_name||''} ${CD.last_name||''}</div><div style="margin-top:8px;font-size:13px;color:var(--muted)">${CD.dl_number?'DL: '+CD.dl_number:''}</div>`;
   if(navigator.vibrate&&d.risk_score>=70)navigator.vibrate([300,100,300]);
-  showS('s-result');cPhoto=null;cBlob=null;CD={};
+  showS('s-result');CD={};
 }
 
+// ═══════════════════════════════════════════════════════════
 // HISTORY
+// ═══════════════════════════════════════════════════════════
 async function loadHistory(){try{const r=await fetch('/api/scans?limit=30',{headers:{'x-auth-token':TK}});const s=await r.json();const l=document.getElementById('h-list');
   if(!s.length){l.innerHTML='<p style="color:var(--muted);text-align:center;padding:40px">No scans yet</p>';return;}
   l.innerHTML=s.map(s=>{const rc=s.risk_score>=70?'risk-high':s.risk_score>=30?'risk-med':'risk-low';const t=new Date(s.created_at+'Z').toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
-  return`<div class="scan-item"><div><div class="scan-item-name">${s.first_name||''} ${s.last_name||'Unknown'}</div><div class="scan-item-meta">${s.dl_number||'No DL'} · ${t}</div></div><span class="risk-badge ${rc}">${s.risk_score}</span></div>`;}).join('');}catch(e){toast('Failed','error');}}
+  return`<div class="scan-item"><div><div class="scan-item-name">${s.first_name||''} ${s.last_name||'Unknown'}</div><div class="scan-item-meta">${s.dl_number||'No DL'} \u00b7 ${t}</div></div><span class="risk-badge ${rc}">${s.risk_score}</span></div>`;}).join('');}catch(e){toast('Failed','error');}}
 
+// ═══════════════════════════════════════════════════════════
 // DASHBOARD
+// ═══════════════════════════════════════════════════════════
 async function loadDash(){try{const r=await fetch('/api/dashboard',{headers:{'x-auth-token':TK}});const d=await r.json();
   document.getElementById('d-stats').innerHTML=`<div class="stat-card"><div class="stat-num" style="color:var(--blue)">${d.today}</div><div class="stat-label">Today</div></div><div class="stat-card"><div class="stat-num" style="color:var(--red)">${d.flagged}</div><div class="stat-label">Flagged</div></div><div class="stat-card"><div class="stat-num">${d.total}</div><div class="stat-label">All Time</div></div><div class="stat-card"><div class="stat-num" style="color:var(--amber)">${d.watchlist}</div><div class="stat-label">Watchlist</div></div>`;
-  document.getElementById('d-decode').innerHTML=d.decode?`ZXing-WASM 12-pass · ${d.decode.rate}% success · ${d.decode.avg_ms}ms avg · ${d.decode.total} attempts`:'No decode data';
   loadWL();}catch(e){toast('Failed','error');}}
 async function loadWL(){try{const r=await fetch('/api/watchlist',{headers:{'x-auth-token':TK}});const items=await r.json();
-  document.getElementById('d-wl').innerHTML=items.length?items.map(w=>`<div class="scan-item"><div><div class="scan-item-name">${w.first_name||''} ${w.last_name||'—'}</div><div class="scan-item-meta">${w.dl_number||'No DL'} · ${w.reason||''}</div></div><button class="btn btn-red btn-sm" style="width:auto;padding:6px 12px;font-size:12px" onclick="rmWL('${w.id}')">X</button></div>`).join(''):'<p style="color:var(--muted);font-size:13px">Empty</p>';}catch(_){}}
+  document.getElementById('d-wl').innerHTML=items.length?items.map(w=>`<div class="scan-item"><div><div class="scan-item-name">${w.first_name||''} ${w.last_name||'\u2014'}</div><div class="scan-item-meta">${w.dl_number||'No DL'} \u00b7 ${w.reason||''}</div></div><button class="btn btn-red btn-sm" style="width:auto;padding:6px 12px;font-size:12px" onclick="rmWL('${w.id}')">X</button></div>`).join(''):'<p style="color:var(--muted);font-size:13px">Empty</p>';}catch(_){}}
 function toggleWLForm(){const f=document.getElementById('wl-form');f.style.display=f.style.display==='none'?'block':'none';}
 async function addWL(){try{await fetch('/api/watchlist',{method:'POST',headers:{'Content-Type':'application/json','x-auth-token':TK},body:JSON.stringify({dl_number:document.getElementById('wl-dl').value,last_name:document.getElementById('wl-last').value,reason:document.getElementById('wl-reason').value})});['wl-dl','wl-last','wl-reason'].forEach(id=>document.getElementById(id).value='');document.getElementById('wl-form').style.display='none';loadWL();toast('Added','success');}catch(e){toast('Failed','error');}}
 async function rmWL(id){await fetch('/api/watchlist/'+id,{method:'DELETE',headers:{'x-auth-token':TK}});loadWL();}
