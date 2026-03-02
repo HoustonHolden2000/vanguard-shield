@@ -1,9 +1,16 @@
 /**
- * IRON HALO VERIFY v3.2 — Production Server
- * Server-side PDF417 decoding | AAMVA parsing | Photo capture
+ * IRON HALO VERIFY v3.3 — regression fix — tuned PDF417 decode for phone photos
+ *
+ * WHAT CHANGED (v3.2 → v3.3):
+ * - REMOVED pre-resize to 2400px that was killing barcode detail
+ * - RESTORED v3.0 proven passes with original sigma values
+ * - REDUCED from 12 experimental passes to 6 proven passes
+ * - Pass 1 is pure grayscale again (was resize-1600 with no grayscale)
+ * - Sharpen sigmas restored: 2.0 (blur), 1.5 (normalize), 2.5 (contrast)
+ * - Kept: 25s timeout, per-pass logging, startup self-test, Iron Halo branding
  *
  * Decode engine: zxing-wasm (ZXing C++ via WebAssembly)
- * Image preprocessing: sharp (12-pass hardened pipeline)
+ * Image preprocessing: sharp (6-pass tuned pipeline)
  * Stack: Node 18+, Express 4, SQLite, Sharp, zxing-wasm, bcryptjs
  *
  * ═══════════════════════════════════════════════════════════════
@@ -11,31 +18,23 @@
  * ═══════════════════════════════════════════════════════════════
  *
  * BEFORE DEMO:
- *   [ ] Render health: GET /api/health → {"status":"ok","version":"3.2.0","decoder":"zxing-wasm"}
+ *   [ ] Render health: GET /api/health → {"status":"ok","version":"3.3.0","decoder":"zxing-wasm"}
  *   [ ] Login on iPhone Safari: admin / vanguard2026
- *   [ ] Confirm bottom nav: Scan | History | Dashboard
  *
- * SCAN FLOW (the money demo):
- *   [ ] Tap big camera button → native camera opens
- *   [ ] Photo of TN DL barcode (back side, steady, good light)
- *   [ ] "Analyzing license..." overlay with pass progress
- *   [ ] If decode hits: green flash → confirm screen with fields auto-filled
- *   [ ] If decode fails: smooth transition to manual entry (feels intentional)
- *   [ ] Tap "CONFIRM & SAVE" → risk score result
+ * SCAN FLOW:
+ *   [ ] Tap camera button → native camera opens
+ *   [ ] Photo TN DL barcode (back side, steady, good light, fill frame)
+ *   [ ] "Analyzing license..." overlay with progress
+ *   [ ] Success: green flash → fields auto-filled on confirm screen
+ *   [ ] Fail: smooth transition to manual entry (feels intentional)
  *
- * IF BARCODE FAILS:
- *   → App automatically transitions to manual entry
- *   → Guard name and date pre-populated
- *   → Only needs: name, DL#, DOB — feels like part of the flow
- *   → Try again: closer, better light, hold steady 2 sec
- *
- * 12-PASS DECODE PIPELINE:
- *   1. resize-1600         7. threshold-160
- *   2. gray-sharpen        8. resize-2000-sharpen
- *   3. gray-norm-sharpen   9. resize-1200-norm
- *   4. hi-contrast        10. resize-2400-threshold
- *   5. threshold-128      11. rotate-180
- *   6. threshold-100      12. center-crop-80
+ * 6-PASS DECODE PIPELINE (proven from v3.0):
+ *   1. grayscale          — clean photo, no processing needed
+ *   2. gray+sharpen(2.0)  — corrects slight camera blur
+ *   3. gray+norm+sharp    — handles uneven indoor lighting
+ *   4. upscale-2k+sharp   — handles small/distant barcodes
+ *   5. hi-contrast+sharp  — handles low-light, washed-out photos
+ *   6. threshold-128      — nuclear option, pure black & white
  *
  * Logins: admin/vanguard2026 | guard/guard123 | demo/demo
  * ═══════════════════════════════════════════════════════════════
@@ -74,10 +73,12 @@ async function initDecoder() {
 
 /**
  * Decode PDF417 from an image buffer.
- * 12-pass hardened pipeline for real phone photos under field conditions:
- * indoor lighting, granite surfaces, phone angle, motion blur, finger obstruction.
  *
- * Pre-resizes to 2400px max to cap memory usage (Render 512MB).
+ * 6-pass pipeline tuned for real phone photos of TN driver licenses.
+ * These are the PROVEN passes from v3.0 that successfully decoded
+ * in the field. No pre-resize — works on full-resolution phone images
+ * to preserve barcode detail.
+ *
  * 25-second timeout to stay under Render's 30s request limit.
  */
 async function decodePdf417FromBuffer(imageBuffer) {
@@ -85,37 +86,28 @@ async function decodePdf417FromBuffer(imageBuffer) {
     throw new Error('Barcode decoder not initialized');
   }
 
-  // Pre-resize to cap memory — Render free tier = 512MB RAM
-  const meta = await sharp(imageBuffer).metadata();
-  let inputBuffer = imageBuffer;
-  const maxDim = 2400;
-  if ((meta.width && meta.width > maxDim) || (meta.height && meta.height > maxDim)) {
-    inputBuffer = await sharp(imageBuffer)
-      .resize({ width: maxDim, height: maxDim, fit: 'inside', withoutEnlargement: true })
-      .toBuffer();
-    console.log(`  → Pre-resized: ${meta.width}x${meta.height} → max ${maxDim}`);
-  }
+  // NO pre-resize. v3.2's pre-resize to 2400px killed barcode detail.
+  // Phone photos are 3000-4000px wide — that resolution helps decode.
+  // Sharp handles full-res images fine within Render's 512MB.
 
-  // 12-pass pipeline — ordered from fastest/cheapest to most aggressive
   const passes = [
-    { name: 'resize-1600', fn: buf => sharp(buf).resize({ width: 1600, withoutEnlargement: true }).png().toBuffer() },
-    { name: 'gray-sharpen', fn: buf => sharp(buf).grayscale().sharpen({ sigma: 1.5 }).png().toBuffer() },
-    { name: 'gray-norm-sharpen', fn: buf => sharp(buf).grayscale().normalize().sharpen({ sigma: 2.0 }).png().toBuffer() },
-    { name: 'hi-contrast', fn: buf => sharp(buf).grayscale().linear(1.5, -30).sharpen({ sigma: 2.0 }).png().toBuffer() },
-    { name: 'threshold-128', fn: buf => sharp(buf).grayscale().threshold(128).png().toBuffer() },
-    { name: 'threshold-100', fn: buf => sharp(buf).grayscale().threshold(100).png().toBuffer() },
-    { name: 'threshold-160', fn: buf => sharp(buf).grayscale().threshold(160).png().toBuffer() },
-    { name: 'resize-2000-sharpen', fn: buf => sharp(buf).resize({ width: 2000, withoutEnlargement: false }).grayscale().sharpen({ sigma: 2.0 }).png().toBuffer() },
-    { name: 'resize-1200-norm', fn: buf => sharp(buf).resize({ width: 1200, withoutEnlargement: true }).grayscale().normalize().sharpen({ sigma: 1.5 }).png().toBuffer() },
-    { name: 'resize-2400-threshold', fn: buf => sharp(buf).resize({ width: 2400, withoutEnlargement: false }).grayscale().threshold(128).png().toBuffer() },
-    { name: 'rotate-180', fn: buf => sharp(buf).rotate(180).grayscale().sharpen({ sigma: 1.5 }).png().toBuffer() },
-    { name: 'center-crop-80', fn: async buf => {
-      const m = await sharp(buf).metadata();
-      const w = m.width || 1600, h = m.height || 1200;
-      const cw = Math.round(w * 0.8), ch = Math.round(h * 0.8);
-      const left = Math.round((w - cw) / 2), top = Math.round((h - ch) / 2);
-      return sharp(buf).extract({ left, top, width: cw, height: ch }).grayscale().sharpen({ sigma: 1.5 }).png().toBuffer();
-    }},
+    // Pass 1: Pure grayscale — often enough for clean, well-lit photos
+    { name: 'grayscale', fn: buf => sharp(buf).grayscale().png().toBuffer() },
+
+    // Pass 2: Grayscale + strong sharpen — corrects camera blur / slight motion
+    { name: 'gray+sharp', fn: buf => sharp(buf).grayscale().sharpen({ sigma: 2.0 }).png().toBuffer() },
+
+    // Pass 3: Grayscale + normalize + sharpen — handles uneven indoor lighting
+    { name: 'gray+norm+sharp', fn: buf => sharp(buf).grayscale().normalize().sharpen({ sigma: 1.5 }).png().toBuffer() },
+
+    // Pass 4: Upscale to 2000px + grayscale + sharpen — for small/distant barcodes
+    { name: 'upscale-2k', fn: buf => sharp(buf).resize({ width: 2000, withoutEnlargement: false }).grayscale().sharpen({ sigma: 2.0 }).png().toBuffer() },
+
+    // Pass 5: High contrast + aggressive sharpen — low-light, washed-out photos
+    { name: 'hi-contrast', fn: buf => sharp(buf).grayscale().linear(1.5, -30).sharpen({ sigma: 2.5 }).png().toBuffer() },
+
+    // Pass 6: Pure black & white threshold — last resort nuclear option
+    { name: 'threshold', fn: buf => sharp(buf).grayscale().threshold(128).png().toBuffer() },
   ];
 
   const startTime = Date.now();
@@ -132,7 +124,7 @@ async function decodePdf417FromBuffer(imageBuffer) {
 
     const passStart = Date.now();
     try {
-      const processed = await pass.fn(inputBuffer);
+      const processed = await pass.fn(imageBuffer);
       const blob = new Blob([processed], { type: 'image/png' });
 
       const results = await readBarcodes(blob, {
@@ -145,7 +137,7 @@ async function decodePdf417FromBuffer(imageBuffer) {
 
       if (results && results.length > 0 && results[0].text) {
         console.log(`  ✓ PDF417 decoded on pass ${i+1}/${passes.length}: ${pass.name} (${results[0].text.length} chars, ${passDuration}ms)`);
-        // Log success
+        // Log successful pass
         try {
           db.prepare('INSERT INTO decode_log (success,pass_name,raw_length,fields_found,duration_ms) VALUES (?,?,?,?,?)')
             .run(1, pass.name, results[0].text.length, 0, passDuration);
@@ -384,7 +376,7 @@ app.post('/api/logout', (req, res) => {
   res.json({ ok: true });
 });
 
-// --- Decode DL (THE CORE — 12-pass pipeline with 25s timeout) ---
+// --- Decode DL (THE CORE — 6-pass tuned pipeline with 25s timeout) ---
 app.post('/api/decode-dl', auth, upload.single('photo'), async (req, res) => {
   const start = Date.now();
   if (!req.file) return res.status(400).json({ success: false, error: 'No photo uploaded' });
@@ -392,7 +384,6 @@ app.post('/api/decode-dl', auth, upload.single('photo'), async (req, res) => {
   console.log(`\n  → Decode: ${(req.file.size / 1024).toFixed(0)}KB ${req.file.mimetype}`);
 
   try {
-    // Race the decode against a 25-second timeout
     const result = await Promise.race([
       decodePdf417FromBuffer(req.file.buffer),
       new Promise((_, reject) => setTimeout(() => reject(new Error('Decode timeout (25s)')), 25000)),
@@ -403,6 +394,11 @@ app.post('/api/decode-dl', auth, upload.single('photo'), async (req, res) => {
     if (result && result.raw) {
       const parsed = parseAAMVA(result.raw);
       const fc = parsed ? Object.entries(parsed).filter(([k,v]) => k !== 'raw' && v).length : 0;
+      // Update the successful decode_log row with field count
+      try {
+        db.prepare('UPDATE decode_log SET fields_found = ? WHERE id = (SELECT MAX(id) FROM decode_log WHERE success = 1)')
+          .run(fc);
+      } catch (_) {}
       console.log(`  ✓ Decoded ${duration}ms — ${fc} fields via pass ${result.passIndex}/${result.totalPasses} (${result.pass})`);
       return res.json({ success: true, data: parsed, meta: { decode_ms: duration, pass: result.pass, passIndex: result.passIndex, totalPasses: result.totalPasses } });
     }
@@ -508,22 +504,22 @@ app.get('/api/dashboard', auth, (req, res) => {
 
 // --- Health ---
 app.get('/api/health', (req, res) => {
-  res.json({ status:'ok', version:'3.2.0', decoder:decoderReady?'zxing-wasm':'unavailable', uptime:Math.round(process.uptime()) });
+  res.json({ status:'ok', version:'3.3.0', decoder:decoderReady?'zxing-wasm':'unavailable', uptime:Math.round(process.uptime()) });
 });
 
 // ═══════════════════════════════════════════════════════════════
-// START — all routes registered above, then listen
+// START — all routes registered above, then listen + self-test
 // ═══════════════════════════════════════════════════════════════
 
 async function start() {
   console.log('\n╔══════════════════════════════════════════╗');
-  console.log('║  IRON HALO VERIFY v3.2                   ║');
-  console.log('║  12-Pass PDF417 | Hardened Pipeline       ║');
+  console.log('║  IRON HALO VERIFY v3.3                   ║');
+  console.log('║  6-Pass PDF417 | Regression Fix           ║');
   console.log('╚══════════════════════════════════════════╝\n');
   await initDecoder();
   app.listen(PORT, async () => {
     console.log(`\n  ▸ Server: http://localhost:${PORT}`);
-    console.log(`  ▸ Decoder: ${decoderReady ? 'ZXing-WASM (PDF417, 12-pass pipeline, 25s timeout)' : 'UNAVAILABLE — manual entry only'}`);
+    console.log(`  ▸ Decoder: ${decoderReady ? 'ZXing-WASM (PDF417, 6-pass tuned pipeline, 25s timeout)' : 'UNAVAILABLE — manual entry only'}`);
     console.log('  ▸ Logins: admin/vanguard2026 | guard/guard123 | demo/demo\n');
 
     // Startup self-test
