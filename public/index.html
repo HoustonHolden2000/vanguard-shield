@@ -73,19 +73,6 @@ input,button,select,textarea{font-family:inherit;font-size:inherit}
 
 /* === SCANNER === */
 #s-scanner{background:#000;padding:0!important;padding-bottom:0!important;position:relative}
-#scanner-region{width:100%;height:100vh}
-#scanner-region video{object-fit:cover}
-.scanner-header{position:absolute;top:0;left:0;right:0;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:linear-gradient(to bottom,rgba(0,0,0,.8),transparent)}
-.scanner-header span{color:#fff;font-weight:600;font-size:14px}
-.scanner-header button{background:rgba(255,255,255,.15);border:none;color:#fff;padding:8px 16px;border-radius:20px;font-size:14px;font-weight:600;cursor:pointer}
-.scanner-toolbar{position:absolute;bottom:0;left:0;right:0;z-index:15;display:flex;align-items:center;justify-content:center;gap:12px;padding:16px 16px 28px;background:linear-gradient(to top,rgba(0,0,0,.85),transparent)}
-.scanner-toolbar button{display:flex;flex-direction:column;align-items:center;gap:4px;background:rgba(255,255,255,.12);border:none;color:#fff;padding:12px 16px;border-radius:12px;font-size:11px;font-weight:600;cursor:pointer;min-width:64px}
-.scanner-toolbar button:active{background:rgba(255,255,255,.25)}
-.scanner-toolbar button.torch-on{background:rgba(255,214,0,.3);color:#FFD600}
-.scanner-toolbar button.photo-btn{background:rgba(0,86,160,.6);min-width:80px}
-.scanner-status{position:absolute;top:56px;left:0;right:0;z-index:10;text-align:center;padding:6px 16px}
-.scanner-status span{display:inline-block;padding:4px 12px;background:rgba(0,86,160,.7);border-radius:12px;font-size:12px;font-weight:600;color:#fff}
-.scanner-hint{position:absolute;bottom:120px;left:0;right:0;text-align:center;color:#fff;font-size:14px;font-weight:600;z-index:10;text-shadow:0 1px 4px rgba(0,0,0,.8)}
 .scan-success-flash{position:fixed;top:0;left:0;right:0;bottom:0;z-index:50;background:var(--green);pointer-events:none;animation:successFlash .6s ease-out forwards}
 @keyframes successFlash{0%{opacity:.8}100%{opacity:0}}
 
@@ -106,7 +93,7 @@ input,button,select,textarea{font-family:inherit;font-size:inherit}
   <div class="screen active" id="s-login">
     <div style="flex:1;display:flex;align-items:center;justify-content:center">
       <div class="login-box">
-        <div class="login-logo"><h2>IRON HALO VERIFY</h2><p>Guard Verification System v5.0</p></div>
+        <div class="login-logo"><h2>IRON HALO VERIFY</h2><p>Guard Verification System v5.1</p></div>
         <div class="field"><label>Username</label><input type="text" id="l-user" autocapitalize="none" autocomplete="username"></div>
         <div class="field"><label>Password</label>
           <div class="input-eye-wrap">
@@ -123,39 +110,24 @@ input,button,select,textarea{font-family:inherit;font-size:inherit}
   <!-- HOME / SCAN -->
   <div class="screen" id="s-scan">
     <div class="scan-hero">
-      <div class="scan-btn-big" onclick="startScanner()">
+      <div class="scan-btn-big" onclick="takePhoto()">
         <svg viewBox="0 0 24 24"><path d="M12 15.2a3.2 3.2 0 100-6.4 3.2 3.2 0 000 6.4z"/><path d="M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/></svg>
       </div>
       <div style="font-size:18px;font-weight:700">SCAN LICENSE</div>
-      <div style="font-size:13px;color:var(--muted);text-align:center;max-width:260px">Tap circle for live scan or use <strong>Take Photo</strong> below</div>
+      <div style="font-size:13px;color:var(--muted);text-align:center;max-width:260px">Tap to take photo of barcode on <strong>back</strong> of license</div>
       <button class="btn btn-primary" onclick="takePhoto()" style="margin-top:8px;font-size:16px;padding:14px 20px;">
         &#128247; TAKE PHOTO OF BARCODE
       </button>
-      <div style="font-size:11px;color:var(--muted);margin-top:2px">Photo of back barcode — most reliable method</div>
     </div>
     <button class="btn btn-outline btn-sm" onclick="goManual()" style="margin-top:auto">Manual Entry</button>
   </div>
 
-  <!-- LIVE SCANNER -->
+  <!-- DECODE PROCESSING -->
   <div class="screen" id="s-scanner">
-    <div class="scanner-header">
-      <span id="scanner-header-text">Scanning...</span>
-      <button onclick="stopScanner()">Cancel</button>
-    </div>
-    <div class="scanner-status" id="scanner-status" style="display:none;"><span id="scanner-status-text"></span></div>
-    <div id="scanner-region"></div>
-    <div class="scanner-hint" id="scanner-hint">Position barcode on back of license in frame</div>
-    <div class="scanner-toolbar">
-      <button id="torch-btn" onclick="toggleTorch()">&#128294; Torch</button>
-      <button onclick="takePhotoFromScanner()" class="photo-btn">&#128247; Photo</button>
-      <button onclick="goManualFromScanner()">&#9997; Manual</button>
-      <button onclick="stopScanner()">&#10005; Cancel</button>
-    </div>
-    <!-- Decode processing overlay (hidden by default) -->
-    <div class="decode-overlay" id="decode-overlay" style="display:none">
+    <div class="decode-overlay" id="decode-overlay" style="display:flex">
       <div class="decode-spinner"></div>
       <div style="font-size:18px;font-weight:700" id="decode-status-text">Decoding barcode...</div>
-      <div style="font-size:13px;color:var(--muted)" id="decode-step-text">Uploading photo to server...</div>
+      <div style="font-size:13px;color:var(--muted)" id="decode-step-text">Reading photo...</div>
     </div>
   </div>
 
@@ -168,7 +140,7 @@ input,button,select,textarea{font-family:inherit;font-size:inherit}
       <button class="btn btn-green" onclick="confirmScan()">CONFIRM &amp; SAVE</button>
       <div style="display:flex;gap:10px">
         <button class="btn btn-outline btn-sm" onclick="editConfirm()" style="flex:1">Edit</button>
-        <button class="btn btn-outline btn-sm" onclick="startScanner()" style="flex:1">Re-scan</button>
+        <button class="btn btn-outline btn-sm" onclick="takePhoto()" style="flex:1">Re-scan</button>
       </div>
     </div>
   </div>
@@ -253,8 +225,6 @@ input,button,select,textarea{font-family:inherit;font-size:inherit}
 // ═══════════════════════════════════════════════════════════
 let TK=localStorage.getItem('stk')||'',US=JSON.parse(localStorage.getItem('sus')||'null'),CD={};
 let dynamsoftReader=null,dynamsoftReady=false;
-let scannerStream=null,scannerVideoTrack=null,dynamsoftFrameLoop=null;
-let torchOn=false,dynFrameCount=0,scannerTimeout=null;
 
 // ═══════════════════════════════════════════════════════════
 // HELPERS
@@ -362,23 +332,16 @@ function takePhoto(){
   input.value='';
   input.click();
 }
-function takePhotoFromScanner(){
-  cleanupScanner();
-  takePhoto();
-}
-
 document.getElementById('photo-file-input').addEventListener('change',async function(e){
   const file=e.target.files[0];
   if(!file)return;
 
   // Show decode overlay
   showS('s-scanner');
-  document.getElementById('scanner-region').innerHTML='';
   const overlay=document.getElementById('decode-overlay');
   overlay.style.display='flex';
   document.getElementById('decode-status-text').textContent='Decoding barcode...';
-  document.getElementById('decode-step-text').textContent='Reading photo with Dynamsoft...';
-  document.getElementById('scanner-header-text').textContent='Processing photo...';
+  document.getElementById('decode-step-text').textContent='Reading photo...';
 
   try{
     // Init Dynamsoft reader if needed
@@ -412,7 +375,7 @@ document.getElementById('photo-file-input').addEventListener('change',async func
   }catch(err){
     console.error('[PHOTO] Decode error:',err);
     overlay.style.display='none';
-    toast('Decode error: '+(err.message||err),'error');
+    toast('Could not read barcode. Try again or use Manual Entry.','error');
     showS('s-scan');
   }
   e.target.value='';
@@ -434,111 +397,7 @@ function onDecodeSuccess(fields,engine){
 }
 
 // ═══════════════════════════════════════════════════════════
-// LIVE BARCODE SCANNER (Dynamsoft frame-by-frame)
-// ═══════════════════════════════════════════════════════════
-async function startScanner(){
-  CD={};
-  torchOn=false;dynFrameCount=0;
-  showS('s-scanner');
-  document.getElementById('scanner-header-text').textContent='Scanning...';
-  document.getElementById('decode-overlay').style.display='none';
-  document.getElementById('scanner-status').style.display='none';
-  document.getElementById('scanner-hint').textContent='Position barcode on back of license in frame';
-  const torchBtn=document.getElementById('torch-btn');
-  if(torchBtn)torchBtn.classList.remove('torch-on');
-
-  try{
-    // Init reader first
-    let reader;
-    try{reader=await getDynamsoftReader();}
-    catch(e){
-      console.error('[SCAN] Reader init failed:',e);
-      toast('Scanner init failed — use Take Photo instead','error');
-      showS('s-scan');
-      return;
-    }
-
-    // Open camera
-    scannerStream=await navigator.mediaDevices.getUserMedia({
-      video:{facingMode:'environment',width:{ideal:1920},height:{ideal:1080}}
-    });
-    const tracks=scannerStream.getVideoTracks();
-    if(tracks.length>0)scannerVideoTrack=tracks[0];
-
-    const region=document.getElementById('scanner-region');
-    region.innerHTML='';
-    const video=document.createElement('video');
-    video.autoplay=true;video.playsInline=true;video.muted=true;
-    video.style.cssText='width:100%;height:100vh;object-fit:cover;';
-    video.srcObject=scannerStream;
-    region.appendChild(video);
-    await video.play();
-    console.log('[SCAN] Video:',video.videoWidth,'x',video.videoHeight);
-
-    const canvas=document.createElement('canvas');
-    const ctx=canvas.getContext('2d');
-
-    function decodeFrame(){
-      if(!scannerStream)return;
-      dynFrameCount++;
-      if(video.readyState>=video.HAVE_CURRENT_DATA){
-        canvas.width=video.videoWidth;canvas.height=video.videoHeight;
-        ctx.drawImage(video,0,0);
-        reader.decode(canvas).then(results=>{
-          if(results&&results.length>0&&results[0].barcodeText&&results[0].barcodeText.length>20){
-            console.log('[SCAN] DECODED! len='+results[0].barcodeText.length);
-            cleanupScanner();
-            const parsed=parsePDF417(results[0].barcodeText);
-            onDecodeSuccess(parsed,'dynamsoft-live');
-            return;
-          }
-          if(dynFrameCount%30===0){
-            document.getElementById('scanner-header-text').textContent='Scanning... ('+dynFrameCount+' frames)';
-          }
-          dynamsoftFrameLoop=requestAnimationFrame(decodeFrame);
-        }).catch(()=>{dynamsoftFrameLoop=requestAnimationFrame(decodeFrame);});
-      }else{dynamsoftFrameLoop=requestAnimationFrame(decodeFrame);}
-    }
-    dynamsoftFrameLoop=requestAnimationFrame(decodeFrame);
-
-    // 30s: suggest photo or manual
-    scannerTimeout=setTimeout(()=>{
-      document.getElementById('scanner-hint').textContent='Having trouble? Tap Photo or Manual below';
-    },30000);
-  }catch(e){
-    console.error('[SCANNER ERROR]',e);
-    toast('Camera error: '+(e.message||e),'error');
-    showS('s-scan');
-  }
-}
-
-// ═══════════════════════════════════════════════════════════
-// CLEANUP SCANNER
-// ═══════════════════════════════════════════════════════════
-function cleanupScanner(){
-  if(scannerTimeout){clearTimeout(scannerTimeout);scannerTimeout=null;}
-  if(dynamsoftFrameLoop){cancelAnimationFrame(dynamsoftFrameLoop);dynamsoftFrameLoop=null;}
-  if(scannerStream){try{scannerStream.getTracks().forEach(t=>t.stop());}catch(e){}scannerStream=null;}
-  scannerVideoTrack=null;torchOn=false;
-}
-function stopScanner(){cleanupScanner();showS('s-scan');}
-
-// ═══════════════════════════════════════════════════════════
-// TORCH
-// ═══════════════════════════════════════════════════════════
-async function toggleTorch(){
-  if(!scannerVideoTrack){toast('Torch not available','info');return;}
-  try{
-    const cap=scannerVideoTrack.getCapabilities();
-    if(!cap.torch){toast('Torch not supported','info');return;}
-    torchOn=!torchOn;
-    await scannerVideoTrack.applyConstraints({advanced:[{torch:torchOn}]});
-    document.getElementById('torch-btn')?.classList.toggle('torch-on',torchOn);
-  }catch(e){toast('Torch not supported','info');torchOn=false;}
-}
-
-// ═══════════════════════════════════════════════════════════
-// PDF417 AAMVA PARSER (client-side fallback)
+// PDF417 AAMVA PARSER
 // ═══════════════════════════════════════════════════════════
 function parsePDF417(raw){
   const fields={};
@@ -627,13 +486,6 @@ async function confirmScan(){
 function goManual(){
   document.getElementById('manual-hdr').innerHTML='<h2>Enter License Details</h2><p>Record driver information manually</p>';
   clearManualFields();document.getElementById('m-notes').value='';
-  showS('s-manual');setTimeout(()=>document.getElementById('m-first').focus(),100);
-}
-function goManualFromScanner(){
-  cleanupScanner();
-  document.getElementById('manual-hdr').innerHTML='<h2>Enter License Details</h2><p>Scanner stopped \u2014 enter from the license</p>';
-  clearManualFields();
-  document.getElementById('m-notes').value='Manual entry '+(new Date()).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'})+' by '+(US?.display_name||'guard');
   showS('s-manual');setTimeout(()=>document.getElementById('m-first').focus(),100);
 }
 function clearManualFields(){['m-first','m-last','m-dl','m-dob','m-exp'].forEach(id=>document.getElementById(id).value='');document.getElementById('m-state').value='TN';}

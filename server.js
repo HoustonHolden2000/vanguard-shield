@@ -1,15 +1,14 @@
 /**
- * IRON HALO VERIFY v4.1 — Hybrid Scanner
+ * IRON HALO VERIFY v5.1 — Photo-Only Scanner
  *
  * Scanner architecture:
- * - CLIENT-SIDE: Dynamsoft + html5-qrcode live camera (best-effort)
- * - SERVER-SIDE: Photo capture → upload → @zxing/library decode (reliable fallback)
- * - Photo mode: native camera still → Dynamsoft client decode → server decode
- * - Manual entry: smooth fallback from scanner toolbar
+ * - CLIENT-SIDE: Photo capture → Dynamsoft BarcodeReader v9.6.42 (self-hosted /dbr/)
+ * - No live viewfinder — photo-only for maximum reliability
+ * - Manual entry fallback always available
  *
- * Server handles: auth, barcode decode, scan storage, risk scoring, watchlist, dashboard
+ * Server handles: auth, scan storage, risk scoring, watchlist, dashboard
  *
- * Stack: Node 18+, Express 4, SQLite, @zxing/library, sharp, bcryptjs, multer, uuid
+ * Stack: Node 18+, Express 4, SQLite, bcryptjs, multer, uuid
  * Brand: Matte black + Vanguard blue (#0056A0)
  * Live URL: vanguard-shield.onrender.com
  *
@@ -424,7 +423,7 @@ app.get('/api/debug/raw-decode', auth, (req, res) => {
 
 // --- Health ---
 app.get('/api/health', (req, res) => {
-  res.json({ status:'ok', version:'5.0.0', scanner:'Dynamsoft BarcodeReader v9.6.42 (self-hosted)', uptime:Math.round(process.uptime()) });
+  res.json({ status:'ok', version:'5.1.0', scanner:'Dynamsoft BarcodeReader v9.6.42 (photo-only, self-hosted)', uptime:Math.round(process.uptime()) });
 });
 
 
