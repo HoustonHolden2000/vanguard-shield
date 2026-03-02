@@ -26,6 +26,7 @@ textarea{width:100%;height:120px;background:#1a1a1a;color:#0f0;border:1px solid 
 <h1>PDF417 Decode Test — TN License</h1>
 <div id="status">Ready. Tap button to start scanning.</div>
 <button id="btn-scan" onclick="startScan()">SCAN TN LICENSE (TEST)</button>
+<button id="btn-retry-sdk" style="display:none;width:100%;padding:14px;font-size:16px;font-weight:700;background:#555;color:#fff;border:none;border-radius:8px;cursor:pointer;margin-bottom:12px;" onclick="retrySdk()">RETRY LOADING SDK</button>
 <button id="btn-stop" onclick="stopScan()">STOP SCANNER</button>
 
 <div id="video-box"><video id="video" autoplay playsinline muted></video></div>
@@ -48,9 +49,6 @@ textarea{width:100%;height:120px;background:#1a1a1a;color:#0f0;border:1px solid 
 </div>
 <div id="engine-info"></div>
 
-<!-- Dynamsoft BarcodeReader v9.6.42 -->
-<script src="https://cdn.jsdelivr.net/npm/dynamsoft-javascript-barcode@9.6.42/dist/dbr.js"></script>
-
 <script>
 // ═════════════════════════════════════════════
 // GLOBALS
@@ -60,6 +58,7 @@ let stream = null;
 let reader = null;
 let frameLoop = null;
 let decodeCount = 0;
+let sdkLoaded = false;
 
 const statusEl = document.getElementById('status');
 const videoBox = document.getElementById('video-box');
@@ -69,10 +68,38 @@ const btnScan = document.getElementById('btn-scan');
 const btnStop = document.getElementById('btn-stop');
 
 // ═════════════════════════════════════════════
+// LOAD DYNAMSOFT SDK (dynamic script injection)
+// ═════════════════════════════════════════════
+function loadSDK() {
+  return new Promise(function(resolve, reject) {
+    if (sdkLoaded && window.Dynamsoft) { resolve(); return; }
+    statusEl.textContent = 'Loading Dynamsoft SDK from CDN...';
+    var script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/dynamsoft-javascript-barcode@9.6.42/dist/dbr.js';
+    script.onload = function() {
+      sdkLoaded = true;
+      statusEl.textContent = 'SDK loaded. Initializing...';
+      resolve();
+    };
+    script.onerror = function() {
+      reject(new Error('Failed to load Dynamsoft SDK from CDN. Check network/WiFi.'));
+    };
+    document.head.appendChild(script);
+  });
+}
+
+// ═════════════════════════════════════════════
 // DYNAMSOFT INIT
 // ═════════════════════════════════════════════
 async function initDynamsoft() {
-  statusEl.textContent = 'Loading Dynamsoft BarcodeReader...';
+  // Load the SDK script first
+  await loadSDK();
+
+  if (typeof Dynamsoft === 'undefined') {
+    throw new Error('Dynamsoft global not found after script load');
+  }
+
+  statusEl.textContent = 'Creating BarcodeReader instance...';
   Dynamsoft.DBR.BarcodeReader.license = 'DLS2eyJvcmdhbml6YXRpb25JRCI6IjIwMDAwMSJ9';
   reader = await Dynamsoft.DBR.BarcodeReader.createInstance();
   const settings = await reader.getRuntimeSettings();
@@ -80,7 +107,7 @@ async function initDynamsoft() {
   settings.expectedBarcodesCount = 1;
   settings.deblurLevel = 5;
   await reader.updateRuntimeSettings(settings);
-  statusEl.textContent = 'Dynamsoft ready. Tap SCAN.';
+  statusEl.textContent = 'Dynamsoft ready. Opening camera...';
 }
 
 // ═════════════════════════════════════════════
@@ -95,7 +122,8 @@ async function startScan() {
     try {
       await initDynamsoft();
     } catch (e) {
-      statusEl.textContent = 'Dynamsoft load error: ' + e.message;
+      statusEl.textContent = 'SDK error: ' + e.message;
+      document.getElementById('btn-retry-sdk').style.display = 'block';
       btnScan.disabled = false;
       return;
     }
@@ -265,6 +293,30 @@ function showFields(f) {
     else el.classList.remove('ok');
   }
 }
+
+// ═════════════════════════════════════════════
+// RETRY SDK LOAD
+// ═════════════════════════════════════════════
+function retrySdk() {
+  sdkLoaded = false;
+  reader = null;
+  document.getElementById('btn-retry-sdk').style.display = 'none';
+  startScan();
+}
+
+// ═════════════════════════════════════════════
+// AUTO-LOAD SDK ON PAGE LOAD
+// ═════════════════════════════════════════════
+statusEl.textContent = 'Loading SDK...';
+btnScan.disabled = true;
+loadSDK().then(function() {
+  statusEl.textContent = 'SDK loaded. Tap SCAN to start.';
+  btnScan.disabled = false;
+}).catch(function(e) {
+  statusEl.textContent = 'SDK load failed: ' + e.message;
+  document.getElementById('btn-retry-sdk').style.display = 'block';
+  btnScan.disabled = false;
+});
 </script>
 </body>
 </html>
