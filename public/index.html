@@ -372,16 +372,8 @@ document.getElementById('photo-input').addEventListener('change', async function
   photoStatus.style.color = '#aaa';
   photoStatus.textContent = 'Processing photo...';
 
-  // === STEP 1: Ensure Dynamsoft reader is ready ===
-  if (!reader) {
-    photoStatus.textContent = 'Initializing decoder...';
-    try {
-      await initDynamsoft(function(msg) { photoStatus.textContent = msg; });
-    } catch(err) {
-      logError('wasm-failed', err.message, navigator.userAgent);
-      reader = null;
-    }
-  }
+  // === STEP 1: Use Dynamsoft ONLY if already loaded (don't wait for WASM) ===
+  // WASM preloads in background — if it's ready, great. If not, skip to server.
 
   // === STEP 2: Load photo into canvas ===
   photoStatus.textContent = 'Loading photo...';
