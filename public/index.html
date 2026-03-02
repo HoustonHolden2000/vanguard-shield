@@ -2,1201 +2,308 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<meta name="theme-color" content="#0056A0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Vanguard Shield</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-:root {
-  --bg: #0a0a0a; --card: #1a1a1a; --border: #2a2a2a; --blue: #0056A0;
-  --blue-light: #0070CC; --green: #00C853; --yellow: #FFD600; --red: #FF1744;
-  --text: #FFFFFF; --text2: #999999; --text3: #666666;
-  --radius: 8px; --radius-sm: 6px;
-}
-html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'Inter', -apple-system, sans-serif; -webkit-font-smoothing: antialiased; overflow: hidden; }
-body { display: flex; flex-direction: column; }
-.screen { display: none; flex-direction: column; height: 100vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-.screen.active { display: flex; }
-.card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 12px; }
-.btn { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 12px 24px; border: none; border-radius: var(--radius-sm); font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.15s; -webkit-tap-highlight-color: transparent; }
-.btn:active { transform: scale(0.97); }
-.btn-primary { background: var(--blue); color: white; }
-.btn-primary:hover { background: var(--blue-light); }
-.btn-danger { background: var(--red); color: white; }
-.btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
-.btn-outline:hover { border-color: var(--blue); color: var(--blue); }
-.btn-green { background: var(--green); color: #000; }
-.btn-yellow { background: var(--yellow); color: #000; }
-.btn-full { width: 100%; }
-.btn-lg { min-height: 64px; font-size: 18px; font-weight: 700; letter-spacing: 0.5px; }
-input, select { width: 100%; min-height: 48px; padding: 12px 16px; background: #111; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-family: inherit; font-size: 16px; outline: none; transition: border-color 0.2s; }
-input:focus, select:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(0,86,160,0.2); }
-input::placeholder { color: var(--text3); }
-label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
-.form-group { margin-bottom: 16px; }
-.topbar { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: var(--card); border-bottom: 1px solid var(--border); flex-shrink: 0; min-height: 56px; }
-.topbar-title { font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
-.topbar-sub { font-size: 11px; color: var(--text2); }
-.topbar-back { background: none; border: none; color: var(--text2); font-size: 14px; cursor: pointer; padding: 8px; }
-.content { flex: 1; padding: 16px; overflow-y: auto; }
-.badge { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px; font-size: 11px; font-weight: 700; }
-.badge-red { background: var(--red); color: white; }
-.alert-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
-.alert-dot.GREEN { background: var(--green); }
-.alert-dot.YELLOW { background: var(--yellow); }
-.alert-dot.RED { background: var(--red); animation: pulse-red 1s infinite; }
-@keyframes pulse-red { 0%, 100% { box-shadow: 0 0 0 0 rgba(255,23,68,0.5); } 50% { box-shadow: 0 0 0 8px rgba(255,23,68,0); } }
-.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.text-center { text-align: center; }
-.text-muted { color: var(--text2); }
-.text-sm { font-size: 13px; }
-.mt-8 { margin-top: 8px; }
-.mt-16 { margin-top: 16px; }
-.mb-16 { margin-bottom: 16px; }
-
-/* LOGIN */
-#login-screen { justify-content: center; align-items: center; padding: 24px; }
-.login-card { width: 100%; max-width: 360px; }
-.login-logo { text-align: center; margin-bottom: 32px; }
-.login-logo h1 { font-size: 28px; font-weight: 800; letter-spacing: 2px; }
-.login-logo h1 span { color: var(--blue); }
-.login-logo p { font-size: 12px; color: var(--text2); text-transform: uppercase; letter-spacing: 2px; margin-top: 4px; }
-.login-error { background: rgba(255,23,68,0.1); border: 1px solid var(--red); border-radius: var(--radius-sm); padding: 10px 14px; font-size: 13px; color: var(--red); margin-bottom: 16px; display: none; }
-.login-footer { text-align: center; margin-top: 32px; font-size: 11px; color: var(--text3); }
-
-/* HOME */
-.scan-btn-wrap { padding: 32px 16px; text-align: center; }
-.scan-btn { width: 100%; min-height: 120px; background: linear-gradient(135deg, var(--blue), var(--blue-light)); border: none; border-radius: 16px; color: white; font-family: inherit; font-size: 22px; font-weight: 800; letter-spacing: 1px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s; box-shadow: 0 4px 24px rgba(0,86,160,0.3); }
-.scan-btn:active { transform: scale(0.97); box-shadow: 0 2px 12px rgba(0,86,160,0.2); }
-.scan-btn svg { width: 40px; height: 40px; }
-.quick-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 0 16px; margin-bottom: 16px; }
-.stat-box { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; text-align: center; }
-.stat-num { font-size: 28px; font-weight: 800; }
-.stat-label { font-size: 10px; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; margin-top: 2px; }
-.nav-grid { padding: 0 16px 24px; }
-
-/* PROCESSING OVERLAY */
-#processing-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.95); z-index: 200; flex-direction: column; align-items: center; justify-content: center; gap: 24px; }
-#processing-overlay.active { display: flex; }
-.spinner { width: 60px; height: 60px; border: 4px solid var(--border); border-top-color: var(--blue); border-radius: 50%; animation: spin 0.8s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
-#processing-text { font-size: 18px; font-weight: 600; color: var(--text); }
-#processing-sub { font-size: 14px; color: var(--text2); max-width: 280px; text-align: center; }
-
-/* CONFIRM */
-.dl-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.dl-field { background: #111; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; }
-.dl-field-label { font-size: 10px; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; }
-.dl-field-value { font-size: 15px; font-weight: 600; margin-top: 2px; word-break: break-all; }
-.dl-name { grid-column: 1 / -1; }
-.dl-name .dl-field-value { font-size: 22px; font-weight: 800; }
-.dl-expired { border-color: var(--red); background: rgba(255,23,68,0.08); }
-.dl-expired .dl-field-value { color: var(--red); }
-.dl-valid { border-color: var(--green); background: rgba(0,200,83,0.08); }
-.dl-valid .dl-field-value { color: var(--green); }
-
-/* RISK (legacy — kept for scan detail view) */
-.risk-flag { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: #111; border: 1px solid var(--border); border-radius: var(--radius-sm); margin-bottom: 6px; font-size: 13px; }
-
-/* SCAN LIST */
-.scan-item { display: flex; align-items: center; gap: 12px; padding: 14px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 8px; cursor: pointer; transition: border-color 0.15s; }
-.scan-item:active { border-color: var(--blue); }
-.scan-item-info { flex: 1; min-width: 0; }
-.scan-item-name { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.scan-item-detail { font-size: 12px; color: var(--text2); margin-top: 2px; }
-.scan-item-time { font-size: 12px; color: var(--text3); text-align: right; white-space: nowrap; }
-
-/* CAMERA OVERLAY (for evidence photos) */
-#camera-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #000; z-index: 100; flex-direction: column; }
-#camera-overlay.active { display: flex; }
-#camera-overlay video { flex: 1; object-fit: cover; }
-.camera-controls { display: flex; align-items: center; justify-content: center; gap: 24px; padding: 20px; background: rgba(0,0,0,0.9); }
-.shutter-btn { width: 72px; height: 72px; border-radius: 50%; border: 4px solid white; background: transparent; cursor: pointer; position: relative; }
-.shutter-btn::after { content: ''; position: absolute; top: 6px; left: 6px; right: 6px; bottom: 6px; border-radius: 50%; background: white; transition: transform 0.1s; }
-.shutter-btn:active::after { transform: scale(0.9); }
-
-/* FILTER TABS */
-.filter-tabs { display: flex; gap: 6px; margin-bottom: 12px; overflow-x: auto; }
-.filter-tab { padding: 8px 14px; border-radius: 20px; border: 1px solid var(--border); background: transparent; color: var(--text2); font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
-.filter-tab.active { background: var(--blue); border-color: var(--blue); color: white; }
-
-/* TOAST */
-#toast-container { position: fixed; top: 16px; left: 16px; right: 16px; z-index: 300; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
-.toast { padding: 14px 18px; border-radius: var(--radius); font-size: 14px; font-weight: 500; transform: translateY(-20px); opacity: 0; transition: all 0.3s; pointer-events: auto; }
-.toast.show { transform: translateY(0); opacity: 1; }
-.toast-success { background: var(--green); color: #000; }
-.toast-warning { background: var(--yellow); color: #000; }
-.toast-error { background: var(--red); color: white; }
-.toast-info { background: var(--blue); color: white; }
-
-/* DASHBOARD */
-.stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 16px; }
-.big-stat { padding: 16px; text-align: center; }
-.big-stat-num { font-size: 36px; font-weight: 800; }
-
-/* PHOTO EVIDENCE */
-.photo-capture-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 48px; background: #111; border: 2px dashed var(--border); border-radius: var(--radius-sm); color: var(--text2); font-family: inherit; font-size: 14px; cursor: pointer; transition: all 0.2s; }
-.photo-capture-btn:hover { border-color: var(--blue); color: var(--blue); }
-.photo-capture-btn.captured { border-color: var(--green); border-style: solid; color: var(--green); }
-
-/* PREVIEW IMAGE */
-#scan-preview { max-width: 100%; max-height: 200px; border-radius: var(--radius); margin: 12px auto; display: none; border: 2px solid var(--border); }
-
-/* SCAN GUIDANCE OVERLAY */
-#scan-guidance { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.92); z-index:150; flex-direction:column; align-items:center; justify-content:center; padding:32px; text-align:center; gap:24px; }
-#scan-guidance.active { display:flex; }
-#scan-guidance .guidance-icon { font-size:64px; }
-#scan-guidance .guidance-text { font-size:18px; font-weight:500; line-height:1.6; max-width:320px; color:var(--text); }
-#scan-guidance .guidance-tip { font-size:13px; color:var(--text2); max-width:280px; }
-
-/* PASSWORD TOGGLE */
-.password-wrap { position:relative; }
-.password-wrap input { padding-right:52px; }
-.pw-toggle { position:absolute; right:4px; top:50%; transform:translateY(-50%); width:44px; height:44px; background:none; border:none; color:var(--text2); cursor:pointer; display:flex; align-items:center; justify-content:center; border-radius:var(--radius-sm); }
-.pw-toggle:active { background:rgba(255,255,255,0.1); }
-.pw-toggle svg { width:24px; height:24px; }
-
-/* EDITABLE CONFIRM FIELDS */
-.dl-edit { width:100%; background:transparent; border:none; color:var(--text); font-family:inherit; font-size:15px; font-weight:600; padding:0; outline:none; }
-.dl-edit::placeholder { color:var(--text3); font-weight:400; }
-.dl-name .dl-edit { font-size:20px; font-weight:800; }
-
-/* FULL-SCREEN RESULT */
-#result-screen { overflow: hidden; }
-#result-bg { color: #fff; }
-#result-bg.GREEN { background: linear-gradient(160deg, #00894e 0%, #00C853 50%, #69F0AE 100%); }
-#result-bg.YELLOW { background: linear-gradient(160deg, #e6a800 0%, #FFD600 50%, #FFF176 100%); color: #1a1a1a; }
-#result-bg.RED { background: linear-gradient(160deg, #b71c1c 0%, #FF1744 50%, #ff5252 100%); }
-#result-bg.YELLOW .topbar-title { color: #1a1a1a; }
-.reason-item { display:flex; align-items:center; gap:8px; padding:8px 12px; background:rgba(255,255,255,0.15); border-radius:6px; margin-bottom:6px; font-size:13px; font-weight:500; }
-.reason-item.positive { background:rgba(255,255,255,0.1); }
-.reason-item.negative { background:rgba(0,0,0,0.15); }
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0a0a0f;--surface:#14141f;--card:#1a1a2e;--border:#2a2a3e;--blue:#0066cc;--green:#00c853;--red:#ff3d3d;--amber:#ffab00;--text:#e8e8f0;--muted:#8888a0;--radius:12px}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent;overflow:hidden}
+input,button,select,textarea{font-family:inherit;font-size:inherit}
+#app{height:100%;display:flex;flex-direction:column}
+.screen{display:none;flex:1;flex-direction:column;overflow-y:auto;padding:16px;padding-bottom:100px}
+.screen.active{display:flex}
+.header{background:var(--surface);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);flex-shrink:0}
+.header h1{font-size:16px;font-weight:700;color:var(--blue)}
+.header .ub{font-size:12px;color:var(--muted)}
+.nav{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);display:flex;z-index:100;padding-bottom:env(safe-area-inset-bottom)}
+.nav button{flex:1;background:none;border:none;color:var(--muted);padding:10px 4px;font-size:11px;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer}
+.nav button.active{color:var(--blue)}
+.nav button svg{width:22px;height:22px}
+.btn{display:flex;align-items:center;justify-content:center;padding:16px 24px;border:none;border-radius:var(--radius);font-size:18px;font-weight:700;cursor:pointer;width:100%;transition:opacity .15s;-webkit-appearance:none}
+.btn:active{opacity:.7}
+.btn-primary{background:var(--blue);color:#fff}
+.btn-green{background:var(--green);color:#000}
+.btn-red{background:var(--red);color:#fff}
+.btn-outline{background:transparent;border:2px solid var(--border);color:var(--text)}
+.btn-sm{padding:10px 16px;font-size:14px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px}
+.card-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.card-value{font-size:18px;font-weight:600}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px}
+.field input,.field textarea{width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:12px;border-radius:8px;font-size:16px;-webkit-appearance:none}
+.field input:focus,.field textarea:focus{outline:none;border-color:var(--blue)}
+.risk-badge{display:inline-flex;align-items:center;padding:4px 12px;border-radius:20px;font-size:13px;font-weight:700}
+.risk-low{background:#1a3a1a;color:var(--green)}
+.risk-med{background:#3a3a1a;color:var(--amber)}
+.risk-high{background:#3a1a1a;color:var(--red)}
+.scan-hero{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:20px;padding:40px 20px}
+.scan-btn-big{width:160px;height:160px;border-radius:50%;background:var(--blue);border:4px solid rgba(0,102,204,.3);display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 0 40px rgba(0,102,204,.2);transition:transform .15s}
+.scan-btn-big:active{transform:scale(.95)}
+.scan-btn-big svg{width:64px;height:64px;fill:#fff}
+.confirm-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.confirm-grid .card{margin-bottom:0}
+.confirm-grid .full{grid-column:1/-1}
+.overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.85);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;gap:16px}
+.overlay.hidden{display:none}
+.spinner{width:48px;height:48px;border:4px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.toast{position:fixed;top:20px;left:16px;right:16px;padding:14px 16px;border-radius:10px;font-size:14px;font-weight:600;z-index:1000;transform:translateY(-120%);transition:transform .3s;text-align:center}
+.toast.show{transform:translateY(0)}
+.toast-success{background:var(--green);color:#000}
+.toast-error{background:var(--red);color:#fff}
+.toast-info{background:var(--blue);color:#fff}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;text-align:center}
+.stat-num{font-size:28px;font-weight:800}
+.stat-label{font-size:11px;color:var(--muted);margin-top:2px}
+.scan-item{display:flex;align-items:center;justify-content:space-between;padding:12px;background:var(--card);border:1px solid var(--border);border-radius:8px;margin-bottom:8px}
+.scan-item-name{font-size:15px;font-weight:600}
+.scan-item-meta{font-size:12px;color:var(--muted)}
+.photo-preview{width:100%;max-height:200px;object-fit:contain;border-radius:8px;border:1px solid var(--border);margin-bottom:12px}
+.login-box{max-width:340px;margin:auto;width:100%}
+.login-logo{text-align:center;margin-bottom:32px}
+.login-logo h2{font-size:24px;color:var(--blue);margin-bottom:4px}
+.login-logo p{font-size:13px;color:var(--muted)}
 </style>
 </head>
 <body>
-
-<!-- TOAST -->
-<div id="toast-container"></div>
-
-<!-- PROCESSING OVERLAY -->
-<div id="processing-overlay">
-  <div class="spinner"></div>
-  <div id="processing-text">Reading barcode...</div>
-  <div id="processing-sub">Hold on, decoding your license photo</div>
-</div>
-
-<!-- HIDDEN FILE INPUT -->
-<input type="file" id="dl-photo-input" accept="image/*" capture="environment" style="display:none">
-
-<!-- SCAN GUIDANCE OVERLAY -->
-<div id="scan-guidance">
-  <div class="guidance-icon">&#128247;</div>
-  <div class="guidance-text">Fill the screen with just the barcode.<br>Hold steady until it's sharp, then tap the shutter.</div>
-  <div class="guidance-tip">Point at the barcode on the BACK of the license</div>
-  <button class="btn btn-primary btn-full btn-lg" id="guidance-open-btn" style="max-width:320px;">OPEN CAMERA</button>
-  <button class="btn btn-outline" id="guidance-cancel-btn" style="max-width:320px;">Cancel</button>
-</div>
-
-<!-- CAMERA OVERLAY (for evidence photos only) -->
-<div id="camera-overlay">
-  <div style="position:absolute;top:12px;left:16px;right:16px;z-index:10;display:flex;justify-content:space-between;align-items:center;">
-    <span id="camera-purpose" style="color:white;font-weight:600;font-size:14px;text-shadow:0 1px 4px rgba(0,0,0,0.8);"></span>
-    <button style="background:rgba(255,255,255,0.15);border:none;color:white;padding:8px 16px;border-radius:20px;font-family:inherit;font-size:14px;cursor:pointer;" id="camera-cancel-btn">Cancel</button>
+<div id="app">
+  <div class="header" id="hdr" style="display:none">
+    <h1>VANGUARD SHIELD</h1>
+    <span class="ub" id="ubadge"></span>
   </div>
-  <video id="camera-video" autoplay playsinline></video>
-  <div class="camera-controls">
-    <button class="shutter-btn" id="camera-shutter"></button>
-  </div>
-  <canvas id="camera-canvas" style="display:none;"></canvas>
-</div>
 
-<!-- LOGIN -->
-<div id="login-screen" class="screen active">
-  <div class="login-card">
-    <div class="login-logo">
-      <h1>VANGUARD <span>SHIELD</span></h1>
-      <p>Security Verification System</p>
-    </div>
-    <div class="login-error" id="login-error"></div>
-    <div class="form-group">
-      <label>Username</label>
-      <input type="text" id="login-user" placeholder="Enter username" autocomplete="username" autocapitalize="none">
-    </div>
-    <div class="form-group">
-      <label>Password</label>
-      <div class="password-wrap">
-        <input type="password" id="login-pass" placeholder="Enter password" autocomplete="current-password">
-        <button type="button" class="pw-toggle" aria-label="Show password">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-        </button>
+  <!-- LOGIN -->
+  <div class="screen active" id="s-login">
+    <div style="flex:1;display:flex;align-items:center;justify-content:center">
+      <div class="login-box">
+        <div class="login-logo"><h2>VANGUARD SHIELD</h2><p>Guard Verification System v3.0</p></div>
+        <div class="field"><label>Username</label><input type="text" id="l-user" autocapitalize="none" autocomplete="username"></div>
+        <div class="field"><label>Password</label><input type="password" id="l-pass" autocomplete="current-password"></div>
+        <button class="btn btn-primary" onclick="doLogin()" id="l-btn">Sign In</button>
+        <p id="l-err" style="color:var(--red);text-align:center;margin-top:12px;font-size:13px"></p>
       </div>
     </div>
-    <button class="btn btn-primary btn-full btn-lg" id="login-btn">SIGN IN</button>
-    <div class="login-footer">Vanguard Security &copy; 2026 &mdash; All Rights Reserved</div>
   </div>
-</div>
 
-<!-- HOME -->
-<div id="home-screen" class="screen">
-  <div class="topbar">
-    <div>
-      <div class="topbar-title" id="home-guard-name"></div>
-      <div class="topbar-sub" id="home-site-name"></div>
+  <!-- SCAN -->
+  <div class="screen" id="s-scan">
+    <div class="scan-hero">
+      <div class="scan-btn-big" onclick="document.getElementById('cam').click()">
+        <svg viewBox="0 0 24 24"><path d="M12 15.2a3.2 3.2 0 100-6.4 3.2 3.2 0 000 6.4z"/><path d="M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/></svg>
+      </div>
+      <div style="font-size:20px;font-weight:700">SCAN LICENSE</div>
+      <div style="font-size:13px;color:var(--muted);text-align:center;max-width:260px">Take a photo of the <strong>back</strong> of the driver's license (barcode side)</div>
+      <input type="file" id="cam" accept="image/*" capture="environment" style="display:none" onchange="handlePhoto(this)">
     </div>
-    <button class="btn btn-outline" style="min-height:36px;padding:6px 14px;font-size:12px;" id="logout-btn">SIGN OUT</button>
+    <button class="btn btn-outline btn-sm" onclick="showS('s-manual')" style="margin-top:auto">Manual Entry</button>
   </div>
-  <div class="scan-btn-wrap">
-    <button class="scan-btn" id="scan-btn">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="7" y1="8" x2="17" y2="8"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="7" y1="16" x2="13" y2="16"/></svg>
-      SCAN DRIVER LICENSE
-    </button>
-  </div>
-  <div class="quick-stats">
-    <div class="stat-box"><div class="stat-num" id="stat-today">0</div><div class="stat-label">Today</div></div>
-    <div class="stat-box"><div class="stat-num" style="color:var(--yellow)" id="stat-yellow">0</div><div class="stat-label">Elevated</div></div>
-    <div class="stat-box"><div class="stat-num" style="color:var(--red)" id="stat-red">0</div><div class="stat-label">High Risk</div></div>
-  </div>
-  <div class="nav-grid">
-    <div class="grid-2">
-      <button class="btn btn-outline" id="manual-btn">&#9997; Manual Entry</button>
-      <button class="btn btn-outline" id="recent-btn">&#128196; Recent Scans</button>
-      <button class="btn btn-outline" id="watchlist-btn">&#128680; Watchlist <span id="watchlist-badge" class="badge badge-red" style="display:none;margin-left:4px;">0</span></button>
-      <button class="btn btn-outline" id="admin-btn" style="display:none;">&#128202; Dashboard</button>
-    </div>
-  </div>
-</div>
 
-<!-- CONFIRM DL DATA -->
-<div id="confirm-screen" class="screen">
-  <div class="topbar">
-    <button class="topbar-back" id="confirm-cancel-btn">&larr; Cancel</button>
-    <div class="topbar-title">Verify License</div>
-    <div></div>
+  <!-- PROCESSING -->
+  <div class="overlay hidden" id="ov">
+    <div class="spinner"></div>
+    <div style="font-size:16px;font-weight:600">Reading barcode...</div>
+    <div style="font-size:13px;color:var(--muted)">Analyzing photo server-side</div>
   </div>
-  <div class="content">
-    <img id="scan-preview" alt="License photo">
-    <div id="scan-status" style="display:none;margin:12px 0;padding:12px;border-radius:8px;font-size:14px;line-height:1.6;"></div>
-    <div class="dl-fields" id="dl-fields"></div>
-    <div class="mt-16 grid-2">
-      <button class="btn btn-outline btn-full" id="rescan-btn">RE-SCAN</button>
-      <button class="btn btn-primary btn-full" id="confirm-btn">CONFIRM &rarr;</button>
-    </div>
-    <details id="decode-debug" style="margin-top:16px;display:none;">
-      <summary style="cursor:pointer;font-size:13px;color:var(--text2);font-weight:600;">Debug: Server Response</summary>
-      <pre id="decode-debug-json" style="margin-top:8px;background:#1a1a2e;color:#0f0;font-size:11px;padding:12px;border-radius:8px;overflow-x:auto;max-height:400px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;"></pre>
-    </details>
-  </div>
-</div>
 
-<!-- BOL VERIFICATION (Phase 2) -->
-<div id="bol-screen" class="screen">
-  <div class="topbar">
-    <button class="topbar-back" id="bol-back-btn">&larr; Back</button>
-    <div class="topbar-title">Verify BOL</div>
-    <div></div>
-  </div>
-  <div class="content">
-    <div style="text-align:center;margin-bottom:16px;">
-      <div style="font-size:13px;color:var(--text2);margin-bottom:8px;">Capture or enter the Bill of Lading details</div>
-    </div>
-    <button class="photo-capture-btn mb-16" id="photo-bol-btn" style="min-height:64px;font-size:16px;font-weight:600;">&#128247; TAKE BOL PHOTO</button>
-    <div class="form-group"><label>BOL Number</label><input type="text" id="d-bol" placeholder="e.g. BOL-2026-001" autocapitalize="characters"></div>
-    <div class="form-group"><label>Carrier Name</label><input type="text" id="d-carrier" placeholder="e.g. Swift Transport"></div>
-    <div class="form-group"><label>Pickup Reference</label><input type="text" id="d-pickup-ref" placeholder="e.g. PU-5521" autocapitalize="characters"></div>
-    <div class="form-group"><label>Destination</label><input type="text" id="d-destination" placeholder="e.g. Nashville, TN"></div>
-    <div class="form-group"><label>Scheduled Pickup</label><input type="date" id="d-sched-pickup"></div>
-    <hr style="border-color:var(--border);margin:16px 0;">
-    <div class="grid-2">
-      <div class="form-group"><label>Truck Plate</label><input type="text" id="d-plate" placeholder="License plate" autocapitalize="characters"></div>
-      <div class="form-group"><label>Trailer #</label><input type="text" id="d-trailer" placeholder="Trailer number"></div>
-    </div>
-    <div class="form-group"><label>Notes</label><input type="text" id="d-notes" placeholder="Any additional notes"></div>
-    <label style="margin-bottom:8px;">Additional Photos</label>
-    <div class="grid-2 mb-16">
-      <button class="photo-capture-btn" id="photo-dl-btn">&#128247; DL Photo</button>
-      <button class="photo-capture-btn" id="photo-truck-btn">&#128247; Truck Photo</button>
-    </div>
-    <button class="btn btn-green btn-full btn-lg" id="submit-scan-btn">SUBMIT &amp; SCORE</button>
-  </div>
-</div>
-
-<!-- SCORING RESULT (Phase 2 — full screen) -->
-<div id="result-screen" class="screen">
-  <div id="result-bg" style="display:flex;flex-direction:column;height:100vh;transition:background 0.5s;">
-    <div class="topbar" style="background:transparent;border:none;"><div></div><div class="topbar-title" style="color:inherit;">Scan Result</div><div></div></div>
-    <div class="content" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;">
-      <div id="result-icon" style="font-size:80px;margin-bottom:8px;"></div>
-      <div id="risk-score-num" style="font-size:72px;font-weight:800;line-height:1;"></div>
-      <div id="risk-label" style="font-size:22px;font-weight:700;text-transform:uppercase;letter-spacing:3px;margin-top:8px;"></div>
-      <div id="risk-reasons" style="margin-top:24px;width:100%;max-width:360px;text-align:left;"></div>
-      <div id="risk-actions" class="mt-16" style="width:100%;max-width:360px;"></div>
-      <button class="btn btn-full btn-lg mt-16" id="complete-btn" style="max-width:360px;background:rgba(255,255,255,0.2);color:inherit;font-weight:800;letter-spacing:1px;">CONFIRM &amp; SAVE</button>
-    </div>
-  </div>
-</div>
-
-<!-- MANUAL ENTRY -->
-<div id="manual-screen" class="screen">
-  <div class="topbar">
-    <button class="topbar-back" id="manual-back-btn">&larr; Back</button>
-    <div class="topbar-title">Manual Entry</div>
-    <div></div>
-  </div>
-  <div class="content">
-    <div class="grid-2">
-      <div class="form-group"><label>First Name</label><input type="text" id="m-first" autocapitalize="words"></div>
-      <div class="form-group"><label>Last Name</label><input type="text" id="m-last" autocapitalize="words"></div>
-    </div>
-    <div class="grid-2">
-      <div class="form-group"><label>DL Number</label><input type="text" id="m-dl" autocapitalize="characters"></div>
-      <div class="form-group"><label>DL State</label>
-        <select id="m-state"><option value="">Select</option><option value="TN">TN</option><option value="AL">AL</option><option value="AR">AR</option><option value="GA">GA</option><option value="IL">IL</option><option value="IN">IN</option><option value="KY">KY</option><option value="LA">LA</option><option value="MO">MO</option><option value="MS">MS</option><option value="NC">NC</option><option value="OH">OH</option><option value="SC">SC</option><option value="TX">TX</option><option value="VA">VA</option><option value="OTHER">Other</option></select>
+  <!-- CONFIRM -->
+  <div class="screen" id="s-confirm">
+    <h2 style="margin-bottom:4px;font-size:18px">Verify Details</h2>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:14px" id="c-src"></p>
+    <img id="c-photo" class="photo-preview" style="display:none">
+    <div class="confirm-grid" id="c-fields"></div>
+    <div style="margin-top:16px;display:flex;flex-direction:column;gap:10px">
+      <button class="btn btn-green" onclick="confirmScan()">&#10003; CONFIRM &amp; SAVE</button>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-outline btn-sm" onclick="editConfirm()" style="flex:1">Edit</button>
+        <button class="btn btn-outline btn-sm" onclick="showS('s-scan')" style="flex:1">Re-scan</button>
       </div>
     </div>
-    <div class="grid-2">
-      <div class="form-group"><label>Date of Birth</label><input type="date" id="m-dob"></div>
-      <div class="form-group"><label>Expiration</label><input type="date" id="m-exp"></div>
-    </div>
-    <hr style="border-color:var(--border);margin:16px 0;">
-    <div class="form-group"><label>Carrier Name</label><input type="text" id="m-carrier"></div>
-    <div class="grid-2">
-      <div class="form-group"><label>MC #</label><input type="text" id="m-mc" inputmode="numeric"></div>
-      <div class="form-group"><label>DOT #</label><input type="text" id="m-dot" inputmode="numeric"></div>
-    </div>
-    <div class="grid-2">
-      <div class="form-group"><label>Truck Plate</label><input type="text" id="m-plate" autocapitalize="characters"></div>
-      <div class="form-group"><label>Trailer #</label><input type="text" id="m-trailer"></div>
-    </div>
-    <div class="form-group"><label>BOL / PO #</label><input type="text" id="m-bol"></div>
-    <button class="btn btn-green btn-full btn-lg mt-16" id="submit-manual-btn">SUBMIT SCAN</button>
   </div>
-</div>
 
-<!-- RECENT SCANS -->
-<div id="scans-screen" class="screen">
-  <div class="topbar">
-    <button class="topbar-back" id="scans-back-btn">&larr; Back</button>
-    <div class="topbar-title">Recent Scans</div>
-    <div></div>
-  </div>
-  <div class="content">
-    <div class="filter-tabs" id="scan-filters"></div>
-    <div id="scans-list"></div>
-  </div>
-</div>
-
-<!-- SCAN DETAIL -->
-<div id="scan-detail-screen" class="screen">
-  <div class="topbar">
-    <button class="topbar-back" id="detail-back-btn">&larr; Back</button>
-    <div class="topbar-title">Scan Detail</div>
-    <div></div>
-  </div>
-  <div class="content" id="scan-detail-content"></div>
-</div>
-
-<!-- WATCHLIST -->
-<div id="watchlist-screen" class="screen">
-  <div class="topbar">
-    <button class="topbar-back" id="wl-back-btn">&larr; Back</button>
-    <div class="topbar-title">Watchlist</div>
-    <div></div>
-  </div>
-  <div class="content">
-    <button class="btn btn-danger btn-full mb-16" id="wl-add-toggle">+ Add to Watchlist</button>
-    <div id="watchlist-add-form" style="display:none;" class="card mb-16">
-      <div class="form-group"><label>DL Number</label><input type="text" id="w-dl" autocapitalize="characters"></div>
-      <div class="grid-2">
-        <div class="form-group"><label>First Name</label><input type="text" id="w-first"></div>
-        <div class="form-group"><label>Last Name</label><input type="text" id="w-last"></div>
-      </div>
-      <div class="form-group"><label>Reason</label><input type="text" id="w-reason" placeholder="Why flagged?"></div>
-      <div class="form-group"><label>Severity</label>
-        <select id="w-severity"><option value="YELLOW">Yellow - Caution</option><option value="RED">Red - Do Not Admit</option></select>
-      </div>
-      <button class="btn btn-danger btn-full" id="wl-add-submit">ADD TO WATCHLIST</button>
+  <!-- EDIT -->
+  <div class="screen" id="s-edit">
+    <h2 style="margin-bottom:14px;font-size:18px">Edit Details</h2>
+    <img id="e-photo" class="photo-preview" style="display:none">
+    <div id="e-fields"></div>
+    <div style="display:flex;gap:10px;margin-top:12px">
+      <button class="btn btn-green" onclick="saveEdit()" style="flex:1">Save</button>
+      <button class="btn btn-outline btn-sm" onclick="backConfirm()" style="flex:1">Cancel</button>
     </div>
-    <div id="watchlist-list"></div>
   </div>
-</div>
 
-<!-- DASHBOARD -->
-<div id="dashboard-screen" class="screen">
-  <div class="topbar">
-    <button class="topbar-back" id="dash-back-btn">&larr; Back</button>
-    <div class="topbar-title">Dashboard</div>
-    <button class="btn btn-outline" style="min-height:36px;padding:6px 12px;font-size:11px;" id="export-btn">EXPORT</button>
+  <!-- MANUAL -->
+  <div class="screen" id="s-manual">
+    <h2 style="margin-bottom:14px;font-size:18px">Manual Entry</h2>
+    <div class="field"><label>First Name</label><input id="m-first" autocapitalize="words"></div>
+    <div class="field"><label>Last Name</label><input id="m-last" autocapitalize="words"></div>
+    <div class="field"><label>DL Number</label><input id="m-dl" autocapitalize="characters"></div>
+    <div class="field"><label>DOB (MM/DD/YYYY)</label><input id="m-dob" inputmode="numeric"></div>
+    <div class="field"><label>Expiration</label><input id="m-exp" inputmode="numeric"></div>
+    <div class="field"><label>State</label><input id="m-state" maxlength="2" autocapitalize="characters" value="TN"></div>
+    <div class="field"><label>Notes</label><textarea id="m-notes" rows="2"></textarea></div>
+    <button class="btn btn-green" onclick="submitManual()">Submit</button>
+    <button class="btn btn-outline btn-sm" onclick="showS('s-scan')" style="margin-top:10px">Cancel</button>
   </div>
-  <div class="content" id="dashboard-content"></div>
+
+  <!-- RESULT -->
+  <div class="screen" id="s-result">
+    <div style="text-align:center;padding:30px 0">
+      <div id="r-icon" style="font-size:64px;margin-bottom:12px"></div>
+      <div id="r-status" style="font-size:22px;font-weight:800;margin-bottom:8px"></div>
+      <div id="r-score"></div>
+      <div id="r-flags" style="margin-top:12px;font-size:13px;color:var(--amber)"></div>
+    </div>
+    <div id="r-detail" class="card" style="margin-bottom:16px"></div>
+    <button class="btn btn-primary" onclick="showS('s-scan')">Next Scan</button>
+  </div>
+
+  <!-- HISTORY -->
+  <div class="screen" id="s-history">
+    <h2 style="margin-bottom:14px;font-size:18px">Recent Scans</h2>
+    <div id="h-list"></div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div class="screen" id="s-dash">
+    <h2 style="margin-bottom:14px;font-size:18px">Dashboard</h2>
+    <div class="stat-grid" id="d-stats"></div>
+    <div class="card"><div class="card-label">Decode Engine</div><div id="d-decode" style="font-size:14px;margin-top:4px"></div></div>
+    <h3 style="font-size:14px;margin:14px 0 8px;color:var(--muted)">Watchlist</h3>
+    <div id="d-wl"></div>
+    <button class="btn btn-outline btn-sm" onclick="toggleWLForm()" style="margin-top:10px">+ Add to Watchlist</button>
+    <div id="wl-form" style="display:none;margin-top:12px" class="card">
+      <div class="field"><label>DL Number</label><input id="wl-dl"></div>
+      <div class="field"><label>Last Name</label><input id="wl-last"></div>
+      <div class="field"><label>Reason</label><input id="wl-reason"></div>
+      <button class="btn btn-primary btn-sm" onclick="addWL()">Add</button>
+    </div>
+  </div>
+
+  <!-- NAV -->
+  <div class="nav" id="nav" style="display:none">
+    <button onclick="showS('s-scan')" id="n-scan">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>Scan</button>
+    <button onclick="showS('s-history');loadHistory()" id="n-hist">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/></svg>History</button>
+    <button onclick="showS('s-dash');loadDash()" id="n-dash">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Dashboard</button>
+  </div>
 </div>
+<div class="toast" id="toast"></div>
 
 <script>
-// ═══════════════════════════════════════════════════════════
-// STATE
-// ═══════════════════════════════════════════════════════════
-let token = null;
-let currentUser = null;
-let currentScanData = {};
-let capturedPhotos = { dl: null, bol: null, truck: null };
-let currentLocation = null;
-let currentScanFilter = '';
-let cameraStream = null;
+let TK=localStorage.getItem('stk')||'',US=JSON.parse(localStorage.getItem('sus')||'null'),CD={},cPhoto=null,cBlob=null;
 
-// ═══════════════════════════════════════════════════════════
-// HELPERS
-// ═══════════════════════════════════════════════════════════
-async function api(method, path, body) {
-  const opts = { method, headers: {} };
-  if (token) opts.headers['Authorization'] = 'Bearer ' + token;
-  if (body && !(body instanceof FormData)) {
-    opts.headers['Content-Type'] = 'application/json';
-    opts.body = JSON.stringify(body);
-  } else if (body) { opts.body = body; }
-  const res = await fetch('/api' + path, opts);
-  if (res.status === 401 || res.status === 403) { doLogout(); throw new Error('Auth failed'); }
-  return res.json();
-}
-
-function showScreen(id) {
-  document.querySelectorAll('.screen').forEach(function(s) { s.classList.remove('active'); });
+function showS(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
+  document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));
+  const m={'s-scan':'n-scan','s-history':'n-hist','s-dash':'n-dash'};
+  if(m[id])document.getElementById(m[id])?.classList.add('active');
+}
+function showApp(){
+  document.getElementById('hdr').style.display='flex';
+  document.getElementById('nav').style.display='flex';
+  document.getElementById('ubadge').textContent=US?.display_name||'';
+  showS('s-scan');
 }
 
-function showToast(msg, type) {
-  type = type || 'info';
-  var t = document.createElement('div');
-  t.className = 'toast toast-' + type;
-  t.textContent = msg;
-  document.getElementById('toast-container').appendChild(t);
-  setTimeout(function() { t.classList.add('show'); }, 10);
-  setTimeout(function() { t.classList.remove('show'); setTimeout(function() { t.remove(); }, 300); }, 3000);
-}
-
-function showProcessing(text, sub) {
-  document.getElementById('processing-text').textContent = text || 'Processing...';
-  document.getElementById('processing-sub').textContent = sub || '';
-  document.getElementById('processing-overlay').classList.add('active');
-}
-
-function hideProcessing() {
-  document.getElementById('processing-overlay').classList.remove('active');
-}
-
-function timeAgo(ts) {
-  var d = new Date(ts + 'Z');
-  var diff = Math.floor((new Date() - d) / 1000);
-  if (diff < 60) return 'Just now';
-  if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
-  if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
-  return d.toLocaleDateString();
-}
-
-function formatTime(ts) {
-  if (!ts) return '';
-  return new Date(ts + 'Z').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-}
-
-// ═══════════════════════════════════════════════════════════
 // AUTH
-// ═══════════════════════════════════════════════════════════
-async function doLogin() {
-  var username = document.getElementById('login-user').value.trim();
-  var password = document.getElementById('login-pass').value;
-  if (!username || !password) return;
-  var errEl = document.getElementById('login-error');
-  try {
-    var data = await api('POST', '/auth/login', { username: username, password: password });
-    if (data.error) { errEl.textContent = data.error; errEl.style.display = 'block'; return; }
-    token = data.token;
-    currentUser = data.user;
-    errEl.style.display = 'none';
-    enterApp();
-  } catch (e) {
-    errEl.textContent = 'Connection error. Check network.';
-    errEl.style.display = 'block';
-  }
+async function doLogin(){
+  const u=document.getElementById('l-user').value.trim(),p=document.getElementById('l-pass').value;
+  document.getElementById('l-err').textContent='';
+  document.getElementById('l-btn').textContent='Signing in...';
+  try{
+    const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+    const d=await r.json();if(!r.ok)throw new Error(d.error);
+    TK=d.token;US=d;localStorage.setItem('stk',TK);localStorage.setItem('sus',JSON.stringify(US));showApp();
+  }catch(e){document.getElementById('l-err').textContent=e.message||'Login failed';}
+  document.getElementById('l-btn').textContent='Sign In';
+}
+if(TK&&US){fetch('/api/dashboard',{headers:{'x-auth-token':TK}}).then(r=>{if(r.ok)showApp();else throw 0;}).catch(()=>{TK='';US=null;localStorage.clear();});}
+document.getElementById('l-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+
+// PHOTO CAPTURE
+async function handlePhoto(input){
+  const file=input.files[0];if(!file)return;input.value='';
+  cBlob=file;
+  const reader=new FileReader();reader.onload=()=>{cPhoto=reader.result;};reader.readAsDataURL(file);
+  document.getElementById('ov').classList.remove('hidden');
+  try{
+    const form=new FormData();form.append('photo',file);
+    const resp=await fetch('/api/decode-dl',{method:'POST',headers:{'x-auth-token':TK},body:form});
+    const result=await resp.json();
+    document.getElementById('ov').classList.add('hidden');
+    if(result.success&&result.data){
+      CD=result.data;showConfirm(result.data,true);toast('Barcode decoded','success');if(navigator.vibrate)navigator.vibrate(200);
+    }else{CD={};showConfirm({},false);toast(result.error||'Could not read barcode. Enter details from photo.','info');}
+  }catch(err){document.getElementById('ov').classList.add('hidden');CD={};showConfirm({},false);toast('Connection error','error');}
 }
 
-function doLogout() {
-  token = null; currentUser = null;
-  showScreen('login-screen');
-  document.getElementById('login-pass').value = '';
+// CONFIRM
+function showConfirm(data,decoded){
+  document.getElementById('c-src').textContent=decoded?'✓ Auto-decoded from barcode':'Photo captured — tap Edit to enter details';
+  const img=document.getElementById('c-photo');if(cPhoto){img.src=cPhoto;img.style.display='block';}else{img.style.display='none';}
+  const fs=[{k:'first_name',l:'First Name'},{k:'last_name',l:'Last Name'},{k:'dl_number',l:'DL Number',f:1},{k:'dob',l:'Date of Birth'},{k:'expiration',l:'Expiration'},{k:'address',l:'Address',f:1},{k:'city',l:'City'},{k:'state',l:'State'}];
+  document.getElementById('c-fields').innerHTML=fs.map(f=>`<div class="card ${f.f?'full':''}"><div class="card-label">${f.l}</div><div class="card-value" style="${!data[f.k]?'color:var(--muted);font-style:italic':''}">${data[f.k]||(decoded?'—':'Tap Edit')}</div></div>`).join('');
+  showS('s-confirm');
+}
+function editConfirm(){
+  const fs=[{k:'first_name',l:'First Name'},{k:'last_name',l:'Last Name'},{k:'middle_name',l:'Middle Name'},{k:'dl_number',l:'DL Number'},{k:'dob',l:'DOB (MM/DD/YYYY)'},{k:'expiration',l:'Expiration'},{k:'address',l:'Address'},{k:'city',l:'City'},{k:'state',l:'State'},{k:'postal_code',l:'ZIP'}];
+  const img=document.getElementById('e-photo');if(cPhoto){img.src=cPhoto;img.style.display='block';}else{img.style.display='none';}
+  document.getElementById('e-fields').innerHTML=fs.map(f=>`<div class="field"><label>${f.l}</label><input id="e-${f.k}" value="${CD[f.k]||''}" autocapitalize="${f.k==='state'?'characters':'words'}"></div>`).join('');
+  showS('s-edit');
+}
+function saveEdit(){const ks=['first_name','last_name','middle_name','dl_number','dob','expiration','address','city','state','postal_code'];ks.forEach(k=>{CD[k]=document.getElementById('e-'+k)?.value||'';});showConfirm(CD,Object.values(CD).some(v=>v));}
+function backConfirm(){showConfirm(CD,Object.values(CD).some(v=>v));}
+
+// SUBMIT
+async function confirmScan(){
+  const form=new FormData();Object.entries(CD).forEach(([k,v])=>{if(k!=='raw')form.append(k,v);});
+  if(cBlob)form.append('dl_photo',cBlob);
+  try{const r=await fetch('/api/scans',{method:'POST',headers:{'x-auth-token':TK},body:form});const d=await r.json();showResult(d);}
+  catch(e){toast('Failed to save','error');}
+}
+async function submitManual(){
+  const data={first_name:document.getElementById('m-first').value,last_name:document.getElementById('m-last').value,dl_number:document.getElementById('m-dl').value,dob:document.getElementById('m-dob').value,expiration:document.getElementById('m-exp').value,state:document.getElementById('m-state').value,notes:document.getElementById('m-notes').value};
+  try{const r=await fetch('/api/scans',{method:'POST',headers:{'Content-Type':'application/json','x-auth-token':TK},body:JSON.stringify(data)});const d=await r.json();
+  ['m-first','m-last','m-dl','m-dob','m-exp','m-notes'].forEach(id=>document.getElementById(id).value='');document.getElementById('m-state').value='TN';showResult(d);}
+  catch(e){toast('Failed','error');}
+}
+function showResult(d){
+  const icon=document.getElementById('r-icon'),st=document.getElementById('r-status'),sc=document.getElementById('r-score'),fl=document.getElementById('r-flags');
+  if(d.risk_score>=70){icon.textContent='⚠️';st.textContent='FLAGGED';st.style.color='var(--red)';}
+  else if(d.risk_score>=30){icon.textContent='⚡';st.textContent='CAUTION';st.style.color='var(--amber)';}
+  else{icon.textContent='✓';st.textContent='CLEARED';st.style.color='var(--green)';}
+  const rc=d.risk_score>=70?'risk-high':d.risk_score>=30?'risk-med':'risk-low';
+  sc.innerHTML=`<span class="risk-badge ${rc}">Risk: ${d.risk_score}</span>`;
+  fl.innerHTML=(d.risk_flags||[]).map(f=>`<div style="margin-top:4px">⚑ ${f}</div>`).join('');
+  document.getElementById('r-detail').innerHTML=`<div class="card-label">Driver</div><div class="card-value">${CD.first_name||''} ${CD.last_name||''}</div><div style="margin-top:8px;font-size:13px;color:var(--muted)">${CD.dl_number?'DL: '+CD.dl_number:''}</div>`;
+  if(navigator.vibrate&&d.risk_score>=70)navigator.vibrate([300,100,300]);
+  showS('s-result');cPhoto=null;cBlob=null;CD={};
 }
 
-function enterApp() {
-  document.getElementById('home-guard-name').textContent = currentUser.full_name;
-  document.getElementById('home-site-name').textContent = currentUser.site_name || 'Unassigned';
-  if (currentUser.role === 'admin' || currentUser.role === 'supervisor') {
-    document.getElementById('admin-btn').style.display = '';
-  }
-  showScreen('home-screen');
-  loadHomeStats();
-  getGPS();
-}
+// HISTORY
+async function loadHistory(){try{const r=await fetch('/api/scans?limit=30',{headers:{'x-auth-token':TK}});const s=await r.json();const l=document.getElementById('h-list');
+  if(!s.length){l.innerHTML='<p style="color:var(--muted);text-align:center;padding:40px">No scans yet</p>';return;}
+  l.innerHTML=s.map(s=>{const rc=s.risk_score>=70?'risk-high':s.risk_score>=30?'risk-med':'risk-low';const t=new Date(s.created_at+'Z').toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+  return`<div class="scan-item"><div><div class="scan-item-name">${s.first_name||''} ${s.last_name||'Unknown'}</div><div class="scan-item-meta">${s.dl_number||'No DL'} · ${t}</div></div><span class="risk-badge ${rc}">${s.risk_score}</span></div>`;}).join('');}catch(e){toast('Failed','error');}}
 
-// ═══════════════════════════════════════════════════════════
-// GPS
-// ═══════════════════════════════════════════════════════════
-function getGPS() {
-  if (!navigator.geolocation) return;
-  navigator.geolocation.getCurrentPosition(
-    function(p) { currentLocation = { lat: p.coords.latitude, lng: p.coords.longitude }; },
-    function() { currentLocation = null; },
-    { enableHighAccuracy: true, timeout: 10000 }
-  );
-}
-
-// ═══════════════════════════════════════════════════════════
-// HOME STATS
-// ═══════════════════════════════════════════════════════════
-async function loadHomeStats() {
-  try {
-    var today = new Date().toISOString().slice(0, 10);
-    var data = await api('GET', '/scans?date_from=' + today + 'T00:00:00&limit=200');
-    var scans = data.scans || [];
-    document.getElementById('stat-today').textContent = scans.length;
-    document.getElementById('stat-yellow').textContent = scans.filter(function(s) { return s.alert_level === 'YELLOW'; }).length;
-    document.getElementById('stat-red').textContent = scans.filter(function(s) { return s.alert_level === 'RED'; }).length;
-    var wl = await api('GET', '/watchlist');
-    var wlBadge = document.getElementById('watchlist-badge');
-    if (wl.length > 0) { wlBadge.textContent = wl.length; wlBadge.style.display = ''; }
-    else { wlBadge.style.display = 'none'; }
-  } catch (e) { console.error('Stats error:', e); }
-}
-
-// ═══════════════════════════════════════════════════════════
-// SCANNER - PHOTO CAPTURE → SERVER DECODE
-// Native camera photo → upload to /api/decode-dl → show fields
-// No browser barcode libraries. Server does all decoding.
-// ═══════════════════════════════════════════════════════════
-function startScanner() {
-  currentScanData = {};
-  capturedPhotos = { dl: null, bol: null, truck: null };
-  document.getElementById('scan-status').style.display = 'none';
-  document.getElementById('decode-debug').style.display = 'none';
-  // Show guidance overlay before opening camera
-  document.getElementById('scan-guidance').classList.add('active');
-}
-
-function openCameraAfterGuidance() {
-  document.getElementById('scan-guidance').classList.remove('active');
-  document.getElementById('dl-photo-input').click();
-}
-
-document.getElementById('dl-photo-input').addEventListener('change', async function(e) {
-  var file = e.target.files[0];
-  if (!file) return;
-  e.target.value = '';
-
-  // Check image dimensions before uploading
-  var previewUrl = URL.createObjectURL(file);
-  try {
-    var imgDims = await new Promise(function(resolve, reject) {
-      var img = new Image();
-      img.onload = function() { resolve({ w: img.naturalWidth, h: img.naturalHeight }); };
-      img.onerror = function() { reject(new Error('Could not read image')); };
-      img.src = previewUrl;
-    });
-    if (imgDims.w < 800 && imgDims.h < 800) {
-      showToast('Photo is too small (' + imgDims.w + 'x' + imgDims.h + '). Please retake closer to the barcode.', 'warning');
-      return;
-    }
-  } catch (dimErr) {
-    // Can't check dims — proceed anyway
-  }
-
-  showProcessing('Reading barcode...', 'Sending photo to server for decode');
-
-  try {
-    // Upload photo directly to server (file upload, not base64)
-    var formData = new FormData();
-    formData.append('dlImage', file);
-
-    var res = await fetch('/api/decode-dl', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + token },
-      body: formData
-    });
-    var result = await res.json();
-
-    // Show raw JSON in debug box on confirm screen
-    var debugBox = document.getElementById('decode-debug');
-    var debugJson = document.getElementById('decode-debug-json');
-    debugBox.style.display = 'block';
-    debugBox.open = true;
-    debugJson.textContent = JSON.stringify(result, null, 2);
-
-    // Build plain-text status lines
-    var statusDiv = document.getElementById('scan-status');
-    var dbg = result.debug || {};
-    var logLines = (dbg.log || []).join(' | ');
-
-    if (result.success && result.data) {
-      // Map server response fields → confirm screen fields
-      var d = result.data;
-      var mapped = {
-        first_name: d.first_name || '',
-        last_name: d.last_name || '',
-        middle_name: d.middle_name || '',
-        dl_number: d.dl_number || '',
-        dl_state: d.state || '',
-        address_state: d.state || '',
-        date_of_birth: d.dob || '',
-        expiration_date: d.expiration || '',
-        address_street: d.address || '',
-        address_city: d.city || '',
-        address_zip: d.postal_code || '',
-        gender: d.gender || '',
-        eye_color: d.eye_color || '',
-        height: d.height || '',
-      };
-
-      if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-      hideProcessing();
-      currentScanData = mapped;
-      showConfirmScreen(mapped, previewUrl);
-
-      // Status: success
-      statusDiv.style.display = 'block';
-      statusDiv.style.background = '#e8f5e9';
-      statusDiv.style.border = '1px solid #4caf50';
-      statusDiv.innerHTML = '<strong>Server said: SUCCESS</strong> &ndash; fields decoded (' + (result.engine || 'unknown') + ' engine)<br>' +
-        '<span style="font-size:12px;color:#555;">Engine debug: ' + logLines + '</span>';
-
-      showToast('License scanned successfully!', 'success');
-      return;
-    }
-
-    // Decode failed — show photo + editable fields for manual entry
-    hideProcessing();
-    currentScanData = {};
-    showConfirmScreen({}, previewUrl);
-
-    // Status: failed
-    statusDiv.style.display = 'block';
-    statusDiv.style.background = '#fff3e0';
-    statusDiv.style.border = '1px solid #ff9800';
-    statusDiv.innerHTML = '<strong>Server said: FAILED</strong> &ndash; ' + (result.error || 'unknown error') + '<br>' +
-      '<span style="font-size:12px;color:#555;">Engine debug: ' + logLines + '</span>';
-
-    showToast('Could not read barcode. Conditions here are tough \u2013 please type the details from the card.', 'warning');
-
-  } catch (err) {
-    hideProcessing();
-    console.error('[SCAN] Error:', err);
-    showToast('Error processing photo. Check connection and try again.', 'error');
-    showScreen('home-screen');
-  }
-});
-
-// ═══════════════════════════════════════════════════════════
-// PDF417 AAMVA PARSER
-// ═══════════════════════════════════════════════════════════
-function parsePDF417(raw) {
-  var fields = {};
-  var map = {
-    'DCS': 'last_name', 'DAC': 'first_name', 'DCT': 'first_name',
-    'DAD': 'middle_name', 'DBB': 'date_of_birth', 'DBA': 'expiration_date',
-    'DAQ': 'dl_number', 'DAG': 'address_street', 'DAI': 'address_city',
-    'DAJ': 'address_state', 'DAK': 'address_zip', 'DBC': 'gender',
-    'DAY': 'eye_color', 'DAU': 'height', 'DAW': 'weight', 'DCG': 'dl_country',
-    'DCF': 'document_discriminator', 'DCA': 'dl_class', 'DCD': 'endorsements',
-    'DBD': 'issue_date',
-  };
-  var lines = raw.split(/[\n\r\x1e\x1d]+/);
-  for (var i = 0; i < lines.length; i++) {
-    var trimmed = lines[i].trim();
-    for (var code in map) {
-      if (trimmed.indexOf(code) === 0) {
-        var val = trimmed.substring(code.length).trim();
-        var field = map[code];
-        if (field === 'first_name' && fields.first_name && code === 'DCT') continue;
-        fields[field] = val;
-      }
-    }
-  }
-  var ansiMatch = raw.match(/\bDL(\w{2})/);
-  if (ansiMatch && !fields.address_state) fields.dl_state = ansiMatch[1];
-  if (fields.address_state) fields.dl_state = fields.address_state;
-  var dateFields = ['date_of_birth', 'expiration_date', 'issue_date'];
-  for (var j = 0; j < dateFields.length; j++) {
-    var df = dateFields[j];
-    if (fields[df] && fields[df].length >= 8) {
-      var d = fields[df].replace(/[^0-9]/g, '');
-      if (d.length === 8) {
-        var first2 = parseInt(d.slice(0, 2));
-        if (first2 > 12) fields[df] = d.slice(0,4) + '-' + d.slice(4,6) + '-' + d.slice(6,8);
-        else fields[df] = d.slice(4,8) + '-' + d.slice(0,2) + '-' + d.slice(2,4);
-      }
-    }
-  }
-  if (fields.gender === '1') fields.gender = 'M';
-  else if (fields.gender === '2') fields.gender = 'F';
-  if (fields.address_zip) fields.address_zip = fields.address_zip.substring(0, 5);
-  var nameFields = ['first_name', 'last_name', 'middle_name', 'address_city'];
-  for (var k = 0; k < nameFields.length; k++) {
-    var nf = nameFields[k];
-    if (fields[nf]) fields[nf] = fields[nf].charAt(0).toUpperCase() + fields[nf].slice(1).toLowerCase();
-  }
-  return fields;
-}
-
-// ═══════════════════════════════════════════════════════════
-// CONFIRM SCREEN
-// ═══════════════════════════════════════════════════════════
-function showConfirmScreen(data, previewUrl) {
-  showScreen('confirm-screen');
-
-  // Show photo preview if available
-  var preview = document.getElementById('scan-preview');
-  if (previewUrl) { preview.src = previewUrl; preview.style.display = 'block'; }
-  else { preview.style.display = 'none'; }
-
-  var c = document.getElementById('dl-fields');
-  var isExpired = data.expiration_date && new Date(data.expiration_date) < new Date();
-  var expClass = isExpired ? 'dl-expired' : (data.expiration_date ? 'dl-valid' : '');
-
-  // Editable inputs — guard can always correct or fill in fields
-  c.innerHTML =
-    '<div class="dl-field dl-name"><div class="dl-field-label">First Name</div>' +
-      '<input class="dl-edit" id="cf-first" value="' + (data.first_name || '') + '" placeholder="First name"></div>' +
-    '<div class="dl-field dl-name"><div class="dl-field-label">Last Name</div>' +
-      '<input class="dl-edit" id="cf-last" value="' + (data.last_name || '') + '" placeholder="Last name"></div>' +
-    '<div class="dl-field"><div class="dl-field-label">DL Number</div>' +
-      '<input class="dl-edit" id="cf-dl" value="' + (data.dl_number || '') + '" placeholder="DL number" autocapitalize="characters"></div>' +
-    '<div class="dl-field"><div class="dl-field-label">State</div>' +
-      '<input class="dl-edit" id="cf-state" value="' + (data.dl_state || data.address_state || '') + '" placeholder="State" maxlength="2" autocapitalize="characters"></div>' +
-    '<div class="dl-field"><div class="dl-field-label">Date of Birth</div>' +
-      '<input class="dl-edit" id="cf-dob" type="date" value="' + (data.date_of_birth || '') + '"></div>' +
-    '<div class="dl-field ' + expClass + '"><div class="dl-field-label">Expiration ' + (isExpired ? '&#9888; EXPIRED' : (data.expiration_date ? '&#10003; Valid' : '')) + '</div>' +
-      '<input class="dl-edit" id="cf-exp" type="date" value="' + (data.expiration_date || '') + '"></div>' +
-    '<div class="dl-field" style="grid-column:1/-1;"><div class="dl-field-label">Address</div>' +
-      '<input class="dl-edit" id="cf-addr" value="' + (data.address_street || '') + '" placeholder="Street address"></div>' +
-    '<div class="dl-field"><div class="dl-field-label">City</div>' +
-      '<input class="dl-edit" id="cf-city" value="' + (data.address_city || '') + '" placeholder="City"></div>' +
-    '<div class="dl-field"><div class="dl-field-label">Zip</div>' +
-      '<input class="dl-edit" id="cf-zip" value="' + (data.address_zip || '') + '" placeholder="Zip" inputmode="numeric"></div>' +
-    '<div class="dl-field"><div class="dl-field-label">Gender</div>' +
-      '<input class="dl-edit" id="cf-gender" value="' + (data.gender || '') + '" placeholder="M / F"></div>' +
-    '<div class="dl-field"><div class="dl-field-label">Eyes / Height</div>' +
-      '<input class="dl-edit" id="cf-eyes-ht" value="' + ((data.eye_color || '') + (data.eye_color && data.height ? ' / ' : '') + (data.height || '')) + '" placeholder="e.g. Brown / 6\'0&quot;"></div>';
-}
-
-// Read edited fields back into currentScanData before moving to details
-function readConfirmFields() {
-  currentScanData.first_name = (document.getElementById('cf-first').value || '').trim();
-  currentScanData.last_name = (document.getElementById('cf-last').value || '').trim();
-  currentScanData.dl_number = (document.getElementById('cf-dl').value || '').trim();
-  currentScanData.dl_state = (document.getElementById('cf-state').value || '').trim();
-  currentScanData.address_state = currentScanData.dl_state;
-  currentScanData.date_of_birth = (document.getElementById('cf-dob').value || '').trim();
-  currentScanData.expiration_date = (document.getElementById('cf-exp').value || '').trim();
-  currentScanData.address_street = (document.getElementById('cf-addr').value || '').trim();
-  currentScanData.address_city = (document.getElementById('cf-city').value || '').trim();
-  currentScanData.address_zip = (document.getElementById('cf-zip').value || '').trim();
-  currentScanData.gender = (document.getElementById('cf-gender').value || '').trim();
-  var eyesHt = (document.getElementById('cf-eyes-ht').value || '').trim();
-  if (eyesHt.indexOf('/') > -1) {
-    var parts = eyesHt.split('/');
-    currentScanData.eye_color = parts[0].trim();
-    currentScanData.height = parts[1].trim();
-  } else {
-    currentScanData.eye_color = eyesHt;
-  }
-}
-
-// ═══════════════════════════════════════════════════════════
-// PHOTO CAPTURE (for evidence photos)
-// ═══════════════════════════════════════════════════════════
-function capturePhoto(type) {
-  var overlay = document.getElementById('camera-overlay');
-  var video = document.getElementById('camera-video');
-  var canvas = document.getElementById('camera-canvas');
-  var purpose = document.getElementById('camera-purpose');
-  var labels = { dl: 'Driver License Photo', bol: 'Bill of Lading', truck: 'Truck / Plate' };
-  purpose.textContent = labels[type] || 'Photo';
-  overlay.classList.add('active');
-  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 } } })
-    .then(function(stream) {
-      cameraStream = stream;
-      video.srcObject = stream;
-      video.play();
-      document.getElementById('camera-shutter').onclick = function() {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        canvas.getContext('2d').drawImage(video, 0, 0);
-        canvas.toBlob(function(blob) {
-          stream.getTracks().forEach(function(t) { t.stop(); });
-          overlay.classList.remove('active');
-          cameraStream = null;
-          capturedPhotos[type] = blob;
-          var btn = document.getElementById('photo-' + type + '-btn');
-          if (btn) { btn.classList.add('captured'); btn.textContent = '✓ ' + labels[type] + ' Captured'; }
-          showToast('Photo captured', 'success');
-        }, 'image/jpeg', 0.85);
-      };
-    })
-    .catch(function(e) {
-      overlay.classList.remove('active');
-      showToast('Camera error: ' + e.message, 'error');
-    });
-}
-
-function cancelCamera() {
-  if (cameraStream) { cameraStream.getTracks().forEach(function(t) { t.stop(); }); cameraStream = null; }
-  document.getElementById('camera-overlay').classList.remove('active');
-}
-
-// ═══════════════════════════════════════════════════════════
-// SUBMIT SCAN (Phase 2 — DL + BOL combined)
-// ═══════════════════════════════════════════════════════════
-async function submitScan() {
-  showProcessing('Scoring...', 'Checking BOL against expected pickups');
-  var formData = new FormData();
-  for (var key in currentScanData) {
-    if (currentScanData[key]) formData.append(key, currentScanData[key]);
-  }
-  // BOL fields
-  formData.append('bol_number', (document.getElementById('d-bol').value || '').trim());
-  formData.append('carrier_name', (document.getElementById('d-carrier').value || '').trim());
-  formData.append('pickup_reference', (document.getElementById('d-pickup-ref').value || '').trim());
-  formData.append('destination', (document.getElementById('d-destination').value || '').trim());
-  formData.append('scheduled_pickup', (document.getElementById('d-sched-pickup').value || '').trim());
-  // Vehicle
-  formData.append('truck_plate', (document.getElementById('d-plate').value || '').trim());
-  formData.append('trailer_number', (document.getElementById('d-trailer').value || '').trim());
-  formData.append('notes', (document.getElementById('d-notes').value || '').trim());
-  if (currentLocation) {
-    formData.append('latitude', currentLocation.lat);
-    formData.append('longitude', currentLocation.lng);
-  }
-  if (capturedPhotos.dl) formData.append('dl_photo', capturedPhotos.dl, 'dl.jpg');
-  if (capturedPhotos.bol) formData.append('bol_photo', capturedPhotos.bol, 'bol.jpg');
-  if (capturedPhotos.truck) formData.append('truck_photo', capturedPhotos.truck, 'truck.jpg');
-  try {
-    var res = await fetch('/api/scans', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: formData });
-    var result = await res.json();
-    hideProcessing();
-    if (result.error) throw new Error(result.error);
-    if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-    showRiskResult(result);
-  } catch (e) {
-    hideProcessing();
-    showToast('Error: ' + e.message, 'error');
-  }
-}
-
-async function submitManual() {
-  showProcessing('Scoring...', 'Checking BOL against expected pickups');
-  var data = {
-    first_name: document.getElementById('m-first').value,
-    last_name: document.getElementById('m-last').value,
-    dl_number: document.getElementById('m-dl').value,
-    dl_state: document.getElementById('m-state').value,
-    address_state: document.getElementById('m-state').value,
-    date_of_birth: document.getElementById('m-dob').value,
-    expiration_date: document.getElementById('m-exp').value,
-    carrier_name: document.getElementById('m-carrier').value,
-    carrier_mc_number: document.getElementById('m-mc').value,
-    carrier_dot_number: document.getElementById('m-dot').value,
-    truck_plate: document.getElementById('m-plate').value,
-    trailer_number: document.getElementById('m-trailer').value,
-    bol_number: document.getElementById('m-bol').value,
-  };
-  if (currentLocation) { data.latitude = currentLocation.lat; data.longitude = currentLocation.lng; }
-  try {
-    var result = await api('POST', '/scans', data);
-    hideProcessing();
-    if (result.error) throw new Error(result.error);
-    if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-    showRiskResult(result);
-  } catch (e) {
-    hideProcessing();
-    showToast('Error: ' + e.message, 'error');
-  }
-}
-
-// ═══════════════════════════════════════════════════════════
-// SCORING RESULT DISPLAY (Phase 2 — full screen)
-// ═══════════════════════════════════════════════════════════
-function showRiskResult(result) {
-  showScreen('result-screen');
-  var score = result.risk_score || 0;
-  var level = result.alert_level || 'GREEN';
-  var reasons = result.reasons || result.risk_flags || [];
-
-  // Full-screen color background
-  var bg = document.getElementById('result-bg');
-  bg.className = level;
-
-  // Icon
-  var icons = { GREEN: '&#9989;', YELLOW: '&#9888;&#65039;', RED: '&#128721;' };
-  document.getElementById('result-icon').innerHTML = icons[level] || '';
-
-  // Score number
-  var scoreEl = document.getElementById('risk-score-num');
-  scoreEl.textContent = score;
-
-  // Label
-  var labelEl = document.getElementById('risk-label');
-  var labels = { GREEN: 'CLEARED', YELLOW: 'CAUTION', RED: 'DO NOT ADMIT' };
-  labelEl.textContent = labels[level] || 'ASSESSED';
-
-  // Reasons list
-  var reasonsEl = document.getElementById('risk-reasons');
-  if (reasons.length > 0) {
-    reasonsEl.innerHTML = reasons.map(function(r) {
-      var isNeg = r.indexOf('(') > -1 && r.indexOf('-') > -1;
-      var cls = isNeg ? 'negative' : 'positive';
-      var icon = isNeg ? '&#10060;' : '&#9989;';
-      return '<div class="reason-item ' + cls + '">' + icon + ' ' + r + '</div>';
-    }).join('');
-  } else {
-    reasonsEl.innerHTML = '<div class="reason-item positive">&#9989; All checks passed</div>';
-  }
-
-  // Actions (add to watchlist for RED)
-  var actionsEl = document.getElementById('risk-actions');
-  if (level === 'RED') {
-    actionsEl.innerHTML = '<button class="btn btn-full" id="add-wl-btn" style="background:rgba(255,255,255,0.2);color:inherit;">&#128680; ADD TO WATCHLIST</button>';
-    document.getElementById('add-wl-btn').addEventListener('click', addCurrentToWatchlist);
-  } else {
-    actionsEl.innerHTML = '';
-  }
-}
-
-function addCurrentToWatchlist() {
-  var dl = currentScanData.dl_number;
-  if (!dl) { showToast('No DL number to add', 'error'); return; }
-  api('POST', '/watchlist', { dl_number: dl, dl_state: currentScanData.dl_state || currentScanData.address_state, first_name: currentScanData.first_name, last_name: currentScanData.last_name, reason: 'Flagged during scan - HIGH RISK', severity: 'RED' })
-    .then(function() { showToast('Added to watchlist', 'success'); })
-    .catch(function(e) { showToast('Error: ' + e.message, 'error'); });
-}
-
-function resetToHome() {
-  ['d-carrier','d-plate','d-trailer','d-bol','d-notes','d-pickup-ref','d-destination','d-sched-pickup'].forEach(function(id) { var el = document.getElementById(id); if (el) el.value = ''; });
-  document.getElementById('photo-dl-btn').textContent = '📷 DL Photo';
-  document.getElementById('photo-dl-btn').classList.remove('captured');
-  document.getElementById('photo-bol-btn').textContent = '📷 TAKE BOL PHOTO';
-  document.getElementById('photo-bol-btn').classList.remove('captured');
-  document.getElementById('photo-truck-btn').textContent = '📷 Truck Photo';
-  document.getElementById('photo-truck-btn').classList.remove('captured');
-  document.getElementById('scan-preview').style.display = 'none';
-  document.getElementById('result-bg').className = '';
-  currentScanData = {};
-  capturedPhotos = { dl: null, bol: null, truck: null };
-  showScreen('home-screen');
-  loadHomeStats();
-  getGPS();
-}
-
-// ═══════════════════════════════════════════════════════════
-// RECENT SCANS
-// ═══════════════════════════════════════════════════════════
-async function loadRecentScans() {
-  showScreen('scans-screen');
-  currentScanFilter = '';
-  document.getElementById('scan-filters').innerHTML =
-    '<button class="filter-tab active" data-filter="">All</button>' +
-    '<button class="filter-tab" data-filter="RED">&#128308; Red</button>' +
-    '<button class="filter-tab" data-filter="YELLOW">&#128992; Yellow</button>' +
-    '<button class="filter-tab" data-filter="GREEN">&#128994; Green</button>';
-  document.querySelectorAll('#scan-filters .filter-tab').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      document.querySelectorAll('#scan-filters .filter-tab').forEach(function(b) { b.classList.remove('active'); });
-      btn.classList.add('active');
-      currentScanFilter = btn.getAttribute('data-filter');
-      renderScans();
-    });
-  });
-  await renderScans();
-}
-
-async function renderScans() {
-  var list = document.getElementById('scans-list');
-  list.innerHTML = '<div class="text-center text-muted">Loading...</div>';
-  try {
-    var url = '/scans?limit=50';
-    if (currentScanFilter) url += '&alert_level=' + currentScanFilter;
-    var data = await api('GET', url);
-    if (!data.scans || data.scans.length === 0) { list.innerHTML = '<div class="text-center text-muted" style="padding:32px;">No scans found</div>'; return; }
-    list.innerHTML = data.scans.map(function(s) {
-      return '<div class="scan-item" data-id="' + s.id + '">' +
-        '<span class="alert-dot ' + s.alert_level + '"></span>' +
-        '<div class="scan-item-info"><div class="scan-item-name">' + (s.first_name || '?') + ' ' + (s.last_name || 'Unknown') + '</div>' +
-        '<div class="scan-item-detail">' + (s.carrier_name || 'No carrier') + ' &bull; DL: ' + (s.dl_number || 'N/A') + '</div></div>' +
-        '<div class="scan-item-time">' + formatTime(s.scan_timestamp) + '<br><span style="font-size:11px;color:var(--text3);">Score: ' + s.risk_score + '</span></div></div>';
-    }).join('');
-    list.querySelectorAll('.scan-item').forEach(function(item) {
-      item.addEventListener('click', function() { showScanDetail(item.getAttribute('data-id')); });
-    });
-  } catch (e) { list.innerHTML = '<div class="text-center" style="color:var(--red);padding:32px;">Error loading scans</div>'; }
-}
-
-async function showScanDetail(id) {
-  showScreen('scan-detail-screen');
-  var content = document.getElementById('scan-detail-content');
-  content.innerHTML = '<div class="text-center text-muted">Loading...</div>';
-  try {
-    var s = await api('GET', '/scans/' + id);
-    var isExpired = s.expiration_date && new Date(s.expiration_date) < new Date();
-    content.innerHTML =
-      '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;">' +
-      '<div><div style="font-size:20px;font-weight:800;">' + (s.first_name || '?') + ' ' + (s.last_name || 'Unknown') + '</div>' +
-      '<div class="text-sm text-muted">DL: ' + (s.dl_number || 'N/A') + ' (' + (s.dl_state || '?') + ')</div></div>' +
-      '<div class="alert-dot ' + s.alert_level + '" style="width:20px;height:20px;"></div></div></div>' +
-      '<div class="card"><div style="font-weight:600;margin-bottom:8px;">Risk Assessment</div>' +
-      '<div style="font-size:36px;font-weight:800;color:' + (s.alert_level === 'RED' ? 'var(--red)' : s.alert_level === 'YELLOW' ? 'var(--yellow)' : 'var(--green)') + ';">' + s.risk_score + '/100</div></div>' +
-      '<div class="card"><div style="font-weight:600;margin-bottom:8px;">License Details</div>' +
-      '<div class="text-sm">DOB: ' + (s.date_of_birth || 'N/A') + '</div>' +
-      '<div class="text-sm">Exp: ' + (s.expiration_date || 'N/A') + (isExpired ? ' ⚠ EXPIRED' : '') + '</div>' +
-      '<div class="text-sm">Address: ' + (s.address_street || '') + ' ' + (s.address_city || '') + ', ' + (s.address_state || '') + ' ' + (s.address_zip || '') + '</div></div>' +
-      '<div class="card"><div style="font-weight:600;margin-bottom:8px;">BOL &amp; Carrier</div>' +
-      '<div class="text-sm">BOL: ' + (s.bol_number || 'N/A') + '</div>' +
-      '<div class="text-sm">Carrier: ' + (s.carrier_name || 'N/A') + '</div>' +
-      '<div class="text-sm">Destination: ' + (s.destination || 'N/A') + '</div>' +
-      '<div class="text-sm">Pickup Ref: ' + (s.pickup_reference || 'N/A') + '</div>' +
-      '<div class="text-sm">Plate: ' + (s.truck_plate || 'N/A') + ' | Trailer: ' + (s.trailer_number || 'N/A') + '</div></div>' +
-      (s.risk_flags ? '<div class="card"><div style="font-weight:600;margin-bottom:8px;">Score Reasons</div>' + JSON.parse(s.risk_flags).map(function(f) { return '<div class="risk-flag">&#9888; ' + f + '</div>'; }).join('') + '</div>' : '') +
-      '<div class="card text-sm text-muted"><div>Guard: ' + (s.guard_name || 'N/A') + ' | Site: ' + (s.site_name || 'N/A') + '</div>' +
-      '<div>Time: ' + new Date(s.scan_timestamp + 'Z').toLocaleString() + '</div>' +
-      '<div>GPS: ' + (s.latitude ? s.latitude.toFixed(4) + ', ' + s.longitude.toFixed(4) : 'N/A') + '</div>' +
-      '<div style="word-break:break-all;margin-top:4px;">Hash: ' + (s.integrity_hash || 'N/A') + '</div></div>';
-  } catch (e) { content.innerHTML = '<div class="text-center" style="color:var(--red);">Error loading scan</div>'; }
-}
-
-// ═══════════════════════════════════════════════════════════
-// WATCHLIST
-// ═══════════════════════════════════════════════════════════
-async function loadWatchlist() {
-  showScreen('watchlist-screen');
-  document.getElementById('watchlist-add-form').style.display = 'none';
-  var list = document.getElementById('watchlist-list');
-  list.innerHTML = '<div class="text-center text-muted">Loading...</div>';
-  try {
-    var entries = await api('GET', '/watchlist');
-    if (entries.length === 0) { list.innerHTML = '<div class="text-center text-muted" style="padding:32px;">No watchlist entries</div>'; return; }
-    list.innerHTML = entries.map(function(e) {
-      return '<div class="card" style="border-left:3px solid var(--' + (e.severity === 'RED' ? 'red' : 'yellow') + ');">' +
-        '<div style="display:flex;justify-content:space-between;align-items:start;"><div>' +
-        '<div style="font-weight:700;">' + (e.first_name || '?') + ' ' + (e.last_name || 'Unknown') + '</div>' +
-        '<div class="text-sm text-muted">DL: ' + e.dl_number + (e.dl_state ? ' (' + e.dl_state + ')' : '') + '</div>' +
-        '<div class="text-sm" style="margin-top:4px;">' + e.reason + '</div>' +
-        '<div class="text-sm text-muted" style="margin-top:4px;">Added: ' + new Date(e.added_at).toLocaleDateString() + ' by ' + (e.added_by_name || 'Unknown') + '</div></div>' +
-        '<button class="btn btn-outline wl-remove-btn" style="min-height:32px;padding:4px 10px;font-size:11px;" data-id="' + e.id + '">Remove</button></div></div>';
-    }).join('');
-    list.querySelectorAll('.wl-remove-btn').forEach(function(btn) {
-      btn.addEventListener('click', function() { removeWatchlist(btn.getAttribute('data-id')); });
-    });
-  } catch (e) { list.innerHTML = '<div class="text-center" style="color:var(--red);">Error loading watchlist</div>'; }
-}
-
-async function addToWatchlist() {
-  var dl = document.getElementById('w-dl').value.trim();
-  var reason = document.getElementById('w-reason').value.trim();
-  if (!dl || !reason) { showToast('DL number and reason required', 'error'); return; }
-  try {
-    await api('POST', '/watchlist', { dl_number: dl, first_name: document.getElementById('w-first').value, last_name: document.getElementById('w-last').value, reason: reason, severity: document.getElementById('w-severity').value });
-    showToast('Added to watchlist', 'success');
-    loadWatchlist();
-  } catch (e) { showToast('Error adding to watchlist', 'error'); }
-}
-
-async function removeWatchlist(id) {
-  if (!confirm('Remove from watchlist?')) return;
-  await api('DELETE', '/watchlist/' + id);
-  showToast('Removed', 'success');
-  loadWatchlist();
-}
-
-// ═══════════════════════════════════════════════════════════
 // DASHBOARD
-// ═══════════════════════════════════════════════════════════
-async function loadDashboard() {
-  showScreen('dashboard-screen');
-  var content = document.getElementById('dashboard-content');
-  content.innerHTML = '<div class="text-center text-muted">Loading...</div>';
-  try {
-    var d = await api('GET', '/dashboard/stats');
-    var alertMap = {};
-    (d.byAlert || []).forEach(function(a) { alertMap[a.alert_level] = a.cnt; });
-    content.innerHTML =
-      '<div class="stats-grid">' +
-      '<div class="card big-stat"><div class="big-stat-num">' + d.today + '</div><div class="stat-label">Today</div></div>' +
-      '<div class="card big-stat"><div class="big-stat-num">' + d.week + '</div><div class="stat-label">This Week</div></div>' +
-      '<div class="card big-stat"><div class="big-stat-num" style="color:var(--red)">' + (alertMap.RED || 0) + '</div><div class="stat-label">Red Alerts (7d)</div></div>' +
-      '<div class="card big-stat"><div class="big-stat-num" style="color:var(--yellow)">' + (alertMap.YELLOW || 0) + '</div><div class="stat-label">Elevated (7d)</div></div></div>' +
-      '<div class="card text-sm text-muted">Watchlist entries: ' + d.watchlistCount + ' | Monthly scans: ' + d.month + '</div>';
-  } catch (e) { content.innerHTML = '<div class="text-center" style="color:var(--red);">Error loading dashboard</div>'; }
-}
-
-function exportCSV() {
-  fetch('/api/export/scans', { headers: { 'Authorization': 'Bearer ' + token } })
-    .then(function(r) { return r.blob(); })
-    .then(function(blob) {
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement('a');
-      a.href = url;
-      a.download = 'shield_export_' + new Date().toISOString().slice(0,10) + '.csv';
-      a.click();
-      URL.revokeObjectURL(url);
-    })
-    .catch(function() { showToast('Export error', 'error'); });
-}
-
-// ═══════════════════════════════════════════════════════════
-// EVENT LISTENERS (no inline onclick - avoids CSP issues)
-// ═══════════════════════════════════════════════════════════
-document.getElementById('login-btn').addEventListener('click', doLogin);
-document.getElementById('login-pass').addEventListener('keydown', function(e) { if (e.key === 'Enter') doLogin(); });
-document.getElementById('login-user').addEventListener('keydown', function(e) { if (e.key === 'Enter') document.getElementById('login-pass').focus(); });
-document.getElementById('logout-btn').addEventListener('click', doLogout);
-document.getElementById('scan-btn').addEventListener('click', startScanner);
-document.getElementById('manual-btn').addEventListener('click', function() { showScreen('manual-screen'); });
-document.getElementById('recent-btn').addEventListener('click', loadRecentScans);
-document.getElementById('watchlist-btn').addEventListener('click', loadWatchlist);
-document.getElementById('admin-btn').addEventListener('click', loadDashboard);
-document.getElementById('confirm-cancel-btn').addEventListener('click', function() { showScreen('home-screen'); });
-document.getElementById('rescan-btn').addEventListener('click', startScanner);
-document.getElementById('confirm-btn').addEventListener('click', function() { readConfirmFields(); showScreen('bol-screen'); });
-document.getElementById('bol-back-btn').addEventListener('click', function() { showScreen('confirm-screen'); });
-document.getElementById('photo-dl-btn').addEventListener('click', function() { capturePhoto('dl'); });
-document.getElementById('photo-bol-btn').addEventListener('click', function() { capturePhoto('bol'); });
-document.getElementById('photo-truck-btn').addEventListener('click', function() { capturePhoto('truck'); });
-document.getElementById('submit-scan-btn').addEventListener('click', submitScan);
-document.getElementById('submit-manual-btn').addEventListener('click', submitManual);
-document.getElementById('complete-btn').addEventListener('click', resetToHome);
-document.getElementById('manual-back-btn').addEventListener('click', function() { showScreen('home-screen'); });
-document.getElementById('scans-back-btn').addEventListener('click', function() { showScreen('home-screen'); });
-document.getElementById('detail-back-btn').addEventListener('click', function() { showScreen('scans-screen'); });
-document.getElementById('wl-back-btn').addEventListener('click', function() { showScreen('home-screen'); });
-document.getElementById('wl-add-toggle').addEventListener('click', function() { var f = document.getElementById('watchlist-add-form'); f.style.display = f.style.display === 'none' ? '' : 'none'; });
-document.getElementById('wl-add-submit').addEventListener('click', addToWatchlist);
-document.getElementById('dash-back-btn').addEventListener('click', function() { showScreen('home-screen'); });
-document.getElementById('export-btn').addEventListener('click', exportCSV);
-document.getElementById('camera-cancel-btn').addEventListener('click', cancelCamera);
-
-// Scan guidance overlay
-document.getElementById('guidance-open-btn').addEventListener('click', openCameraAfterGuidance);
-document.getElementById('guidance-cancel-btn').addEventListener('click', function() {
-  document.getElementById('scan-guidance').classList.remove('active');
-});
-
-// Password visibility toggle
-document.querySelectorAll('.pw-toggle').forEach(function(btn) {
-  btn.addEventListener('click', function() {
-    var input = btn.parentElement.querySelector('input');
-    var isHidden = input.type === 'password';
-    input.type = isHidden ? 'text' : 'password';
-    // Swap icon: eye-off (hidden) → eye-open (visible)
-    btn.innerHTML = isHidden
-      ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>'
-      : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
-  });
-});
+async function loadDash(){try{const r=await fetch('/api/dashboard',{headers:{'x-auth-token':TK}});const d=await r.json();
+  document.getElementById('d-stats').innerHTML=`<div class="stat-card"><div class="stat-num" style="color:var(--blue)">${d.today}</div><div class="stat-label">Today</div></div><div class="stat-card"><div class="stat-num" style="color:var(--red)">${d.flagged}</div><div class="stat-label">Flagged</div></div><div class="stat-card"><div class="stat-num">${d.total}</div><div class="stat-label">All Time</div></div><div class="stat-card"><div class="stat-num" style="color:var(--amber)">${d.watchlist}</div><div class="stat-label">Watchlist</div></div>`;
+  document.getElementById('d-decode').innerHTML=d.decode?`ZXing-WASM · ${d.decode.rate}% success · ${d.decode.avg_ms}ms avg · ${d.decode.total} attempts`:'No decode data';
+  loadWL();}catch(e){toast('Failed','error');}}
+async function loadWL(){try{const r=await fetch('/api/watchlist',{headers:{'x-auth-token':TK}});const items=await r.json();
+  document.getElementById('d-wl').innerHTML=items.length?items.map(w=>`<div class="scan-item"><div><div class="scan-item-name">${w.first_name||''} ${w.last_name||'—'}</div><div class="scan-item-meta">${w.dl_number||'No DL'} · ${w.reason||''}</div></div><button class="btn btn-red btn-sm" style="width:auto;padding:6px 12px;font-size:12px" onclick="rmWL('${w.id}')">✕</button></div>`).join(''):'<p style="color:var(--muted);font-size:13px">Empty</p>';}catch(_){}}
+function toggleWLForm(){const f=document.getElementById('wl-form');f.style.display=f.style.display==='none'?'block':'none';}
+async function addWL(){try{await fetch('/api/watchlist',{method:'POST',headers:{'Content-Type':'application/json','x-auth-token':TK},body:JSON.stringify({dl_number:document.getElementById('wl-dl').value,last_name:document.getElementById('wl-last').value,reason:document.getElementById('wl-reason').value})});['wl-dl','wl-last','wl-reason'].forEach(id=>document.getElementById(id).value='');document.getElementById('wl-form').style.display='none';loadWL();toast('Added','success');}catch(e){toast('Failed','error');}}
+async function rmWL(id){await fetch('/api/watchlist/'+id,{method:'DELETE',headers:{'x-auth-token':TK}});loadWL();}
+function toast(msg,type){const t=document.getElementById('toast');t.className=`toast toast-${type||'info'} show`;t.textContent=msg;setTimeout(()=>t.classList.remove('show'),3500);}
 </script>
 </body>
 </html>
