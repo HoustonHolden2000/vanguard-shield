@@ -6,7 +6,6 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Iron Halo Verify</title>
-<script src="/dbr/dbr.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--bg:#0a0a0f;--surface:#14141f;--card:#1a1a2e;--border:#2a2a3e;--blue:#0056A0;--green:#00c853;--red:#ff3d3d;--amber:#ffab00;--text:#e8e8f0;--muted:#8888a0;--radius:12px}
@@ -305,16 +304,30 @@ if(TK&&US){fetch('/api/dashboard',{headers:{'x-auth-token':TK}}).then(r=>{if(r.o
 document.getElementById('l-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 
 // ═══════════════════════════════════════════════════════════
-// DYNAMSOFT SDK (self-hosted from /dbr/)
+// DYNAMSOFT SDK (self-hosted from /dbr/, loaded dynamically)
 // ═══════════════════════════════════════════════════════════
+let sdkLoaded=false;
+function loadSDK(){
+  return new Promise(function(resolve,reject){
+    if(sdkLoaded&&window.Dynamsoft){resolve();return;}
+    console.log('[DYN] Loading SDK from /dbr/dbr.js...');
+    var s=document.createElement('script');
+    s.src='/dbr/dbr.js';
+    s.onload=function(){sdkLoaded=true;console.log('[DYN] SDK loaded OK');resolve();};
+    s.onerror=function(){reject(new Error('Failed to load Dynamsoft SDK'));};
+    document.head.appendChild(s);
+  });
+}
+
 async function getDynamsoftReader(){
   if(dynamsoftReader)return dynamsoftReader;
-  if(typeof Dynamsoft==='undefined')throw new Error('Dynamsoft SDK not loaded');
+  await loadSDK();
+  if(typeof Dynamsoft==='undefined')throw new Error('Dynamsoft SDK not available');
   console.log('[DYN] Creating reader instance...');
   Dynamsoft.DBR.BarcodeReader.engineResourcePath='/dbr/';
   Dynamsoft.DBR.BarcodeReader.license='DLS2eyJvcmdhbml6YXRpb25JRCI6IjIwMDAwMSJ9';
   dynamsoftReader=await Dynamsoft.DBR.BarcodeReader.createInstance();
-  const settings=await dynamsoftReader.getRuntimeSettings();
+  var settings=await dynamsoftReader.getRuntimeSettings();
   settings.barcodeFormatIds=Dynamsoft.DBR.EnumBarcodeFormat.BF_PDF417;
   settings.expectedBarcodesCount=1;
   settings.deblurLevel=5;
