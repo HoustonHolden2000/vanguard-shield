@@ -615,7 +615,13 @@ async function initDynamsoft() {
   await loadSDK();
   Dynamsoft.DBR.BarcodeReader.engineResourcePath = '/dbr/';
   Dynamsoft.DBR.BarcodeReader.license = 'DLS2eyJvcmdhbml6YXRpb25JRCI6IjIwMDAwMSJ9';
-  dynReader = await Dynamsoft.DBR.BarcodeReader.createInstance();
+  // createInstance loads the 3MB WASM — timeout after 30s
+  dynReader = await Promise.race([
+    Dynamsoft.DBR.BarcodeReader.createInstance(),
+    new Promise(function(_, reject) {
+      setTimeout(function() { reject(new Error('WASM load timed out (30s) — check connection and retry')); }, 30000);
+    })
+  ]);
   var settings = await dynReader.getRuntimeSettings();
   settings.barcodeFormatIds = Dynamsoft.DBR.EnumBarcodeFormat.BF_PDF417;
   settings.expectedBarcodesCount = 1;
@@ -1292,10 +1298,12 @@ function exportCSV() {
 loadSDK().catch(function() {});
 
 // ═══════════════════════════════════════════════════════════
-// PWA
+// UNREGISTER ANY OLD SERVICE WORKER (interferes with WASM loading)
 // ═══════════════════════════════════════════════════════════
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js').catch(() => {});
+  navigator.serviceWorker.getRegistrations().then(function(regs) {
+    for (var i = 0; i < regs.length; i++) { regs[i].unregister(); }
+  });
 }
 </script>
 </body>

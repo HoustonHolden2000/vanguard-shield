@@ -1,3 +1,5 @@
-self.addEventListener('install', e => self.skipWaiting());
-self.addEventListener('activate', e => e.waitUntil(clients.claim()));
-self.addEventListener('fetch', e => e.respondWith(fetch(e.request).catch(() => new Response('Offline', { status: 503 }))));
+// Self-destruct: unregister this service worker and stop intercepting requests
+self.addEventListener('install', function() { self.skipWaiting(); });
+self.addEventListener('activate', function(e) {
+  e.waitUntil(self.registration.unregister());
+});
