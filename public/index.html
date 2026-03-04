@@ -437,7 +437,7 @@ async function processImage(img){
     displayResult(fields);
   }else{
     dbg('FAIL: barcode found but no fields extracted');
-    showStatus('fail','Barcode found but could not extract data. Try a clearer photo.');
+    showStatus('fail','Barcode found but parser failed. Keys: ' + Object.keys(barcodeItem).join(','));
     showDebug('Barcode found but 0 fields extracted. '+totalMs+'ms. Tap DUMP for raw data.');
     showRetryBtn();
   }
@@ -475,6 +475,9 @@ async function parseLicense(barcodeItem){
       if(fields.lastName||fields.firstName||fields.dlNumber)return fields;
     }
   }catch(e){dbg('AAMVA text parse THREW: '+e.message);}
+  console.log("BARCODE ITEM KEYS:", Object.keys(barcodeItem));
+  console.log("BARCODE TEXT:", barcodeItem.text || barcodeItem.barcodeText || "NO TEXT PROPERTY");
+  console.log("BARCODE BYTES:", barcodeItem.bytes ? "YES" : barcodeItem.barcodeBytes ? "YES-old" : "NO BYTES");
   return fields;
 }
 
