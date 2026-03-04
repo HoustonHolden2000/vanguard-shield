@@ -471,9 +471,10 @@ let currentScanFilter = '';
 let cameraResolve = null;
 let cameraStream = null;
 
-// Dynamsoft SDK state (proven path from test_scanner.html)
+// Dynamsoft v11 SDK state
 var sdkLoaded = false;
-var dynReader = null;
+var cvRouter = null;
+var codeParser = null;
 
 // ═══════════════════════════════════════════════════════════
 // HELPERS
@@ -613,7 +614,7 @@ async function loadHomeStats() {
 }
 
 // ═══════════════════════════════════════════════════════════
-// DYNAMSOFT SDK — self-hosted, proven decode path (from test_scanner.html)
+// DYNAMSOFT v11 SDK — barcode reader + code parser
 // ═══════════════════════════════════════════════════════════
 function loadScript(url) {
   return new Promise(function(resolve, reject) {
@@ -625,30 +626,20 @@ function loadScript(url) {
   });
 }
 
-async function loadSDK() {
-  if (sdkLoaded && window.Dynamsoft) return;
-  await loadScript('https://cdn.jsdelivr.net/npm/dynamsoft-javascript-barcode@9.6.42/dist/dbr.js');
-  if (!window.Dynamsoft) throw new Error('Dynamsoft global not found');
-  sdkLoaded = true;
-}
-
 async function initDynamsoft() {
-  if (dynReader) return;
-  await loadSDK();
-  Dynamsoft.DBR.BarcodeReader.engineResourcePath = 'https://cdn.jsdelivr.net/npm/dynamsoft-javascript-barcode@9.6.42/dist/';
-  Dynamsoft.DBR.BarcodeReader.license = 'DLS2eyJvcmdhbml6YXRpb25JRCI6IjIwMDAwMSJ9';
-  // createInstance loads the 3MB WASM — timeout after 30s
-  dynReader = await Promise.race([
-    Dynamsoft.DBR.BarcodeReader.createInstance(),
-    new Promise(function(_, reject) {
-      setTimeout(function() { reject(new Error('WASM load timed out (30s) — check connection and retry')); }, 30000);
-    })
-  ]);
-  var settings = await dynReader.getRuntimeSettings();
-  settings.barcodeFormatIds = Dynamsoft.DBR.EnumBarcodeFormat.BF_PDF417;
-  settings.expectedBarcodesCount = 1;
-  settings.deblurLevel = 9;
-  await dynReader.updateRuntimeSettings(settings);
+  if (cvRouter && codeParser) return;
+  // Load v11 bundle if not already loaded
+  if (!sdkLoaded || !window.Dynamsoft || !window.Dynamsoft.CVR) {
+    await loadScript('https://cdn.jsdelivr.net/npm/dynamsoft-barcode-reader-bundle@11.0.3000/dist/dbr.bundle.js');
+    if (!window.Dynamsoft || !window.Dynamsoft.CVR) throw new Error('Dynamsoft v11 bundle not found');
+    sdkLoaded = true;
+  }
+  // License + WASM init
+  Dynamsoft.License.LicenseManager.initLicense("DLS2eyJoYW5kc2hha2VDb2RlIjoiMTA1MjUzODIxLU1UQTFNalV6T0RJeExYZGxZaTFVY21saGJGQnliMm8iLCJtYWluU2VydmVyVVJMIjoiaHR0cHM6Ly9tZGxzLmR5bmFtc29mdG9ubGluZS5jb20vIiwib3JnYW5pemF0aW9uSUQiOiIxMDUyNTM4MjEiLCJzdGFuZGJ5U2VydmVyVVJMIjoiaHR0cHM6Ly9zZGxzLmR5bmFtc29mdG9ubGluZS5jb20vIiwiY2hlY2tDb2RlIjotMTcyMDI3MzcyOX0=");
+  await Dynamsoft.Core.CoreModule.loadWasm(["DBR", "DCP"]);
+  await Dynamsoft.DCP.CodeParserModule.loadSpec("AAMVA_DL_ID");
+  cvRouter = await Dynamsoft.CVR.CaptureVisionRouter.createInstance();
+  codeParser = await Dynamsoft.DCP.CodeParser.createInstance();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -716,12 +707,12 @@ function preprocessCanvas(img, w, h, contrastMult, invert) {
   return c;
 }
 
-// Decode a blob/file through preprocess pipeline (3 attempts)
+// Decode a blob/file through preprocess + Dynamsoft v11 CaptureVisionRouter
 async function decodeBarcodeFromBlob(blob) {
   var statusEl = document.getElementById('scan-status');
 
-  // Init Dynamsoft if needed
-  if (!dynReader) {
+  // Init Dynamsoft v11 if needed
+  if (!cvRouter || !codeParser) {
     statusEl.textContent = 'Loading decoder (first time)...';
     statusEl.style.color = 'var(--text2)';
     await initDynamsoft();
@@ -734,29 +725,142 @@ async function decodeBarcodeFromBlob(blob) {
   URL.revokeObjectURL(url);
 
   var w = img.naturalWidth, h = img.naturalHeight;
-  var attempts = [
-    { contrast: 1.5, invert: false, label: 'sharp + 1.5x contrast' },
-    { contrast: 2.0, invert: false, label: 'sharp + 2.0x contrast' },
-    { contrast: 1.5, invert: true,  label: 'sharp + inverted' }
-  ];
 
+  // Preprocess: grayscale + contrast boost + sharpen
+  var processed = preprocessCanvas(img, w, h, 1.5, false);
+
+  // Two decode attempts: Balance first, then ReadRateFirst
+  var templates = ['ReadBarcodes_Balance', 'ReadBarcodes_ReadRateFirst'];
   var t0 = Date.now();
-  for (var ai = 0; ai < attempts.length; ai++) {
-    var att = attempts[ai];
-    statusEl.textContent = 'Attempt ' + (ai+1) + '/3 (' + att.label + ') — ' + w + 'x' + h + '...';
-    var processed = preprocessCanvas(img, w, h, att.contrast, att.invert);
-    var results = await dynReader.decode(processed);
-    if (results && results.length > 0 && results[0].barcodeText && results[0].barcodeText.length > 20) {
-      var elapsed = Date.now() - t0;
-      statusEl.textContent = 'Decoded in ' + elapsed + 'ms (attempt ' + (ai+1) + ')!';
-      statusEl.style.color = 'var(--green)';
-      onScanSuccess(results[0].barcodeText);
-      return;
+
+  for (var ti = 0; ti < templates.length; ti++) {
+    var template = templates[ti];
+    statusEl.textContent = 'Attempt ' + (ti+1) + '/2 (' + template + ') — ' + w + 'x' + h + '...';
+
+    var result = await cvRouter.capture(processed, template);
+
+    if (result.items && result.items.length > 0) {
+      // type 2 = barcode result item
+      var barcodeItem = result.items.find(function(item) { return item.type === 2; });
+      if (barcodeItem && barcodeItem.bytes && barcodeItem.bytes.length > 20) {
+        var elapsed = Date.now() - t0;
+
+        // Try CodeParser for structured AAMVA fields
+        try {
+          var parsedResult = await codeParser.parse(barcodeItem.bytes);
+          var dlInfo = JSON.parse(parsedResult.jsonString);
+          console.log('Dynamsoft v11 CodeParser result:', dlInfo);
+
+          // Map v11 CodeParser fields to existing form field names
+          var fields = mapCodeParserFields(dlInfo);
+
+          statusEl.textContent = 'Decoded + parsed in ' + elapsed + 'ms (attempt ' + (ti+1) + ')!';
+          statusEl.style.color = 'var(--green)';
+
+          // Trigger success flow (vibration, flash, confirm screen)
+          if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
+          var flash = document.createElement('div');
+          flash.className = 'scan-success-flash';
+          document.body.appendChild(flash);
+          flash.addEventListener('animationend', function() { flash.remove(); });
+
+          currentScanData = fields;
+          showConfirmScreen(fields);
+          return;
+        } catch (parseErr) {
+          console.warn('CodeParser failed, falling back to raw text parse:', parseErr);
+          // Fall back to raw barcode text through existing AAMVA parser
+          var rawText = barcodeItem.text || new TextDecoder().decode(new Uint8Array(barcodeItem.bytes));
+          if (rawText && rawText.length > 20) {
+            statusEl.textContent = 'Decoded in ' + elapsed + 'ms (raw parse, attempt ' + (ti+1) + ')!';
+            statusEl.style.color = 'var(--green)';
+            onScanSuccess(rawText);
+            return;
+          }
+        }
+      }
     }
   }
 
   statusEl.textContent = 'Could not read barcode — try again or enter manually';
   statusEl.style.color = 'var(--red)';
+}
+
+// Map Dynamsoft v11 CodeParser AAMVA JSON to existing form fields
+function mapCodeParserFields(dlInfo) {
+  var fields = {};
+
+  // Helper: safely get a nested value or check multiple possible paths
+  function g(obj) {
+    for (var i = 1; i < arguments.length; i++) {
+      var key = arguments[i];
+      if (obj && obj[key] !== undefined && obj[key] !== null && obj[key] !== '') return String(obj[key]);
+    }
+    return '';
+  }
+
+  // The CodeParser JSON may nest fields under different structures
+  // Try common AAMVA field names from the v11 parser
+  var src = dlInfo.CodeParserResult || dlInfo.ResultInfo || dlInfo;
+
+  fields.first_name = g(src, 'firstName', 'First Name', 'DAC', 'DCT') ||
+                       g(dlInfo, 'firstName', 'First Name', 'DAC', 'DCT');
+  fields.last_name = g(src, 'lastName', 'Last Name', 'DCS') ||
+                      g(dlInfo, 'lastName', 'Last Name', 'DCS');
+  fields.middle_name = g(src, 'middleName', 'Middle Name', 'DAD') ||
+                        g(dlInfo, 'middleName', 'Middle Name', 'DAD');
+  fields.dl_number = g(src, 'licenseNumber', 'License Number', 'DAQ') ||
+                      g(dlInfo, 'licenseNumber', 'License Number', 'DAQ');
+  fields.date_of_birth = g(src, 'dateOfBirth', 'Date of Birth', 'DBB') ||
+                          g(dlInfo, 'dateOfBirth', 'Date of Birth', 'DBB');
+  fields.expiration_date = g(src, 'expirationDate', 'Expiration Date', 'DBA') ||
+                            g(dlInfo, 'expirationDate', 'Expiration Date', 'DBA');
+  fields.issue_date = g(src, 'issueDate', 'Issue Date', 'DBD') ||
+                       g(dlInfo, 'issueDate', 'Issue Date', 'DBD');
+  fields.address_street = g(src, 'street', 'Street', 'DAG') ||
+                           g(dlInfo, 'street', 'Street', 'DAG');
+  fields.address_city = g(src, 'city', 'City', 'DAI') ||
+                         g(dlInfo, 'city', 'City', 'DAI');
+  fields.address_state = g(src, 'state', 'Jurisdiction', 'DAJ') ||
+                          g(dlInfo, 'state', 'Jurisdiction', 'DAJ');
+  fields.dl_state = fields.address_state;
+  fields.address_zip = g(src, 'zipCode', 'Postal Code', 'DAK') ||
+                        g(dlInfo, 'zipCode', 'Postal Code', 'DAK');
+  fields.gender = g(src, 'sex', 'Sex', 'DBC') ||
+                   g(dlInfo, 'sex', 'Sex', 'DBC');
+  fields.eye_color = g(src, 'eyeColor', 'Eye Color', 'DAY') ||
+                      g(dlInfo, 'eyeColor', 'Eye Color', 'DAY');
+  fields.height = g(src, 'height', 'Height', 'DAU') ||
+                   g(dlInfo, 'height', 'Height', 'DAU');
+
+  // Normalize dates to YYYY-MM-DD
+  for (var df of ['date_of_birth', 'expiration_date', 'issue_date']) {
+    if (fields[df] && fields[df].length >= 8) {
+      var d = fields[df].replace(/[^0-9]/g, '');
+      if (d.length === 8) {
+        var first2 = parseInt(d.slice(0, 2));
+        if (first2 > 12) {
+          fields[df] = d.slice(0,4) + '-' + d.slice(4,6) + '-' + d.slice(6,8);
+        } else {
+          fields[df] = d.slice(4,8) + '-' + d.slice(0,2) + '-' + d.slice(2,4);
+        }
+      }
+    }
+  }
+
+  // Gender normalize
+  if (fields.gender === '1') fields.gender = 'M';
+  else if (fields.gender === '2') fields.gender = 'F';
+
+  // Zip first 5
+  if (fields.address_zip) fields.address_zip = fields.address_zip.substring(0, 5);
+
+  // Capitalize names
+  for (var nf of ['first_name', 'last_name', 'middle_name', 'address_city']) {
+    if (fields[nf]) fields[nf] = fields[nf].charAt(0).toUpperCase() + fields[nf].slice(1).toLowerCase();
+  }
+
+  return fields;
 }
 
 // Open camera overlay with barcode guide for scanning
