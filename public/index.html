@@ -279,10 +279,11 @@ label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); 
     <div></div>
   </div>
   <div class="content" style="text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;">
-    <div id="scan-status" style="color:var(--text2);font-size:14px;margin-bottom:20px;"></div>
+    <div id="scan-status" style="color:var(--text2);font-size:16px;font-weight:600;margin-bottom:20px;min-height:24px;"></div>
     <input type="file" id="barcode-file-input" accept="image/*" capture="environment" style="display:none;">
-    <button class="btn btn-primary btn-full btn-lg" type="button" onclick="openBarcodeCamera()">SCAN LICENSE</button>
-    <p style="margin-top:16px;color:var(--text2);font-size:13px;">Opens camera with barcode alignment guide</p>
+    <button class="btn btn-primary btn-full btn-lg" id="scan-btn" type="button" onclick="openBarcodeCamera()">SCAN LICENSE</button>
+    <p id="scan-hint" style="margin-top:16px;color:var(--text2);font-size:13px;">Opens camera with barcode alignment guide</p>
+    <button class="btn btn-full btn-lg" id="retry-btn" type="button" onclick="openBarcodeCamera()" style="display:none;background:var(--red);color:white;margin-top:12px;">SCAN FAILED — TAP TO RETRY</button>
     <button class="btn btn-outline btn-full mt-16" onclick="showScreen('manual-screen')">ENTER MANUALLY</button>
   </div>
 </div>
@@ -648,8 +649,8 @@ async function initDynamsoft() {
 function startScanner() {
   currentScanData = {};
   capturedPhotos = { dl: null, bol: null, truck: null };
-  document.getElementById('scan-status').textContent = '';
-  document.getElementById('scan-status').style.color = 'var(--text2)';
+  setScanStatus('', 'var(--text2)');
+  showRetryButton(false);
   showScreen('scanner-screen');
 }
 
@@ -709,16 +710,13 @@ function preprocessCanvas(img, w, h, contrastMult, invert) {
 
 // Decode a blob/file through preprocess + Dynamsoft v11 CaptureVisionRouter
 async function decodeBarcodeFromBlob(blob) {
-  var statusEl = document.getElementById('scan-status');
-
   // Init Dynamsoft v11 if needed
   if (!cvRouter || !codeParser) {
-    statusEl.textContent = 'Loading decoder (first time)...';
-    statusEl.style.color = 'var(--text2)';
+    setScanStatus('Loading barcode engine (first time)...', 'var(--yellow)');
     await initDynamsoft();
   }
 
-  statusEl.textContent = 'Decoding barcode...';
+  setScanStatus('Processing photo...', 'var(--yellow)');
   var img = new Image();
   var url = URL.createObjectURL(blob);
   await new Promise(function(resolve, reject) { img.onload = resolve; img.onerror = reject; img.src = url; });
@@ -729,13 +727,15 @@ async function decodeBarcodeFromBlob(blob) {
   // Preprocess: grayscale + contrast boost + sharpen
   var processed = preprocessCanvas(img, w, h, 1.5, false);
 
+  setScanStatus('Reading barcode...', 'var(--yellow)');
+
   // Two decode attempts: Balance first, then ReadRateFirst
   var templates = ['ReadBarcodes_Balance', 'ReadBarcodes_ReadRateFirst'];
   var t0 = Date.now();
 
   for (var ti = 0; ti < templates.length; ti++) {
     var template = templates[ti];
-    statusEl.textContent = 'Attempt ' + (ti+1) + '/2 (' + template + ') — ' + w + 'x' + h + '...';
+    if (ti === 1) setScanStatus('Retrying with enhanced reader...', 'var(--yellow)');
 
     var result = await cvRouter.capture(processed, template);
 
@@ -744,6 +744,8 @@ async function decodeBarcodeFromBlob(blob) {
       var barcodeItem = result.items.find(function(item) { return item.type === 2; });
       if (barcodeItem && barcodeItem.bytes && barcodeItem.bytes.length > 20) {
         var elapsed = Date.now() - t0;
+
+        setScanStatus('Populating fields...', 'var(--green)');
 
         // Try CodeParser for structured AAMVA fields
         try {
@@ -754,8 +756,7 @@ async function decodeBarcodeFromBlob(blob) {
           // Map v11 CodeParser fields to existing form field names
           var fields = mapCodeParserFields(dlInfo);
 
-          statusEl.textContent = 'Decoded + parsed in ' + elapsed + 'ms (attempt ' + (ti+1) + ')!';
-          statusEl.style.color = 'var(--green)';
+          setScanStatus('Scan complete (' + elapsed + 'ms)', 'var(--green)');
 
           // Trigger success flow (vibration, flash, confirm screen)
           if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
@@ -772,8 +773,7 @@ async function decodeBarcodeFromBlob(blob) {
           // Fall back to raw barcode text through existing AAMVA parser
           var rawText = barcodeItem.text || new TextDecoder().decode(new Uint8Array(barcodeItem.bytes));
           if (rawText && rawText.length > 20) {
-            statusEl.textContent = 'Decoded in ' + elapsed + 'ms (raw parse, attempt ' + (ti+1) + ')!';
-            statusEl.style.color = 'var(--green)';
+            setScanStatus('Scan complete (' + elapsed + 'ms)', 'var(--green)');
             onScanSuccess(rawText);
             return;
           }
@@ -782,8 +782,9 @@ async function decodeBarcodeFromBlob(blob) {
     }
   }
 
-  statusEl.textContent = 'Could not read barcode — try again or enter manually';
-  statusEl.style.color = 'var(--red)';
+  // FAILURE — show retry button
+  setScanStatus('Scan failed — barcode not detected', 'var(--red)');
+  showRetryButton(true);
 }
 
 // Map Dynamsoft v11 CodeParser AAMVA JSON to existing form fields
@@ -863,8 +864,24 @@ function mapCodeParserFields(dlInfo) {
   return fields;
 }
 
+// Helper: update scan UI state
+function setScanStatus(msg, color) {
+  var el = document.getElementById('scan-status');
+  el.textContent = msg;
+  el.style.color = color || 'var(--text2)';
+}
+
+function showRetryButton(show) {
+  document.getElementById('retry-btn').style.display = show ? 'flex' : 'none';
+  document.getElementById('scan-btn').style.display = show ? 'none' : 'flex';
+  document.getElementById('scan-hint').style.display = show ? 'none' : 'block';
+}
+
 // Open camera overlay with barcode guide for scanning
 function openBarcodeCamera() {
+  showRetryButton(false);
+  setScanStatus('Opening camera...', 'var(--text2)');
+
   var overlay = document.getElementById('camera-overlay');
   var video = document.getElementById('camera-video');
   var canvas = document.getElementById('camera-canvas');
@@ -878,8 +895,10 @@ function openBarcodeCamera() {
       cameraStream = stream;
       video.srcObject = stream;
       video.play();
+      setScanStatus('Camera ready — take photo', 'var(--text2)');
 
       document.getElementById('camera-shutter').onclick = function() {
+        setScanStatus('Processing photo...', 'var(--yellow)');
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         canvas.getContext('2d').drawImage(video, 0, 0);
@@ -890,15 +909,15 @@ function openBarcodeCamera() {
           cameraStream = null;
 
           decodeBarcodeFromBlob(blob).catch(function(err) {
-            var statusEl = document.getElementById('scan-status');
-            statusEl.textContent = 'Decode error: ' + err.message;
-            statusEl.style.color = 'var(--red)';
+            setScanStatus('Scan failed — ' + err.message, 'var(--red)');
+            showRetryButton(true);
           });
         }, 'image/jpeg', 0.92);
       };
     })
     .catch(function(e) {
       overlay.classList.remove('active', 'barcode-mode');
+      setScanStatus('Camera blocked — using file picker...', 'var(--yellow)');
       // Fallback to file input if camera access denied
       document.getElementById('barcode-file-input').click();
     });
@@ -908,12 +927,13 @@ function openBarcodeCamera() {
 document.getElementById('barcode-file-input').addEventListener('change', async function(e) {
   var file = e.target.files[0];
   if (!file) return;
+  showRetryButton(false);
+  setScanStatus('Processing photo...', 'var(--yellow)');
   try {
     await decodeBarcodeFromBlob(file);
   } catch(err) {
-    var statusEl = document.getElementById('scan-status');
-    statusEl.textContent = 'Decode error: ' + err.message;
-    statusEl.style.color = 'var(--red)';
+    setScanStatus('Scan failed — ' + err.message, 'var(--red)');
+    showRetryButton(true);
   }
   e.target.value = '';
 });

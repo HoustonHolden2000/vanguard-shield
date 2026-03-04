@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Decode Test — Dynamsoft v11</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Courier New', monospace; background: #0a0a0a; color: #eee; padding: 20px; }
+h1 { color: #0070CC; margin-bottom: 10px; font-size: 20px; }
+.status { padding: 12px; margin: 10px 0; border-radius: 6px; font-size: 14px; }
+.status-loading { background: #1a1a1a; border: 1px solid #333; color: #999; }
+.status-success { background: #0a2a0a; border: 1px solid #00C853; color: #00C853; }
+.status-error { background: #2a0a0a; border: 1px solid #FF1744; color: #FF1744; }
+.field-table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+.field-table th, .field-table td { padding: 8px 12px; text-align: left; border: 1px solid #333; font-size: 13px; }
+.field-table th { background: #1a1a1a; color: #0070CC; width: 40%; }
+.field-table td { background: #111; }
+.raw-json { background: #111; border: 1px solid #333; padding: 12px; border-radius: 6px; font-size: 12px; white-space: pre-wrap; word-break: break-all; max-height: 400px; overflow-y: auto; margin: 10px 0; }
+button { padding: 12px 24px; border: none; border-radius: 6px; font-size: 16px; font-weight: 600; cursor: pointer; margin: 8px 4px; }
+.btn-blue { background: #0056A0; color: white; }
+.btn-blue:disabled { opacity: 0.4; cursor: not-allowed; }
+.section { margin: 16px 0; padding: 16px; background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 8px; }
+.section h2 { color: #0070CC; font-size: 16px; margin-bottom: 10px; }
+#mapped-fields { display: none; }
+#raw-output { display: none; }
+</style>
+</head>
+<body>
+<h1>DYNAMSOFT v11 DECODE TEST</h1>
+<p style="color:#666;font-size:13px;margin-bottom:16px;">This page loads the Dynamsoft v11 bundle, decodes a photo, and shows every field returned by CodeParser.</p>
+
+<div id="status" class="status status-loading">Ready. Take a photo of a driver's license barcode to test.</div>
+
+<div style="margin:16px 0;">
+  <input type="file" id="test-file" accept="image/*" capture="environment" style="display:none;">
+  <button class="btn-blue" id="test-btn" onclick="document.getElementById('test-file').click()">TAKE PHOTO &amp; DECODE</button>
+</div>
+
+<div id="mapped-fields" class="section">
+  <h2>MAPPED FORM FIELDS</h2>
+  <p style="color:#666;font-size:12px;margin-bottom:8px;">These are what populate the confirm screen.</p>
+  <table class="field-table" id="mapped-table"><tbody></tbody></table>
+</div>
+
+<div id="raw-output" class="section">
+  <h2>RAW CodeParser JSON (every field)</h2>
+  <p style="color:#666;font-size:12px;margin-bottom:8px;">Full output from Dynamsoft v11 CodeParser — all keys and values.</p>
+  <div class="raw-json" id="raw-json"></div>
+</div>
+
+<div id="all-keys" class="section" style="display:none;">
+  <h2>ALL KEYS IN RESPONSE</h2>
+  <table class="field-table" id="keys-table"><tbody></tbody></table>
+</div>
+
+<script>
+var statusEl = document.getElementById('status');
+var cvRouter = null;
+var codeParser = null;
+
+function setStatus(msg, type) {
+  statusEl.textContent = msg;
+  statusEl.className = 'status status-' + type;
+}
+
+document.getElementById('test-file').addEventListener('change', async function(e) {
+  var file = e.target.files[0];
+  if (!file) return;
+  e.target.value = '';
+
+  document.getElementById('test-btn').disabled = true;
+
+  try {
+    // Step 1: Load SDK
+    if (!cvRouter) {
+      setStatus('Loading Dynamsoft v11 bundle (~5MB WASM)...', 'loading');
+      var script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/dynamsoft-barcode-reader-bundle@11.0.3000/dist/dbr.bundle.js';
+      await new Promise(function(res, rej) { script.onload = res; script.onerror = rej; document.head.appendChild(script); });
+
+      setStatus('Initializing license...', 'loading');
+      Dynamsoft.License.LicenseManager.initLicense("DLS2eyJoYW5kc2hha2VDb2RlIjoiMTA1MjUzODIxLU1UQTFNalV6T0RJeExYZGxZaTFVY21saGJGQnliMm8iLCJtYWluU2VydmVyVVJMIjoiaHR0cHM6Ly9tZGxzLmR5bmFtc29mdG9ubGluZS5jb20vIiwib3JnYW5pemF0aW9uSUQiOiIxMDUyNTM4MjEiLCJzdGFuZGJ5U2VydmVyVVJMIjoiaHR0cHM6Ly9zZGxzLmR5bmFtc29mdG9ubGluZS5jb20vIiwiY2hlY2tDb2RlIjotMTcyMDI3MzcyOX0=");
+
+      setStatus('Loading WASM modules (DBR + DCP)...', 'loading');
+      await Dynamsoft.Core.CoreModule.loadWasm(["DBR", "DCP"]);
+
+      setStatus('Loading AAMVA spec...', 'loading');
+      await Dynamsoft.DCP.CodeParserModule.loadSpec("AAMVA_DL_ID");
+
+      setStatus('Creating CaptureVisionRouter...', 'loading');
+      cvRouter = await Dynamsoft.CVR.CaptureVisionRouter.createInstance();
+
+      setStatus('Creating CodeParser...', 'loading');
+      codeParser = await Dynamsoft.DCP.CodeParser.createInstance();
+    }
+
+    // Step 2: Load image
+    setStatus('Loading photo...', 'loading');
+    var img = new Image();
+    var url = URL.createObjectURL(file);
+    await new Promise(function(res, rej) { img.onload = res; img.onerror = rej; img.src = url; });
+    URL.revokeObjectURL(url);
+
+    var canvas = document.createElement('canvas');
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    canvas.getContext('2d').drawImage(img, 0, 0);
+
+    // Step 3: Decode
+    setStatus('Decoding with ReadBarcodes_Balance (' + img.naturalWidth + 'x' + img.naturalHeight + ')...', 'loading');
+    var t0 = Date.now();
+    var result = await cvRouter.capture(canvas, "ReadBarcodes_Balance");
+
+    if (!result.items || result.items.length === 0) {
+      setStatus('Balance failed. Trying ReadBarcodes_ReadRateFirst...', 'loading');
+      result = await cvRouter.capture(canvas, "ReadBarcodes_ReadRateFirst");
+    }
+
+    var elapsed = Date.now() - t0;
+
+    if (!result.items || result.items.length === 0) {
+      setStatus('DECODE FAILED — no barcode found after ' + elapsed + 'ms. Try a clearer photo.', 'error');
+      document.getElementById('test-btn').disabled = false;
+      return;
+    }
+
+    // Step 4: Find barcode item
+    var barcodeItem = null;
+    for (var i = 0; i < result.items.length; i++) {
+      if (result.items[i].type === 2) { barcodeItem = result.items[i]; break; }
+    }
+
+    if (!barcodeItem) {
+      // Show what types we got
+      var types = result.items.map(function(it) { return 'type=' + it.type; }).join(', ');
+      setStatus('DECODE FOUND ITEMS BUT NO BARCODE (type=2). Got: ' + types, 'error');
+      document.getElementById('raw-output').style.display = 'block';
+      document.getElementById('raw-json').textContent = JSON.stringify(result.items, null, 2);
+      document.getElementById('test-btn').disabled = false;
+      return;
+    }
+
+    setStatus('Barcode found! Parsing with CodeParser...', 'loading');
+
+    // Step 5: Parse
+    var dlInfo = null;
+    var parseError = null;
+    try {
+      var parsedResult = await codeParser.parse(barcodeItem.bytes);
+      dlInfo = JSON.parse(parsedResult.jsonString);
+    } catch(pe) {
+      parseError = pe.message || String(pe);
+    }
+
+    // Step 6: Display results
+    if (dlInfo) {
+      setStatus('SUCCESS — Decoded + parsed in ' + elapsed + 'ms', 'success');
+
+      // Show raw JSON
+      document.getElementById('raw-output').style.display = 'block';
+      document.getElementById('raw-json').textContent = JSON.stringify(dlInfo, null, 2);
+
+      // Show all keys
+      document.getElementById('all-keys').style.display = 'block';
+      var keysBody = document.getElementById('keys-table').querySelector('tbody');
+      keysBody.innerHTML = '';
+      flattenAndDisplay(dlInfo, '', keysBody);
+
+      // Show mapped fields
+      document.getElementById('mapped-fields').style.display = 'block';
+      var mappedBody = document.getElementById('mapped-table').querySelector('tbody');
+      mappedBody.innerHTML = '';
+      var mapped = mapFields(dlInfo);
+      var fieldLabels = {
+        first_name: 'First Name', last_name: 'Last Name', middle_name: 'Middle Name',
+        dl_number: 'License Number', date_of_birth: 'Date of Birth',
+        expiration_date: 'Expiration Date', address_street: 'Street',
+        address_city: 'City', address_state: 'State', address_zip: 'Zip Code',
+        gender: 'Gender', eye_color: 'Eye Color', height: 'Height'
+      };
+      for (var key in fieldLabels) {
+        var tr = document.createElement('tr');
+        var th = document.createElement('th');
+        th.textContent = fieldLabels[key] + ' → ' + key;
+        var td = document.createElement('td');
+        td.textContent = mapped[key] || '(empty)';
+        td.style.color = mapped[key] ? '#00C853' : '#FF1744';
+        tr.appendChild(th);
+        tr.appendChild(td);
+        mappedBody.appendChild(tr);
+      }
+    } else {
+      setStatus('Barcode decoded but CodeParser FAILED: ' + parseError + '. Showing raw barcode text.', 'error');
+      document.getElementById('raw-output').style.display = 'block';
+      var rawText = '';
+      try { rawText = barcodeItem.text || new TextDecoder().decode(new Uint8Array(barcodeItem.bytes)); } catch(e) { rawText = '(could not decode bytes)'; }
+      document.getElementById('raw-json').textContent = 'RAW BARCODE TEXT:\n\n' + rawText + '\n\nBARCODE ITEM KEYS:\n' + Object.keys(barcodeItem).join(', ');
+    }
+
+  } catch(err) {
+    setStatus('ERROR: ' + err.message, 'error');
+    document.getElementById('raw-output').style.display = 'block';
+    document.getElementById('raw-json').textContent = err.stack || err.message;
+  }
+
+  document.getElementById('test-btn').disabled = false;
+});
+
+function flattenAndDisplay(obj, prefix, tbody) {
+  for (var key in obj) {
+    if (!obj.hasOwnProperty(key)) continue;
+    var fullKey = prefix ? prefix + '.' + key : key;
+    var val = obj[key];
+    if (val && typeof val === 'object' && !Array.isArray(val)) {
+      flattenAndDisplay(val, fullKey, tbody);
+    } else {
+      var tr = document.createElement('tr');
+      var th = document.createElement('th');
+      th.textContent = fullKey;
+      var td = document.createElement('td');
+      td.textContent = JSON.stringify(val);
+      tr.appendChild(th);
+      tr.appendChild(td);
+      tbody.appendChild(tr);
+    }
+  }
+}
+
+// Same mapping function as main app — test it here
+function mapFields(dlInfo) {
+  var fields = {};
+  function g(obj) {
+    for (var i = 1; i < arguments.length; i++) {
+      var key = arguments[i];
+      if (obj && obj[key] !== undefined && obj[key] !== null && obj[key] !== '') return String(obj[key]);
+    }
+    return '';
+  }
+  var src = dlInfo.CodeParserResult || dlInfo.ResultInfo || dlInfo;
+  fields.first_name = g(src, 'firstName', 'First Name', 'DAC', 'DCT') || g(dlInfo, 'firstName', 'First Name', 'DAC', 'DCT');
+  fields.last_name = g(src, 'lastName', 'Last Name', 'DCS') || g(dlInfo, 'lastName', 'Last Name', 'DCS');
+  fields.middle_name = g(src, 'middleName', 'Middle Name', 'DAD') || g(dlInfo, 'middleName', 'Middle Name', 'DAD');
+  fields.dl_number = g(src, 'licenseNumber', 'License Number', 'DAQ') || g(dlInfo, 'licenseNumber', 'License Number', 'DAQ');
+  fields.date_of_birth = g(src, 'dateOfBirth', 'Date of Birth', 'DBB') || g(dlInfo, 'dateOfBirth', 'Date of Birth', 'DBB');
+  fields.expiration_date = g(src, 'expirationDate', 'Expiration Date', 'DBA') || g(dlInfo, 'expirationDate', 'Expiration Date', 'DBA');
+  fields.address_street = g(src, 'street', 'Street', 'DAG') || g(dlInfo, 'street', 'Street', 'DAG');
+  fields.address_city = g(src, 'city', 'City', 'DAI') || g(dlInfo, 'city', 'City', 'DAI');
+  fields.address_state = g(src, 'state', 'Jurisdiction', 'DAJ') || g(dlInfo, 'state', 'Jurisdiction', 'DAJ');
+  fields.address_zip = g(src, 'zipCode', 'Postal Code', 'DAK') || g(dlInfo, 'zipCode', 'Postal Code', 'DAK');
+  fields.gender = g(src, 'sex', 'Sex', 'DBC') || g(dlInfo, 'sex', 'Sex', 'DBC');
+  fields.eye_color = g(src, 'eyeColor', 'Eye Color', 'DAY') || g(dlInfo, 'eyeColor', 'Eye Color', 'DAY');
+  fields.height = g(src, 'height', 'Height', 'DAU') || g(dlInfo, 'height', 'Height', 'DAU');
+  return fields;
+}
+</script>
+</body>
+</html>

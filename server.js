@@ -433,9 +433,14 @@ app.get('/api/debug/raw-decode', auth, (req, res) => {
   res.json(db.prepare('SELECT * FROM raw_decodes ORDER BY created_at DESC LIMIT 20').all());
 });
 
+// --- Test Decode (serves test-decode.html) ---
+app.get('/api/test-decode', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'test-decode.html'));
+});
+
 // --- Health ---
 app.get('/api/health', (req, res) => {
-  res.json({ status:'ok', version:'6.4.0', scanner:'Dynamsoft BarcodeReader v9.6.42 (photo-only)', uptime:Math.round(process.uptime()) });
+  res.json({ status:'ok', version:'6.5.0', scanner:'Dynamsoft v11.0.3000 CaptureVisionRouter + CodeParser (client-side)', uptime:Math.round(process.uptime()) });
 });
 
 
