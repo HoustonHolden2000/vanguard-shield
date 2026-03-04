@@ -670,7 +670,7 @@ document.getElementById('barcode-file-input').addEventListener('change', async f
 
     var w = img.naturalWidth, h = img.naturalHeight;
 
-    // Helper: draw to canvas, convert to grayscale, apply contrast multiplier
+    // Helper: draw to canvas, grayscale, contrast boost, sharpen
     function preprocessCanvas(contrastMult, invert) {
       var c = document.createElement('canvas');
       c.width = w; c.height = h;
@@ -678,23 +678,59 @@ document.getElementById('barcode-file-input').addEventListener('change', async f
       ctx.drawImage(img, 0, 0);
       var imageData = ctx.getImageData(0, 0, w, h);
       var d = imageData.data;
+      // Step 1: Grayscale + contrast
       for (var i = 0; i < d.length; i += 4) {
-        // Grayscale via luminance
         var gray = 0.299 * d[i] + 0.587 * d[i+1] + 0.114 * d[i+2];
-        // Contrast around midpoint 128
         gray = ((gray - 128) * contrastMult) + 128;
         gray = gray < 0 ? 0 : gray > 255 ? 255 : gray;
-        if (invert) gray = 255 - gray;
         d[i] = d[i+1] = d[i+2] = gray;
       }
       ctx.putImageData(imageData, 0, 0);
+      // Step 2: Sharpen using 3x3 convolution kernel
+      //  [ 0, -1,  0]
+      //  [-1,  5, -1]
+      //  [ 0, -1,  0]
+      var src = ctx.getImageData(0, 0, w, h);
+      var sd = src.data;
+      var out = ctx.createImageData(w, h);
+      var od = out.data;
+      for (var y = 0; y < h; y++) {
+        for (var x = 0; x < w; x++) {
+          var idx = (y * w + x) * 4;
+          if (x === 0 || x === w-1 || y === 0 || y === h-1) {
+            od[idx] = od[idx+1] = od[idx+2] = sd[idx];
+            od[idx+3] = 255;
+            continue;
+          }
+          var val = 5 * sd[idx]
+            - sd[((y-1)*w+x)*4]
+            - sd[((y+1)*w+x)*4]
+            - sd[(y*w+x-1)*4]
+            - sd[(y*w+x+1)*4];
+          val = val < 0 ? 0 : val > 255 ? 255 : val;
+          od[idx] = od[idx+1] = od[idx+2] = val;
+          od[idx+3] = 255;
+        }
+      }
+      ctx.putImageData(out, 0, 0);
+      // Step 3: Invert if requested
+      if (invert) {
+        var inv = ctx.getImageData(0, 0, w, h);
+        var id = inv.data;
+        for (var j = 0; j < id.length; j += 4) {
+          id[j] = 255 - id[j];
+          id[j+1] = 255 - id[j+1];
+          id[j+2] = 255 - id[j+2];
+        }
+        ctx.putImageData(inv, 0, 0);
+      }
       return c;
     }
 
     var attempts = [
-      { contrast: 1.5, invert: false, label: 'grayscale 1.5x' },
-      { contrast: 2.0, invert: false, label: 'grayscale 2.0x' },
-      { contrast: 1.5, invert: true,  label: 'inverted' }
+      { contrast: 1.5, invert: false, label: 'sharp + 1.5x contrast' },
+      { contrast: 2.0, invert: false, label: 'sharp + 2.0x contrast' },
+      { contrast: 1.5, invert: true,  label: 'sharp + inverted' }
     ];
 
     var decoded = false;
