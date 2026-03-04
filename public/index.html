@@ -148,6 +148,18 @@ label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); 
 .shutter-btn::after { content: ''; position: absolute; top: 6px; left: 6px; right: 6px; bottom: 6px; border-radius: 50%; background: white; transition: transform 0.1s; }
 .shutter-btn:active::after { transform: scale(0.9); }
 
+/* ─── BARCODE GUIDE OVERLAY ─── */
+#barcode-guide { display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: 5; pointer-events: none; }
+#camera-overlay.active.barcode-mode #barcode-guide { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.barcode-guide-frame { width: 85%; max-width: 360px; height: 140px; border: 3px solid rgba(0, 86, 160, 0.9); border-radius: 12px; position: relative; box-shadow: 0 0 0 2000px rgba(0,0,0,0.4); }
+.barcode-guide-corner { position: absolute; width: 24px; height: 24px; border-color: #0070CC; border-style: solid; }
+.barcode-guide-corner.tl { top: -3px; left: -3px; border-width: 4px 0 0 4px; border-radius: 8px 0 0 0; }
+.barcode-guide-corner.tr { top: -3px; right: -3px; border-width: 4px 4px 0 0; border-radius: 0 8px 0 0; }
+.barcode-guide-corner.bl { bottom: -3px; left: -3px; border-width: 0 0 4px 4px; border-radius: 0 0 0 8px; }
+.barcode-guide-corner.br { bottom: -3px; right: -3px; border-width: 0 4px 4px 0; border-radius: 0 0 8px 0; }
+.barcode-guide-text { margin-top: 16px; color: white; font-size: 14px; font-weight: 600; text-shadow: 0 1px 6px rgba(0,0,0,0.9); text-align: center; pointer-events: none; }
+.barcode-guide-sub { margin-top: 6px; color: rgba(255,255,255,0.7); font-size: 12px; text-shadow: 0 1px 4px rgba(0,0,0,0.9); text-align: center; pointer-events: none; }
+
 /* ─── FILTER TABS ─── */
 .filter-tabs { display: flex; gap: 6px; margin-bottom: 12px; overflow-x: auto; }
 .filter-tab { padding: 8px 14px; border-radius: 20px; border: 1px solid var(--border); background: transparent; color: var(--text2); font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
@@ -186,6 +198,16 @@ label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); 
     <button onclick="cancelCamera()" style="background:rgba(255,255,255,0.15);border:none;color:white;padding:8px 16px;border-radius:20px;font-family:inherit;font-size:14px;cursor:pointer;">Cancel</button>
   </div>
   <video id="camera-video" autoplay playsinline></video>
+  <div id="barcode-guide">
+    <div class="barcode-guide-frame">
+      <div class="barcode-guide-corner tl"></div>
+      <div class="barcode-guide-corner tr"></div>
+      <div class="barcode-guide-corner bl"></div>
+      <div class="barcode-guide-corner br"></div>
+    </div>
+    <div class="barcode-guide-text">Align barcode within frame</div>
+    <div class="barcode-guide-sub">Back of driver's license — PDF417 barcode</div>
+  </div>
   <div class="camera-controls">
     <button class="shutter-btn" id="camera-shutter"></button>
   </div>
@@ -259,8 +281,8 @@ label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); 
   <div class="content" style="text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;">
     <div id="scan-status" style="color:var(--text2);font-size:14px;margin-bottom:20px;"></div>
     <input type="file" id="barcode-file-input" accept="image/*" capture="environment" style="display:none;">
-    <button class="btn btn-primary btn-full btn-lg" type="button" onclick="document.getElementById('barcode-file-input').click()">SCAN LICENSE</button>
-    <p style="margin-top:16px;color:var(--text2);font-size:13px;">Point camera at barcode on the BACK of the driver's license</p>
+    <button class="btn btn-primary btn-full btn-lg" type="button" onclick="openBarcodeCamera()">SCAN LICENSE</button>
+    <p style="margin-top:16px;color:var(--text2);font-size:13px;">Opens camera with barcode alignment guide</p>
     <button class="btn btn-outline btn-full mt-16" onclick="showScreen('manual-screen')">ENTER MANUALLY</button>
   </div>
 </div>
@@ -640,125 +662,155 @@ function startScanner() {
   showScreen('scanner-screen');
 }
 
-// File input: user takes photo → decode with Dynamsoft (identical to test_scanner.html)
-document.getElementById('barcode-file-input').addEventListener('change', async function(e) {
-  var file = e.target.files[0];
-  if (!file) return;
+// Preprocess helper: grayscale, contrast boost, sharpen, optional invert
+function preprocessCanvas(img, w, h, contrastMult, invert) {
+  var c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  var ctx = c.getContext('2d');
+  ctx.drawImage(img, 0, 0);
+  var imageData = ctx.getImageData(0, 0, w, h);
+  var d = imageData.data;
+  // Step 1: Grayscale + contrast
+  for (var i = 0; i < d.length; i += 4) {
+    var gray = 0.299 * d[i] + 0.587 * d[i+1] + 0.114 * d[i+2];
+    gray = ((gray - 128) * contrastMult) + 128;
+    gray = gray < 0 ? 0 : gray > 255 ? 255 : gray;
+    d[i] = d[i+1] = d[i+2] = gray;
+  }
+  ctx.putImageData(imageData, 0, 0);
+  // Step 2: Sharpen using 3x3 convolution kernel
+  var src = ctx.getImageData(0, 0, w, h);
+  var sd = src.data;
+  var out = ctx.createImageData(w, h);
+  var od = out.data;
+  for (var y = 0; y < h; y++) {
+    for (var x = 0; x < w; x++) {
+      var idx = (y * w + x) * 4;
+      if (x === 0 || x === w-1 || y === 0 || y === h-1) {
+        od[idx] = od[idx+1] = od[idx+2] = sd[idx];
+        od[idx+3] = 255;
+        continue;
+      }
+      var val = 5 * sd[idx]
+        - sd[((y-1)*w+x)*4]
+        - sd[((y+1)*w+x)*4]
+        - sd[(y*w+x-1)*4]
+        - sd[(y*w+x+1)*4];
+      val = val < 0 ? 0 : val > 255 ? 255 : val;
+      od[idx] = od[idx+1] = od[idx+2] = val;
+      od[idx+3] = 255;
+    }
+  }
+  ctx.putImageData(out, 0, 0);
+  // Step 3: Invert if requested
+  if (invert) {
+    var inv = ctx.getImageData(0, 0, w, h);
+    var id = inv.data;
+    for (var j = 0; j < id.length; j += 4) {
+      id[j] = 255 - id[j];
+      id[j+1] = 255 - id[j+1];
+      id[j+2] = 255 - id[j+2];
+    }
+    ctx.putImageData(inv, 0, 0);
+  }
+  return c;
+}
 
+// Decode a blob/file through preprocess pipeline (3 attempts)
+async function decodeBarcodeFromBlob(blob) {
   var statusEl = document.getElementById('scan-status');
 
-  // Init Dynamsoft if needed (CDN)
+  // Init Dynamsoft if needed
   if (!dynReader) {
     statusEl.textContent = 'Loading decoder (first time)...';
     statusEl.style.color = 'var(--text2)';
-    try { await initDynamsoft(); }
-    catch(err) {
-      statusEl.textContent = 'Decoder error: ' + err.message;
-      statusEl.style.color = 'var(--red)';
-      e.target.value = '';
+    await initDynamsoft();
+  }
+
+  statusEl.textContent = 'Decoding barcode...';
+  var img = new Image();
+  var url = URL.createObjectURL(blob);
+  await new Promise(function(resolve, reject) { img.onload = resolve; img.onerror = reject; img.src = url; });
+  URL.revokeObjectURL(url);
+
+  var w = img.naturalWidth, h = img.naturalHeight;
+  var attempts = [
+    { contrast: 1.5, invert: false, label: 'sharp + 1.5x contrast' },
+    { contrast: 2.0, invert: false, label: 'sharp + 2.0x contrast' },
+    { contrast: 1.5, invert: true,  label: 'sharp + inverted' }
+  ];
+
+  var t0 = Date.now();
+  for (var ai = 0; ai < attempts.length; ai++) {
+    var att = attempts[ai];
+    statusEl.textContent = 'Attempt ' + (ai+1) + '/3 (' + att.label + ') — ' + w + 'x' + h + '...';
+    var processed = preprocessCanvas(img, w, h, att.contrast, att.invert);
+    var results = await dynReader.decode(processed);
+    if (results && results.length > 0 && results[0].barcodeText && results[0].barcodeText.length > 20) {
+      var elapsed = Date.now() - t0;
+      statusEl.textContent = 'Decoded in ' + elapsed + 'ms (attempt ' + (ai+1) + ')!';
+      statusEl.style.color = 'var(--green)';
+      onScanSuccess(results[0].barcodeText);
       return;
     }
   }
 
-  // Load photo, preprocess, and decode with up to 3 attempts
+  statusEl.textContent = 'Could not read barcode — try again or enter manually';
+  statusEl.style.color = 'var(--red)';
+}
+
+// Open camera overlay with barcode guide for scanning
+function openBarcodeCamera() {
+  var overlay = document.getElementById('camera-overlay');
+  var video = document.getElementById('camera-video');
+  var canvas = document.getElementById('camera-canvas');
+  var purpose = document.getElementById('camera-purpose');
+
+  purpose.textContent = 'Scan Barcode';
+  overlay.classList.add('active', 'barcode-mode');
+
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 } } })
+    .then(function(stream) {
+      cameraStream = stream;
+      video.srcObject = stream;
+      video.play();
+
+      document.getElementById('camera-shutter').onclick = function() {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext('2d').drawImage(video, 0, 0);
+
+        canvas.toBlob(function(blob) {
+          stream.getTracks().forEach(function(t) { t.stop(); });
+          overlay.classList.remove('active', 'barcode-mode');
+          cameraStream = null;
+
+          decodeBarcodeFromBlob(blob).catch(function(err) {
+            var statusEl = document.getElementById('scan-status');
+            statusEl.textContent = 'Decode error: ' + err.message;
+            statusEl.style.color = 'var(--red)';
+          });
+        }, 'image/jpeg', 0.92);
+      };
+    })
+    .catch(function(e) {
+      overlay.classList.remove('active', 'barcode-mode');
+      // Fallback to file input if camera access denied
+      document.getElementById('barcode-file-input').click();
+    });
+}
+
+// File input fallback: still works if camera overlay fails
+document.getElementById('barcode-file-input').addEventListener('change', async function(e) {
+  var file = e.target.files[0];
+  if (!file) return;
   try {
-    statusEl.textContent = 'Decoding barcode...';
-    var img = new Image();
-    var url = URL.createObjectURL(file);
-    await new Promise(function(resolve, reject) { img.onload = resolve; img.onerror = reject; img.src = url; });
-    URL.revokeObjectURL(url);
-
-    var w = img.naturalWidth, h = img.naturalHeight;
-
-    // Helper: draw to canvas, grayscale, contrast boost, sharpen
-    function preprocessCanvas(contrastMult, invert) {
-      var c = document.createElement('canvas');
-      c.width = w; c.height = h;
-      var ctx = c.getContext('2d');
-      ctx.drawImage(img, 0, 0);
-      var imageData = ctx.getImageData(0, 0, w, h);
-      var d = imageData.data;
-      // Step 1: Grayscale + contrast
-      for (var i = 0; i < d.length; i += 4) {
-        var gray = 0.299 * d[i] + 0.587 * d[i+1] + 0.114 * d[i+2];
-        gray = ((gray - 128) * contrastMult) + 128;
-        gray = gray < 0 ? 0 : gray > 255 ? 255 : gray;
-        d[i] = d[i+1] = d[i+2] = gray;
-      }
-      ctx.putImageData(imageData, 0, 0);
-      // Step 2: Sharpen using 3x3 convolution kernel
-      //  [ 0, -1,  0]
-      //  [-1,  5, -1]
-      //  [ 0, -1,  0]
-      var src = ctx.getImageData(0, 0, w, h);
-      var sd = src.data;
-      var out = ctx.createImageData(w, h);
-      var od = out.data;
-      for (var y = 0; y < h; y++) {
-        for (var x = 0; x < w; x++) {
-          var idx = (y * w + x) * 4;
-          if (x === 0 || x === w-1 || y === 0 || y === h-1) {
-            od[idx] = od[idx+1] = od[idx+2] = sd[idx];
-            od[idx+3] = 255;
-            continue;
-          }
-          var val = 5 * sd[idx]
-            - sd[((y-1)*w+x)*4]
-            - sd[((y+1)*w+x)*4]
-            - sd[(y*w+x-1)*4]
-            - sd[(y*w+x+1)*4];
-          val = val < 0 ? 0 : val > 255 ? 255 : val;
-          od[idx] = od[idx+1] = od[idx+2] = val;
-          od[idx+3] = 255;
-        }
-      }
-      ctx.putImageData(out, 0, 0);
-      // Step 3: Invert if requested
-      if (invert) {
-        var inv = ctx.getImageData(0, 0, w, h);
-        var id = inv.data;
-        for (var j = 0; j < id.length; j += 4) {
-          id[j] = 255 - id[j];
-          id[j+1] = 255 - id[j+1];
-          id[j+2] = 255 - id[j+2];
-        }
-        ctx.putImageData(inv, 0, 0);
-      }
-      return c;
-    }
-
-    var attempts = [
-      { contrast: 1.5, invert: false, label: 'sharp + 1.5x contrast' },
-      { contrast: 2.0, invert: false, label: 'sharp + 2.0x contrast' },
-      { contrast: 1.5, invert: true,  label: 'sharp + inverted' }
-    ];
-
-    var decoded = false;
-    var t0 = Date.now();
-    for (var ai = 0; ai < attempts.length; ai++) {
-      var att = attempts[ai];
-      statusEl.textContent = 'Attempt ' + (ai+1) + '/3 (' + att.label + ') — ' + w + 'x' + h + '...';
-      var processed = preprocessCanvas(att.contrast, att.invert);
-      var results = await dynReader.decode(processed);
-      if (results && results.length > 0 && results[0].barcodeText && results[0].barcodeText.length > 20) {
-        var elapsed = Date.now() - t0;
-        statusEl.textContent = 'Decoded in ' + elapsed + 'ms (attempt ' + (ai+1) + ')!';
-        statusEl.style.color = 'var(--green)';
-        onScanSuccess(results[0].barcodeText);
-        decoded = true;
-        break;
-      }
-    }
-
-    if (!decoded) {
-      statusEl.textContent = 'Could not read barcode — try again or enter manually';
-      statusEl.style.color = 'var(--red)';
-    }
+    await decodeBarcodeFromBlob(file);
   } catch(err) {
+    var statusEl = document.getElementById('scan-status');
     statusEl.textContent = 'Decode error: ' + err.message;
     statusEl.style.color = 'var(--red)';
   }
-
   e.target.value = '';
 });
 
@@ -947,7 +999,7 @@ function capturePhoto(type) {
 
 function cancelCamera() {
   if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null; }
-  document.getElementById('camera-overlay').classList.remove('active');
+  document.getElementById('camera-overlay').classList.remove('active', 'barcode-mode');
 }
 
 // ═══════════════════════════════════════════════════════════
