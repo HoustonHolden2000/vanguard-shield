@@ -2,207 +2,468 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Iron Halo — Vanguard Shield</title>
-<link rel="manifest" href="manifest.json">
-<link rel="icon" href="icon-192.png">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Iron Halo Verify</title>
+<script src="https://cdn.jsdelivr.net/npm/dynamsoft-barcode-reader-bundle@11.0.3000/dist/dbr.bundle.js"></script>
 <style>
-  :root {
-    --bg: #0a0a0a;
-    --card: #1a1a1a;
-    --border: #2a2a2a;
-    --blue: #0056A0;
-    --blue-light: #0070CC;
-    --green: #00C853;
-    --yellow: #FFD600;
-    --red: #FF1744;
-    --text: #FFFFFF;
-    --text2: #999999;
-    --text3: #666666;
-    --radius: 8px;
-  }
-  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100dvh; overflow-x: hidden; }
-
-  /* ── Screens ── */
-  .screen { display: none; min-height: 100dvh; padding: 24px 20px; }
-  .screen.active { display: flex; flex-direction: column; }
-
-  /* ── Login ── */
-  #login-screen { justify-content: center; align-items: center; gap: 24px; }
-  #login-screen h1 { font-size: 22px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
-  #login-screen h1 span { color: var(--blue); }
-  .login-form { width: 100%; max-width: 320px; display: flex; flex-direction: column; gap: 12px; }
-  .login-form input { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; color: var(--text); font-size: 16px; outline: none; }
-  .login-form input:focus { border-color: var(--blue); }
-  .login-error { color: var(--red); font-size: 13px; text-align: center; min-height: 18px; }
-
-  /* ── Header ── */
-  .hdr { display: flex; justify-content: space-between; align-items: center; padding-bottom: 16px; flex-shrink: 0; }
-  .hdr-title { font-size: 16px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
-  .hdr-title span { color: var(--blue); }
-  .hdr-back { background: none; border: 1px solid var(--border); color: var(--text2); padding: 6px 12px; border-radius: var(--radius); font-size: 12px; cursor: pointer; }
-
-  /* ── Scan Screen ── */
-  #scan-screen { justify-content: center; align-items: center; gap: 32px; }
-  .scan-hero { display: flex; flex-direction: column; align-items: center; gap: 20px; }
-  .scan-btn { width: 160px; height: 160px; border-radius: 50%; background: var(--blue); border: 4px solid var(--blue-light); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 0.15s, box-shadow 0.15s; box-shadow: 0 0 40px rgba(0,86,160,0.3); }
-  .scan-btn:active { transform: scale(0.94); }
-  .scan-btn svg { width: 64px; height: 64px; fill: var(--text); }
-  .scan-sub { color: var(--text2); font-size: 14px; text-align: center; line-height: 1.5; }
-  .btn-manual { margin-top: 8px; }
-
-  /* ── Overlay ── */
-  #overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 100; justify-content: center; align-items: center; flex-direction: column; gap: 16px; }
-  #overlay.active { display: flex; }
-  .spinner { width: 48px; height: 48px; border: 4px solid var(--border); border-top-color: var(--blue); border-radius: 50%; animation: spin 0.8s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  #overlay-text { font-size: 16px; color: var(--text2); }
-
-  /* ── Green Flash ── */
-  .green-flash { position: fixed; inset: 0; background: var(--green); opacity: 0; z-index: 200; pointer-events: none; animation: flash 0.4s ease-out forwards; }
-  @keyframes flash { 0% { opacity: 0.45; } 100% { opacity: 0; } }
-
-  /* ── Toast ── */
-  #toast { position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%); background: var(--card); border: 1px solid var(--red); color: var(--text); padding: 14px 20px; border-radius: var(--radius); font-size: 14px; z-index: 300; max-width: 90%; text-align: center; display: none; }
-  #toast.show { display: block; animation: fadeIn 0.2s ease-out; }
-  @keyframes fadeIn { from { opacity: 0; transform: translateX(-50%) translateY(10px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
-
-  /* ── Fields Grid (Confirm + Manual) ── */
-  .fields-grid { display: flex; flex-direction: column; gap: 10px; flex: 1; overflow-y: auto; padding-bottom: 8px; }
-  .field-row { display: flex; flex-direction: column; gap: 4px; }
-  .field-row label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text3); font-weight: 600; }
-  .field-row input, .field-row select { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; color: var(--text); font-size: 15px; outline: none; }
-  .field-row input:focus, .field-row select:focus { border-color: var(--blue); }
-  .field-row select { appearance: none; }
-  .field-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .btn-row { display: flex; gap: 10px; padding-top: 8px; flex-shrink: 0; }
-
-  /* ── Buttons ── */
-  .btn { padding: 14px 24px; border-radius: var(--radius); font-size: 15px; font-weight: 700; cursor: pointer; border: none; text-align: center; }
-  .btn-blue { background: var(--blue); color: var(--text); }
-  .btn-blue:active { background: var(--blue-light); }
-  .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text2); }
-  .btn-danger { background: var(--red); color: var(--text); }
-  .btn-full { width: 100%; }
-
-  /* ── Result Screen ── */
-  #result-screen { justify-content: center; align-items: center; gap: 20px; }
-  .risk-gauge { position: relative; width: 180px; height: 180px; }
-  .risk-gauge svg { width: 180px; height: 180px; transform: rotate(-90deg); }
-  .risk-gauge circle { fill: none; stroke-width: 10; stroke-linecap: round; }
-  .risk-gauge .bg { stroke: var(--border); }
-  .risk-gauge .fill { stroke-dasharray: 314; stroke-dashoffset: 314; transition: stroke-dashoffset 1s ease-out; }
-  .risk-gauge .fill.GREEN { stroke: var(--green); }
-  .risk-gauge .fill.YELLOW { stroke: var(--yellow); }
-  .risk-gauge .fill.RED { stroke: var(--red); animation: pulse-gauge 1.5s infinite; }
-  @keyframes pulse-gauge { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
-  .risk-score-num { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 48px; font-weight: 800; }
-  .risk-label { font-size: 18px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; }
-  .risk-flags { width: 100%; text-align: left; }
-  .risk-flag { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: #111; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 6px; font-size: 13px; }
-  .risk-flag::before { content: '\26A0'; font-size: 16px; }
-  .risk-name { font-size: 16px; color: var(--text2); }
-  .result-actions { width: 100%; display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
-
-  /* ── Camera input (hidden) ── */
-  #cam-input { display: none; }
-
-  /* ── Init banner ── */
-  #init-banner { position: fixed; top: 0; left: 0; right: 0; background: var(--blue); color: var(--text); text-align: center; padding: 8px; font-size: 13px; font-weight: 600; z-index: 400; display: none; }
-  #init-banner.show { display: block; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+  background: #0C0C0C;
+  color: #E0E0E0;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+.header {
+  background: #111;
+  border-bottom: 2px solid #0056A0;
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.header h1 { font-size: 18px; font-weight: 700; letter-spacing: 2px; }
+.header h1 .iron { color: #0056A0; }
+.header h1 .halo { color: #fff; }
+.header .subtitle { font-size: 10px; color: #666; letter-spacing: 1px; margin-top: 2px; }
+.header .user-info { font-size: 12px; color: #0056A0; }
+.header .logout-btn {
+  background: none; border: 1px solid #333; color: #999;
+  padding: 4px 10px; border-radius: 4px; font-size: 11px; cursor: pointer;
+}
+.login-screen {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; min-height: 100vh; padding: 20px;
+}
+.login-box {
+  background: #151515; border: 1px solid #222; border-radius: 12px;
+  padding: 40px 30px; width: 100%; max-width: 340px; text-align: center;
+}
+.login-box .logo-text { font-size: 28px; font-weight: 700; letter-spacing: 3px; margin-bottom: 4px; }
+.login-box .logo-text .iron { color: #0056A0; }
+.login-box .logo-text .halo { color: #fff; }
+.login-box .logo-sub { font-size: 11px; color: #555; letter-spacing: 2px; margin-bottom: 30px; }
+.login-box input {
+  width: 100%; padding: 12px 14px; margin-bottom: 12px;
+  background: #0C0C0C; border: 1px solid #333; border-radius: 6px;
+  color: #fff; font-size: 16px; outline: none;
+}
+.login-box input:focus { border-color: #0056A0; }
+.login-box .login-btn {
+  width: 100%; padding: 14px; margin-top: 8px;
+  background: #0056A0; border: none; border-radius: 6px;
+  color: #fff; font-size: 16px; font-weight: 600; cursor: pointer; letter-spacing: 1px;
+}
+.login-box .login-btn:active { background: #004080; }
+.login-error { color: #CC3333; font-size: 13px; margin-top: 10px; min-height: 20px; }
+.app-screen { display: none; }
+.app-screen.active { display: block; }
+.scan-section { padding: 20px 16px; }
+.scan-btn {
+  width: 100%; padding: 20px;
+  background: linear-gradient(135deg, #0056A0, #003d73);
+  border: none; border-radius: 10px;
+  color: #fff; font-size: 18px; font-weight: 700;
+  letter-spacing: 2px; cursor: pointer;
+}
+.scan-btn:active { background: linear-gradient(135deg, #004080, #002d55); }
+.scan-hint { text-align: center; margin-top: 8px; font-size: 12px; color: #555; }
+.status-bar {
+  margin: 0 16px; padding: 12px 16px; border-radius: 8px;
+  font-size: 14px; display: none; text-align: center; font-weight: 600;
+}
+.status-bar.processing { background: #1a1a2e; color: #5b8def; display: block; }
+.status-bar.success { background: #0d1f0d; color: #2D8C3C; display: block; }
+.status-bar.fail { background: #1f0d0d; color: #CC3333; display: block; }
+.status-bar.partial { background: #1f1a0d; color: #D4A017; display: block; }
+.result-card {
+  margin: 16px; padding: 20px; background: #151515;
+  border-radius: 10px; border: 1px solid #222; display: none;
+}
+.result-card.visible { display: block; }
+.result-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #222;
+}
+.risk-badge { padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 700; letter-spacing: 1px; }
+.risk-green { background: #0d2618; color: #2D8C3C; border: 1px solid #2D8C3C; }
+.risk-yellow { background: #261a0d; color: #D4A017; border: 1px solid #D4A017; }
+.risk-red { background: #260d0d; color: #CC3333; border: 1px solid #CC3333; }
+.field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.field-label { font-size: 10px; color: #555; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 2px; }
+.field-value { font-size: 15px; color: #fff; font-weight: 500; }
+.field-value.empty { color: #444; font-style: italic; }
+.field-full { grid-column: 1 / -1; }
+.action-row { display: flex; gap: 10px; margin: 16px; }
+.action-btn {
+  flex: 1; padding: 14px; border: none; border-radius: 8px;
+  font-size: 14px; font-weight: 600; cursor: pointer; letter-spacing: 1px;
+}
+.btn-save { background: #0056A0; color: #fff; }
+.btn-retry { background: #222; color: #fff; border: 1px solid #333; }
+.btn-retry-big {
+  width: calc(100% - 32px); margin: 16px; padding: 16px;
+  background: #CC3333; border: none; border-radius: 8px;
+  color: #fff; font-size: 16px; font-weight: 700; cursor: pointer;
+  letter-spacing: 1px; display: none;
+}
+.nav-tabs {
+  display: flex; border-top: 1px solid #222;
+  position: fixed; bottom: 0; left: 0; right: 0; background: #111; z-index: 100;
+}
+.nav-tab {
+  flex: 1; padding: 10px 0; text-align: center; font-size: 11px;
+  color: #555; cursor: pointer; border: none; background: none; letter-spacing: 1px;
+}
+.nav-tab.active { color: #0056A0; border-top: 2px solid #0056A0; }
+.nav-tab .tab-icon { font-size: 18px; display: block; margin-bottom: 2px; }
+.history-section { padding: 16px; padding-bottom: 80px; }
+.history-item {
+  background: #151515; border: 1px solid #222; border-radius: 8px;
+  padding: 12px 14px; margin-bottom: 8px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.history-name { font-size: 14px; color: #fff; font-weight: 500; }
+.history-time { font-size: 11px; color: #555; }
+.history-badge { padding: 3px 8px; border-radius: 10px; font-size: 10px; font-weight: 700; }
+.empty-history { text-align: center; padding: 40px; color: #333; font-size: 14px; }
+#cameraInput { display: none; }
+.loading-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.85); z-index: 200;
+  display: none; flex-direction: column; align-items: center; justify-content: center;
+}
+.loading-overlay.visible { display: flex; }
+.loading-spinner {
+  width: 48px; height: 48px; border: 3px solid #222;
+  border-top-color: #0056A0; border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { margin-top: 16px; font-size: 16px; color: #999; }
+.loading-sub { margin-top: 6px; font-size: 12px; color: #444; }
+.app-content { padding-bottom: 70px; }
 </style>
 </head>
 <body>
-
-<!-- INIT BANNER -->
-<div id="init-banner">Loading barcode engine...</div>
-
-<!-- LOGIN -->
-<div id="login-screen" class="screen active">
-  <h1>Iron <span>Halo</span></h1>
-  <form class="login-form" id="login-form">
-    <input type="text" id="login-user" placeholder="Username" autocomplete="username" required>
-    <input type="password" id="login-pass" placeholder="Password" autocomplete="current-password" required>
-    <button type="submit" class="btn btn-blue btn-full">Sign In</button>
-    <div class="login-error" id="login-error"></div>
-  </form>
-</div>
-
-<!-- SCAN -->
-<div id="scan-screen" class="screen">
-  <div class="hdr">
-    <div class="hdr-title">Iron <span>Halo</span></div>
-    <button class="hdr-back" id="btn-logout">Logout</button>
-  </div>
-  <div class="scan-hero">
-    <button class="scan-btn" id="btn-scan" aria-label="Scan barcode">
-      <svg viewBox="0 0 24 24"><path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Zm0 1.8a5 5 0 1 1 0-10 5 5 0 0 1 0 10ZM4.929 4.929A10 10 0 0 1 12 2v2a8 8 0 0 0-5.657 2.343L4.93 4.93ZM2 12a10 10 0 0 1 2.929-7.071l1.414 1.414A8 8 0 0 0 4 12H2Zm2.929 7.071A10 10 0 0 1 2 12h2a8 8 0 0 0 2.343 5.657l-1.414 1.414ZM12 22a10 10 0 0 1-7.071-2.929l1.414-1.414A8 8 0 0 0 12 20v2Zm7.071-2.929A10 10 0 0 1 12 22v-2a8 8 0 0 0 5.657-2.343l1.414 1.414ZM22 12a10 10 0 0 1-2.929 7.071l-1.414-1.414A8 8 0 0 0 20 12h2Zm-2.929-7.071A10 10 0 0 1 22 12h-2a8 8 0 0 0-2.343-5.657l1.414-1.414ZM12 2a10 10 0 0 1 7.071 2.929l-1.414 1.414A8 8 0 0 0 12 4V2Z"/></svg>
-    </button>
-    <div class="scan-sub">Tap to take photo of back barcode.</div>
-    <button class="btn btn-outline btn-manual" id="btn-manual">Manual Entry</button>
+<div id="loginScreen" class="login-screen">
+  <div class="login-box">
+    <div class="logo-text"><span class="iron">IRON</span> <span class="halo">HALO</span></div>
+    <div class="logo-sub">VERIFY</div>
+    <input type="text" id="loginUser" placeholder="Username" autocomplete="username" autocapitalize="none">
+    <input type="password" id="loginPass" placeholder="Password" autocomplete="current-password">
+    <button class="login-btn" onclick="doLogin()">ENTER</button>
+    <div class="login-error" id="loginError"></div>
   </div>
 </div>
-
-<!-- CONFIRM (populated by scan decode) -->
-<div id="confirm-screen" class="screen">
-  <div class="hdr">
-    <div class="hdr-title">Confirm <span>Scan</span></div>
-    <button class="hdr-back" onclick="showScreen('scan-screen')">Back</button>
+<div id="appScreen" class="app-screen">
+  <div class="header">
+    <div>
+      <h1><span class="iron">IRON</span> <span class="halo">HALO</span></h1>
+      <div class="subtitle">VERIFY</div>
+    </div>
+    <div style="text-align:right">
+      <div class="user-info" id="userDisplay"></div>
+      <button class="logout-btn" onclick="doLogout()">LOGOUT</button>
+    </div>
   </div>
-  <div class="fields-grid" id="confirm-fields"></div>
-  <div class="btn-row">
-    <button class="btn btn-outline" onclick="showScreen('scan-screen')" style="flex:1">Cancel</button>
-    <button class="btn btn-blue" id="btn-confirm" style="flex:2">Confirm &amp; Save</button>
+  <div class="app-content">
+    <div id="tabScan" class="tab-content active">
+      <div class="scan-section">
+        <button class="scan-btn" onclick="startScan()">&#x1f4f7; SCAN LICENSE</button>
+        <div class="scan-hint">Photograph the BACK of the driver's license</div>
+      </div>
+      <div class="status-bar" id="statusBar"></div>
+      <div class="result-card" id="resultCard">
+        <div class="result-header">
+          <div style="font-size:14px;font-weight:600;color:#fff">SCAN RESULT</div>
+          <div class="risk-badge" id="riskBadge">VERIFIED</div>
+        </div>
+        <div class="field-grid">
+          <div class="field-item"><div class="field-label">First Name</div><div class="field-value" id="fFirstName">-</div></div>
+          <div class="field-item"><div class="field-label">Last Name</div><div class="field-value" id="fLastName">-</div></div>
+          <div class="field-item"><div class="field-label">Date of Birth</div><div class="field-value" id="fDOB">-</div></div>
+          <div class="field-item"><div class="field-label">License Number</div><div class="field-value" id="fDLNumber">-</div></div>
+          <div class="field-item"><div class="field-label">Expiration</div><div class="field-value" id="fExpiration">-</div></div>
+          <div class="field-item"><div class="field-label">State</div><div class="field-value" id="fState">-</div></div>
+          <div class="field-item field-full"><div class="field-label">Address</div><div class="field-value" id="fAddress">-</div></div>
+        </div>
+      </div>
+      <div class="action-row" id="actionRow" style="display:none">
+        <button class="action-btn btn-retry" onclick="startScan()">RESCAN</button>
+        <button class="action-btn btn-save" onclick="saveScan()">SAVE</button>
+      </div>
+      <button class="btn-retry-big" id="retryBtn" onclick="startScan()">SCAN FAILED - TAP TO RETRY</button>
+    </div>
+    <div id="tabHistory" class="tab-content" style="display:none">
+      <div class="history-section" id="historyList"><div class="empty-history">No scans yet</div></div>
+    </div>
+  </div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="switchTab('Scan')"><span class="tab-icon">&#x1f50d;</span>SCAN</button>
+    <button class="nav-tab" onclick="switchTab('History')"><span class="tab-icon">&#x1f4cb;</span>HISTORY</button>
   </div>
 </div>
-
-<!-- MANUAL ENTRY -->
-<div id="manual-screen" class="screen">
-  <div class="hdr">
-    <div class="hdr-title">Manual <span>Entry</span></div>
-    <button class="hdr-back" onclick="showScreen('scan-screen')">Back</button>
-  </div>
-  <div class="fields-grid" id="manual-fields"></div>
-  <div class="btn-row">
-    <button class="btn btn-outline" onclick="showScreen('scan-screen')" style="flex:1">Cancel</button>
-    <button class="btn btn-blue" id="btn-manual-save" style="flex:2">Save</button>
-  </div>
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-spinner"></div>
+  <div class="loading-text" id="loadingText">Processing...</div>
+  <div class="loading-sub" id="loadingSub"></div>
 </div>
+<input type="file" id="cameraInput" accept="image/*" capture="environment">
+<script>
+let currentUser=null,lastScanData=null,sdkReady=false,cvRouter=null,parser=null;
 
-<!-- RESULT -->
-<div id="result-screen" class="screen">
-  <div class="risk-gauge">
-    <svg viewBox="0 0 120 120">
-      <circle class="bg" cx="60" cy="60" r="50"/>
-      <circle class="fill" id="risk-circle" cx="60" cy="60" r="50"/>
-    </svg>
-    <div class="risk-score-num" id="risk-score-num">0</div>
-  </div>
-  <div class="risk-label" id="risk-label">ASSESSED</div>
-  <div class="risk-name" id="risk-name"></div>
-  <div class="risk-flags" id="risk-flags"></div>
-  <div class="result-actions" id="result-actions">
-    <button class="btn btn-blue btn-full" onclick="showScreen('scan-screen')">New Scan</button>
-  </div>
-</div>
+async function initSDK(){
+  try{
+    Dynamsoft.License.LicenseManager.initLicense("DLS2eyJoYW5kc2hha2VDb2RlIjoiMTA1MjUzODIxLU1UQTFNalV6T0RJeExYZGxZaTFVY21saGJGQnliMm8iLCJtYWluU2VydmVyVVJMIjoiaHR0cHM6Ly9tZGxzLmR5bmFtc29mdG9ubGluZS5jb20vIiwib3JnYW5pemF0aW9uSUQiOiIxMDUyNTM4MjEiLCJzdGFuZGJ5U2VydmVyVVJMIjoiaHR0cHM6Ly9zZGxzLmR5bmFtc29mdG9ubGluZS5jb20vIiwiY2hlY2tDb2RlIjotMTcyMDI3MzcyOX0=");
+    await Dynamsoft.Core.CoreModule.loadWasm(["DBR","DCP"]);
+    await Dynamsoft.DCP.CodeParserModule.loadSpec("AAMVA_DL_ID");
+    await Dynamsoft.DCP.CodeParserModule.loadSpec("AAMVA_DL_ID_WITH_MAG_STRIPE");
+    cvRouter=await Dynamsoft.CVR.CaptureVisionRouter.createInstance();
+    parser=await Dynamsoft.DCP.CodeParser.createInstance();
+    sdkReady=true;
+    console.log("Iron Halo: SDK ready");
+  }catch(e){
+    console.error("SDK init error:",e);
+    try{cvRouter=await Dynamsoft.CVR.CaptureVisionRouter.createInstance();sdkReady=true;}catch(e2){console.error("SDK total failure:",e2);}
+  }
+}
 
-<!-- OVERLAY -->
-<div id="overlay">
-  <div class="spinner"></div>
-  <div id="overlay-text">Decoding barcode...</div>
-</div>
+async function doLogin(){
+  const user=document.getElementById('loginUser').value.trim();
+  const pass=document.getElementById('loginPass').value;
+  const errEl=document.getElementById('loginError');
+  errEl.textContent='';
+  try{
+    const res=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:user,password:pass})});
+    const data=await res.json();
+    if(data.success){
+      currentUser={username:user,role:data.role,name:data.name};
+      document.getElementById('loginScreen').style.display='none';
+      document.getElementById('appScreen').classList.add('active');
+      document.getElementById('userDisplay').textContent=data.name+' ('+data.role+')';
+      if(!sdkReady)initSDK();
+    }else{errEl.textContent='Invalid credentials';}
+  }catch(e){errEl.textContent='Connection error';}
+}
 
-<!-- TOAST -->
-<div id="toast"></div>
+function doLogout(){
+  currentUser=null;
+  document.getElementById('appScreen').classList.remove('active');
+  document.getElementById('loginScreen').style.display='flex';
+  document.getElementById('loginUser').value='';
+  document.getElementById('loginPass').value='';
+  resetScanUI();
+}
 
-<!-- CAMERA INPUT -->
-<input type="file" id="cam-input" accept="image/*" capture="environment">
+document.getElementById('loginPass').addEventListener('keyup',function(e){if(e.key==='Enter')doLogin();});
 
-<!-- DYNAMSOFT v11 CDN -->
-<script src="https://cdn.jsdelivr.net/npm/dynamsoft-barcode-reader-bundle@11.0.3000/dist/dbr.bundle.js"></script>
-<script src="app.js"></script>
+function switchTab(tab){
+  document.querySelectorAll('.tab-content').forEach(t=>t.style.display='none');
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab'+tab).style.display='block';
+  event.currentTarget.classList.add('active');
+  if(tab==='History')loadHistory();
+}
+
+function startScan(){resetScanUI();document.getElementById('cameraInput').click();}
+
+document.getElementById('cameraInput').addEventListener('change',async function(e){
+  const file=e.target.files[0];if(!file)return;this.value='';
+  showLoading('Opening photo...','');
+  const img=new Image();
+  img.onload=async function(){await processImage(img);};
+  img.onerror=function(){hideLoading();showStatus('fail','Could not load photo.');showRetryBtn();};
+  img.src=URL.createObjectURL(file);
+});
+
+function getRawCanvas(img){
+  const canvas=document.createElement('canvas');
+  const ctx=canvas.getContext('2d');
+  let w=img.naturalWidth||img.width,h=img.naturalHeight||img.height;
+  const MAX=4000;
+  if(w>MAX||h>MAX){const s=MAX/Math.max(w,h);w=Math.round(w*s);h=Math.round(h*s);}
+  canvas.width=w;canvas.height=h;ctx.drawImage(img,0,0,w,h);
+  return canvas;
+}
+
+function preprocessCanvas(img,contrastLevel,invert){
+  const canvas=document.createElement('canvas');
+  const ctx=canvas.getContext('2d');
+  let w=img.naturalWidth||img.width,h=img.naturalHeight||img.height;
+  const MAX=3000;
+  if(w>MAX||h>MAX){const s=MAX/Math.max(w,h);w=Math.round(w*s);h=Math.round(h*s);}
+  canvas.width=w;canvas.height=h;ctx.drawImage(img,0,0,w,h);
+  const imageData=ctx.getImageData(0,0,w,h);
+  const data=imageData.data;const contrast=contrastLevel||1.5;
+  for(let i=0;i<data.length;i+=4){
+    let gray=0.299*data[i]+0.587*data[i+1]+0.114*data[i+2];
+    gray=((gray-128)*contrast)+128;
+    gray=Math.min(255,Math.max(0,gray));
+    if(invert)gray=255-gray;
+    data[i]=data[i+1]=data[i+2]=gray;
+  }
+  ctx.putImageData(imageData,0,0);return canvas;
+}
+
+async function processImage(img){
+  if(!sdkReady||!cvRouter){
+    showLoading('Initializing scanner...','First scan takes a moment');
+    await initSDK();
+    if(!sdkReady){hideLoading();showStatus('fail','Scanner engine failed to load.');showRetryBtn();return;}
+  }
+  const passes=[
+    {label:'Reading barcode...',contrast:0,invert:false,template:'ReadBarcodes_Balance'},
+    {label:'Trying high-res...',contrast:0,invert:false,template:'ReadBarcodes_ReadRateFirst'},
+    {label:'Enhancing image...',contrast:1.3,invert:false,template:'ReadBarcodes_Balance'},
+    {label:'Boosting contrast...',contrast:1.8,invert:false,template:'ReadBarcodes_ReadRateFirst'},
+    {label:'Deep scan...',contrast:2.2,invert:false,template:'ReadBarcodes_ReadRateFirst'},
+    {label:'Trying inverted...',contrast:1.5,invert:true,template:'ReadBarcodes_ReadRateFirst'},
+  ];
+  let barcodeItem=null;
+  for(let p=0;p<passes.length;p++){
+    showLoading(passes[p].label,'Attempt '+(p+1)+' of '+passes.length);
+    try{
+      const canvas=(passes[p].contrast===0)?getRawCanvas(img):preprocessCanvas(img,passes[p].contrast,passes[p].invert);
+      const result=await cvRouter.capture(canvas,passes[p].template);
+      if(result&&result.items){
+        barcodeItem=result.items.find(item=>item.type===2||item.type===Dynamsoft.Core.EnumCapturedResultItemType.CRIT_BARCODE);
+        if(barcodeItem){console.log("Barcode found on pass "+(p+1));break;}
+      }
+    }catch(e){console.warn("Pass failed:",e.message);}
+  }
+  if(!barcodeItem){hideLoading();showStatus('fail','No barcode detected. Make sure the BACK of the license is visible and well-lit.');showRetryBtn();return;}
+  showLoading('Extracting license data...','');
+  const fields=await parseLicense(barcodeItem);
+  hideLoading();
+  if(fields&&Object.keys(fields).length>0){displayResult(fields);}
+  else{showStatus('fail','Barcode found but could not extract data. Try a clearer photo.');showRetryBtn();}
+}
+
+async function parseLicense(barcodeItem){
+  let fields={};
+  if(parser){
+    try{
+      const bytes=barcodeItem.bytes||barcodeItem.barcodeBytes;
+      if(bytes){
+        const parsed=await parser.parse(bytes);
+        if(parsed&&!parsed.exception){
+          const dlInfo=JSON.parse(parsed.jsonString);
+          console.log("CodeParser result:",JSON.stringify(dlInfo,null,2));
+          fields=extractFieldsFromCodeParser(dlInfo);
+          if(fields.lastName||fields.firstName||fields.dlNumber)return fields;
+        }
+      }
+    }catch(e){console.warn("CodeParser failed:",e.message);}
+  }
+  try{
+    const rawText=barcodeItem.text||barcodeItem.barcodeText||'';
+    if(rawText.length>20){
+      fields=parseAAMVAText(rawText);
+      if(fields.lastName||fields.firstName||fields.dlNumber)return fields;
+    }
+  }catch(e){console.warn("AAMVA text parse failed:",e.message);}
+  return fields;
+}
+
+function extractFieldsFromCodeParser(dlInfo){
+  const fields={};const flat=flattenObject(dlInfo);
+  const mapping={
+    firstName:['firstName','First Name','DAC','first_name','givenName','Given Name','DCT'],
+    lastName:['lastName','Last Name','DCS','last_name','familyName','Family Name','surname','Surname'],
+    dob:['dateOfBirth','Date of Birth','DBB','date_of_birth','birthDate','Birth Date','DOB'],
+    dlNumber:['licenseNumber','License Number','DAQ','license_number','documentNumber','Document Number','DL Number'],
+    expiration:['expirationDate','Expiration Date','DBA','expiration_date','Expiry Date'],
+    state:['state','State','DAJ','jurisdictionCode','Jurisdiction Code','issuingJurisdiction'],
+    street:['street','Street','DAG','street_address','addressStreet','Address Street','Address - Street 1'],
+    city:['city','City','DAI','addressCity','Address - City'],
+    zip:['zip','ZIP','DAK','postalCode','Postal Code','zipCode','Address - Postal Code']
+  };
+  for(const[field,keys]of Object.entries(mapping)){for(const key of keys){const val=flat[key];if(val&&String(val).trim()){fields[field]=String(val).trim();break;}}}
+  return fields;
+}
+
+function flattenObject(obj,prefix,result){
+  result=result||{};prefix=prefix||'';
+  if(!obj||typeof obj!=='object')return result;
+  for(const key of Object.keys(obj)){
+    const val=obj[key];const newKey=prefix?prefix+'.'+key:key;
+    if(val&&typeof val==='object'&&!Array.isArray(val)){flattenObject(val,newKey,result);}
+    else{result[key]=val;result[newKey]=val;}
+  }
+  return result;
+}
+
+function parseAAMVAText(raw){
+  const fields={};
+  const codes={DCS:'lastName',DAC:'firstName',DCT:'firstName',DBB:'dob',DAQ:'dlNumber',DBA:'expiration',DAJ:'state',DAG:'street',DAI:'city',DAK:'zip'};
+  const lines=raw.split(/[\n\r]+/);
+  for(const line of lines){for(const[code,field]of Object.entries(codes)){
+    if(line.startsWith(code)||line.includes(code)){
+      const idx=line.indexOf(code);let val=line.substring(idx+code.length).trim();
+      if(val&&!fields[field])fields[field]=val;
+    }
+  }}
+  if(fields.dob&&fields.dob.length===8&&!fields.dob.includes('/'))fields.dob=fields.dob.slice(0,2)+'/'+fields.dob.slice(2,4)+'/'+fields.dob.slice(4);
+  if(fields.expiration&&fields.expiration.length===8&&!fields.expiration.includes('/'))fields.expiration=fields.expiration.slice(0,2)+'/'+fields.expiration.slice(2,4)+'/'+fields.expiration.slice(4);
+  if(fields.zip&&fields.zip.length>5)fields.zip=fields.zip.substring(0,5);
+  return fields;
+}
+
+function displayResult(fields){
+  lastScanData=fields;
+  const setField=(id,val)=>{const el=document.getElementById(id);if(val&&val!=='-'){el.textContent=val;el.classList.remove('empty');}else{el.textContent='-';el.classList.add('empty');}};
+  setField('fFirstName',fields.firstName);setField('fLastName',fields.lastName);
+  setField('fDOB',fields.dob);setField('fDLNumber',fields.dlNumber);
+  setField('fExpiration',fields.expiration);setField('fState',fields.state);
+  let addr=[fields.street,fields.city,fields.state,fields.zip].filter(Boolean).join(', ');
+  setField('fAddress',addr||null);
+  const filled=[fields.firstName,fields.lastName,fields.dob,fields.dlNumber,fields.expiration,fields.state,fields.street].filter(Boolean).length;
+  const badge=document.getElementById('riskBadge');
+  if(filled>=5){badge.textContent='VERIFIED';badge.className='risk-badge risk-green';showStatus('success','License decoded - '+filled+'/7 fields');}
+  else if(filled>=3){badge.textContent='PARTIAL';badge.className='risk-badge risk-yellow';showStatus('partial','Partial decode - '+filled+'/7 fields');}
+  else{badge.textContent='INCOMPLETE';badge.className='risk-badge risk-red';showStatus('partial','Limited decode - '+filled+'/7 fields');}
+  document.getElementById('resultCard').classList.add('visible');
+  document.getElementById('actionRow').style.display='flex';
+  document.getElementById('retryBtn').style.display='none';
+}
+
+async function saveScan(){
+  if(!lastScanData)return;
+  try{
+    await fetch('/api/scans',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...lastScanData,scannedBy:currentUser?currentUser.username:'unknown'})});
+    showStatus('success','Scan saved');setTimeout(()=>resetScanUI(),1500);
+  }catch(e){showStatus('fail','Failed to save');}
+}
+
+async function loadHistory(){
+  try{
+    const res=await fetch('/api/scans');const data=await res.json();
+    const el=document.getElementById('historyList');
+    if(!data.scans||data.scans.length===0){el.innerHTML='<div class="empty-history">No scans yet</div>';return;}
+    el.innerHTML=data.scans.map(s=>{
+      const name=[s.firstName,s.lastName].filter(Boolean).join(' ')||'Unknown';
+      const time=new Date(s.timestamp).toLocaleString();
+      const filled=[s.firstName,s.lastName,s.dob,s.dlNumber,s.expiration,s.state,s.street].filter(Boolean).length;
+      const color=filled>=5?'#2D8C3C':filled>=3?'#D4A017':'#CC3333';
+      const label=filled>=5?'VERIFIED':filled>=3?'PARTIAL':'INCOMPLETE';
+      return '<div class="history-item"><div><div class="history-name">'+name+'</div><div class="history-time">'+time+'</div></div><div class="history-badge" style="background:'+color+'22;color:'+color+';border:1px solid '+color+'">'+label+'</div></div>';
+    }).join('');
+  }catch(e){console.error("History load failed:",e);}
+}
+
+function showStatus(type,msg){const el=document.getElementById('statusBar');el.className='status-bar '+type;el.textContent=msg;}
+function showRetryBtn(){document.getElementById('retryBtn').style.display='block';document.getElementById('actionRow').style.display='none';}
+function showLoading(text,sub){document.getElementById('loadingText').textContent=text;document.getElementById('loadingSub').textContent=sub||'';document.getElementById('loadingOverlay').classList.add('visible');}
+function hideLoading(){document.getElementById('loadingOverlay').classList.remove('visible');}
+function resetScanUI(){
+  document.getElementById('statusBar').className='status-bar';
+  document.getElementById('resultCard').classList.remove('visible');
+  document.getElementById('actionRow').style.display='none';
+  document.getElementById('retryBtn').style.display='none';
+  lastScanData=null;
+  ['fFirstName','fLastName','fDOB','fDLNumber','fExpiration','fState','fAddress'].forEach(id=>{const el=document.getElementById(id);el.textContent='-';el.classList.add('empty');});
+}
+</script>
 </body>
 </html>
