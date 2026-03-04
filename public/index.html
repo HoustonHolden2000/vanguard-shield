@@ -178,7 +178,7 @@ body {
         </div>
       </div>
       <div class="status-bar" id="statusBar"></div>
-      <div id="debugLine" style="margin:0 16px;padding:8px 12px;font-size:11px;font-family:monospace;color:#666;background:#111;border:1px solid #222;border-radius:6px;display:none;word-break:break-all;"></div>
+      <div id="debugLine" style="margin:0 16px;padding:8px 12px;font-size:11px;font-family:monospace;color:#666;background:#111;border:1px solid #222;border-radius:6px;word-break:break-all;">DEBUG: waiting for scan</div>
       <div class="result-card" id="resultCard">
         <div class="result-header">
           <div style="font-size:14px;font-weight:600;color:#fff">SCAN RESULT</div>
@@ -445,39 +445,49 @@ async function processImage(img){
 
 async function parseLicense(barcodeItem){
   let fields={};
-  dbg('parseLicense: parser='+!!parser+' bytes='+(barcodeItem.bytes?barcodeItem.bytes.length:'none'));
-  if(parser){
+  let rawText='';
+
+  // Get text from every possible source
+  if(barcodeItem.text) rawText=barcodeItem.text;
+  else if(barcodeItem.barcodeText) rawText=barcodeItem.barcodeText;
+
+  // Convert bytes to string directly - this is the primary path
+  if((!rawText||rawText.length<20)&&barcodeItem.bytes){
     try{
-      const bytes=barcodeItem.bytes||barcodeItem.barcodeBytes;
-      if(bytes){
-        dbg('Calling CodeParser.parse() on '+bytes.length+' bytes...');
-        const parsed=await parser.parse(bytes);
-        dbg('CodeParser returned. exception='+!!(parsed&&parsed.exception)+' jsonString='+(parsed&&parsed.jsonString?parsed.jsonString.length+' chars':'null'));
-        if(parsed&&!parsed.exception){
-          const dlInfo=JSON.parse(parsed.jsonString);
-          lastDecodeData.parserJSON=dlInfo;
-          dbg('CodeParser JSON keys: '+Object.keys(dlInfo).join(', '));
-          console.log("CodeParser full result:",JSON.stringify(dlInfo,null,2));
+      const bytes=barcodeItem.bytes instanceof Uint8Array?barcodeItem.bytes:new Uint8Array(barcodeItem.bytes);
+      rawText=new TextDecoder('utf-8').decode(bytes);
+      if(!rawText||rawText.length<20) rawText=new TextDecoder('latin1').decode(bytes);
+    }catch(e){console.warn('Byte decode failed:',e);}
+  }
+
+  console.log('RAW TEXT LENGTH:',rawText.length);
+  console.log('RAW TEXT PREVIEW:',rawText.substring(0,200));
+
+  // Try CodeParser first if available
+  if(parser&&barcodeItem.bytes){
+    try{
+      const parsed=await parser.parse(barcodeItem.bytes);
+      if(parsed){
+        // v11 may use different output formats
+        let jsonStr=parsed.jsonString||parsed.getJsonString&&parsed.getJsonString()||null;
+        if(jsonStr){
+          const dlInfo=JSON.parse(jsonStr);
           fields=extractFieldsFromCodeParser(dlInfo);
-          dbg('Extracted fields: '+JSON.stringify(fields));
           if(fields.lastName||fields.firstName||fields.dlNumber)return fields;
-          dbg('CodeParser fields incomplete, falling through to raw text parse');
         }
-      }else{dbg('No bytes on barcodeItem, skipping CodeParser');}
-    }catch(e){dbg('CodeParser THREW: '+e.message);console.warn("CodeParser failed:",e);}
-  }else{dbg('No parser instance, skipping CodeParser');}
-  try{
-    const rawText=barcodeItem.text||barcodeItem.barcodeText||'';
-    dbg('Raw text parse: '+rawText.length+' chars');
-    if(rawText.length>20){
-      fields=parseAAMVAText(rawText);
-      dbg('AAMVA text fields: '+JSON.stringify(fields));
-      if(fields.lastName||fields.firstName||fields.dlNumber)return fields;
-    }
-  }catch(e){dbg('AAMVA text parse THREW: '+e.message);}
-  console.log("BARCODE ITEM KEYS:", Object.keys(barcodeItem));
-  console.log("BARCODE TEXT:", barcodeItem.text || barcodeItem.barcodeText || "NO TEXT PROPERTY");
-  console.log("BARCODE BYTES:", barcodeItem.bytes ? "YES" : barcodeItem.barcodeBytes ? "YES-old" : "NO BYTES");
+        // Try getting fields directly from parsed object
+        const parsedKeys=Object.keys(parsed);
+        console.log('PARSER KEYS:',parsedKeys.join(','));
+      }
+    }catch(e){console.warn('CodeParser error:',e.message);}
+  }
+
+  // AAMVA text parse - primary reliable path
+  if(rawText.length>20){
+    fields=parseAAMVAText(rawText);
+    if(fields.lastName||fields.firstName||fields.dlNumber)return fields;
+  }
+
   return fields;
 }
 
