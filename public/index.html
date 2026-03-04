@@ -192,6 +192,27 @@ body {
           <div class="field-item field-full"><div class="field-label">Address</div><div class="field-value" id="fAddress">-</div></div>
         </div>
       </div>
+      <div class="bol-section" id="bolSection" style="display:none">
+        <div style="margin:16px;padding:20px;background:#151515;border-radius:10px;border:1px solid #222">
+          <div style="font-size:14px;font-weight:600;color:#fff;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid #222">BILL OF LADING VERIFICATION</div>
+          <div style="margin-bottom:12px">
+            <div style="font-size:10px;color:#555;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Carrier Name</div>
+            <input type="text" id="bolCarrier" placeholder="Enter carrier name" style="width:100%;padding:10px 12px;background:#0C0C0C;border:1px solid #333;border-radius:6px;color:#fff;font-size:14px;outline:none" autocapitalize="words">
+          </div>
+          <div style="margin-bottom:12px">
+            <div style="font-size:10px;color:#555;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">BOL / PO Number</div>
+            <input type="text" id="bolNumber" placeholder="Enter BOL or PO number" style="width:100%;padding:10px 12px;background:#0C0C0C;border:1px solid #333;border-radius:6px;color:#fff;font-size:14px;outline:none" autocapitalize="characters">
+          </div>
+          <div style="margin-bottom:12px">
+            <div style="font-size:10px;color:#555;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Load Description</div>
+            <input type="text" id="bolLoad" placeholder="e.g. 17 pallets electronics" style="width:100%;padding:10px 12px;background:#0C0C0C;border:1px solid #333;border-radius:6px;color:#fff;font-size:14px;outline:none" autocapitalize="sentences">
+          </div>
+          <div style="margin-bottom:12px">
+            <div style="font-size:10px;color:#555;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Dock / Gate Number</div>
+            <input type="text" id="bolDock" placeholder="e.g. Dock 4, Gate B" style="width:100%;padding:10px 12px;background:#0C0C0C;border:1px solid #333;border-radius:6px;color:#fff;font-size:14px;outline:none">
+          </div>
+        </div>
+      </div>
       <div class="action-row" id="actionRow" style="display:none">
         <button class="action-btn btn-retry" onclick="startScan()">RESCAN</button>
         <button class="action-btn btn-save" onclick="saveScan()">SAVE</button>
@@ -458,19 +479,49 @@ function displayResult(fields){
   setField('fAddress',addr||null);
   const filled=[fields.firstName,fields.lastName,fields.dob,fields.dlNumber,fields.expiration,fields.state,fields.street].filter(Boolean).length;
   const badge=document.getElementById('riskBadge');
-  if(filled>=5){badge.textContent='VERIFIED';badge.className='risk-badge risk-green';showStatus('success','License decoded - '+filled+'/7 fields');}
-  else if(filled>=3){badge.textContent='PARTIAL';badge.className='risk-badge risk-yellow';showStatus('partial','Partial decode - '+filled+'/7 fields');}
-  else{badge.textContent='INCOMPLETE';badge.className='risk-badge risk-red';showStatus('partial','Limited decode - '+filled+'/7 fields');}
+  // Check expiration
+  let isExpired=false;
+  if(fields.expiration){
+    try{
+      const parts=fields.expiration.split('/');
+      let expDate;
+      if(parts.length===3){
+        expDate=new Date(parseInt(parts[2]),parseInt(parts[0])-1,parseInt(parts[1]));
+      }
+      if(expDate&&expDate<new Date()){isExpired=true;}
+    }catch(e){}
+  }
+
+  if(isExpired){
+    badge.textContent='EXPIRED';badge.className='risk-badge risk-red';
+    showStatus('fail','LICENSE EXPIRED - '+fields.expiration);
+  }else if(filled>=5){
+    badge.textContent='VERIFIED';badge.className='risk-badge risk-green';
+    showStatus('success','License decoded - '+filled+'/7 fields');
+  }else if(filled>=3){
+    badge.textContent='PARTIAL';badge.className='risk-badge risk-yellow';
+    showStatus('partial','Partial decode - '+filled+'/7 fields');
+  }else{
+    badge.textContent='INCOMPLETE';badge.className='risk-badge risk-red';
+    showStatus('partial','Limited decode - '+filled+'/7 fields');
+  }
   document.getElementById('resultCard').classList.add('visible');
   document.getElementById('actionRow').style.display='flex';
+  document.getElementById('bolSection').style.display='block';
   document.getElementById('retryBtn').style.display='none';
 }
 
 async function saveScan(){
   if(!lastScanData)return;
+  const bolData={
+    carrier:document.getElementById('bolCarrier').value.trim(),
+    bolNumber:document.getElementById('bolNumber').value.trim(),
+    loadDescription:document.getElementById('bolLoad').value.trim(),
+    dock:document.getElementById('bolDock').value.trim()
+  };
   try{
-    await fetch('/api/scans',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...lastScanData,scannedBy:currentUser?currentUser.username:'unknown'})});
-    showStatus('success','Scan saved');setTimeout(()=>resetScanUI(),1500);
+    await fetch('/api/scans',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...lastScanData,...bolData,scannedBy:currentUser?currentUser.username:'unknown'})});
+    showStatus('success','Scan + BOL saved');setTimeout(()=>resetScanUI(),1500);
   }catch(e){showStatus('fail','Failed to save');}
 }
 
@@ -481,11 +532,13 @@ async function loadHistory(){
     if(!data.scans||data.scans.length===0){el.innerHTML='<div class="empty-history">No scans yet</div>';return;}
     el.innerHTML=data.scans.map(s=>{
       const name=[s.firstName,s.lastName].filter(Boolean).join(' ')||'Unknown';
+      const bol=s.bolNumber?' | BOL: '+s.bolNumber:'';
+      const carrier=s.carrier?' | '+s.carrier:'';
       const time=new Date(s.timestamp).toLocaleString();
       const filled=[s.firstName,s.lastName,s.dob,s.dlNumber,s.expiration,s.state,s.street].filter(Boolean).length;
       const color=filled>=5?'#2D8C3C':filled>=3?'#D4A017':'#CC3333';
       const label=filled>=5?'VERIFIED':filled>=3?'PARTIAL':'INCOMPLETE';
-      return '<div class="history-item"><div><div class="history-name">'+name+'</div><div class="history-time">'+time+'</div></div><div class="history-badge" style="background:'+color+'22;color:'+color+';border:1px solid '+color+'">'+label+'</div></div>';
+      return '<div class="history-item"><div><div class="history-name">'+name+bol+'</div><div class="history-time">'+time+carrier+'</div></div><div class="history-badge" style="background:'+color+'22;color:'+color+';border:1px solid '+color+'">'+label+'</div></div>';
     }).join('');
   }catch(e){console.error("History load failed:",e);}
 }
@@ -501,6 +554,8 @@ function resetScanUI(){
   document.getElementById('retryBtn').style.display='none';
   lastScanData=null;
   ['fFirstName','fLastName','fDOB','fDLNumber','fExpiration','fState','fAddress'].forEach(id=>{const el=document.getElementById(id);el.textContent='-';el.classList.add('empty');});
+  document.getElementById('bolSection').style.display='none';
+  ['bolCarrier','bolNumber','bolLoad','bolDock'].forEach(id=>{document.getElementById(id).value='';});
 }
 </script>
 </body>
