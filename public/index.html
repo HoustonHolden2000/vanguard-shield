@@ -788,10 +788,12 @@ async function decodeBarcodeFromBlob(blob) {
 }
 
 // Map Dynamsoft v11 CodeParser AAMVA JSON to existing form fields
+// Field names confirmed from Dynamsoft docs:
+// https://www.dynamsoft.com/code-parser/docs/core/code-types/aamva-dl-id.html
 function mapCodeParserFields(dlInfo) {
   var fields = {};
 
-  // Helper: safely get a nested value or check multiple possible paths
+  // Helper: check multiple possible key names, return first non-empty value
   function g(obj) {
     for (var i = 1; i < arguments.length; i++) {
       var key = arguments[i];
@@ -800,39 +802,33 @@ function mapCodeParserFields(dlInfo) {
     return '';
   }
 
-  // The CodeParser JSON may nest fields under different structures
-  // Try common AAMVA field names from the v11 parser
+  // v11 CodeParser may nest under CodeParserResult or return flat
   var src = dlInfo.CodeParserResult || dlInfo.ResultInfo || dlInfo;
 
-  fields.first_name = g(src, 'firstName', 'First Name', 'DAC', 'DCT') ||
-                       g(dlInfo, 'firstName', 'First Name', 'DAC', 'DCT');
-  fields.last_name = g(src, 'lastName', 'Last Name', 'DCS') ||
-                      g(dlInfo, 'lastName', 'Last Name', 'DCS');
-  fields.middle_name = g(src, 'middleName', 'Middle Name', 'DAD') ||
-                        g(dlInfo, 'middleName', 'Middle Name', 'DAD');
-  fields.dl_number = g(src, 'licenseNumber', 'License Number', 'DAQ') ||
-                      g(dlInfo, 'licenseNumber', 'License Number', 'DAQ');
-  fields.date_of_birth = g(src, 'dateOfBirth', 'Date of Birth', 'DBB') ||
-                          g(dlInfo, 'dateOfBirth', 'Date of Birth', 'DBB');
-  fields.expiration_date = g(src, 'expirationDate', 'Expiration Date', 'DBA') ||
-                            g(dlInfo, 'expirationDate', 'Expiration Date', 'DBA');
-  fields.issue_date = g(src, 'issueDate', 'Issue Date', 'DBD') ||
-                       g(dlInfo, 'issueDate', 'Issue Date', 'DBD');
-  fields.address_street = g(src, 'street', 'Street', 'DAG') ||
-                           g(dlInfo, 'street', 'Street', 'DAG');
-  fields.address_city = g(src, 'city', 'City', 'DAI') ||
-                         g(dlInfo, 'city', 'City', 'DAI');
-  fields.address_state = g(src, 'state', 'Jurisdiction', 'DAJ') ||
-                          g(dlInfo, 'state', 'Jurisdiction', 'DAJ');
+  // Names: v11 uses firstName, givenName, lastName, middleName, fullName
+  fields.first_name = g(src, 'firstName', 'givenName') || g(dlInfo, 'firstName', 'givenName');
+  fields.last_name = g(src, 'lastName') || g(dlInfo, 'lastName');
+  fields.middle_name = g(src, 'middleName') || g(dlInfo, 'middleName');
+
+  // License number
+  fields.dl_number = g(src, 'licenseNumber', 'customerIdentifier') || g(dlInfo, 'licenseNumber', 'customerIdentifier');
+
+  // Dates: v11 uses birthDate, expirationDate, issuedDate
+  fields.date_of_birth = g(src, 'birthDate') || g(dlInfo, 'birthDate');
+  fields.expiration_date = g(src, 'expirationDate') || g(dlInfo, 'expirationDate');
+  fields.issue_date = g(src, 'issuedDate') || g(dlInfo, 'issuedDate');
+
+  // Address: v11 uses street_1, city, jurisdictionCode, postalCode
+  fields.address_street = g(src, 'street_1', 'street_2') || g(dlInfo, 'street_1', 'street_2');
+  fields.address_city = g(src, 'city') || g(dlInfo, 'city');
+  fields.address_state = g(src, 'jurisdictionCode') || g(dlInfo, 'jurisdictionCode');
   fields.dl_state = fields.address_state;
-  fields.address_zip = g(src, 'zipCode', 'Postal Code', 'DAK') ||
-                        g(dlInfo, 'zipCode', 'Postal Code', 'DAK');
-  fields.gender = g(src, 'sex', 'Sex', 'DBC') ||
-                   g(dlInfo, 'sex', 'Sex', 'DBC');
-  fields.eye_color = g(src, 'eyeColor', 'Eye Color', 'DAY') ||
-                      g(dlInfo, 'eyeColor', 'Eye Color', 'DAY');
-  fields.height = g(src, 'height', 'Height', 'DAU') ||
-                   g(dlInfo, 'height', 'Height', 'DAU');
+  fields.address_zip = g(src, 'postalCode') || g(dlInfo, 'postalCode');
+
+  // Physical: v11 uses sex, eyeColor, height
+  fields.gender = g(src, 'sex') || g(dlInfo, 'sex');
+  fields.eye_color = g(src, 'eyeColor') || g(dlInfo, 'eyeColor');
+  fields.height = g(src, 'height') || g(dlInfo, 'height');
 
   // Normalize dates to YYYY-MM-DD
   for (var df of ['date_of_birth', 'expiration_date', 'issue_date']) {

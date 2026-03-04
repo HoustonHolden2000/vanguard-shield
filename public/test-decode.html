@@ -228,6 +228,7 @@ function flattenAndDisplay(obj, prefix, tbody) {
 }
 
 // Same mapping function as main app — test it here
+// v11 field names from: https://www.dynamsoft.com/code-parser/docs/core/code-types/aamva-dl-id.html
 function mapFields(dlInfo) {
   var fields = {};
   function g(obj) {
@@ -238,19 +239,19 @@ function mapFields(dlInfo) {
     return '';
   }
   var src = dlInfo.CodeParserResult || dlInfo.ResultInfo || dlInfo;
-  fields.first_name = g(src, 'firstName', 'First Name', 'DAC', 'DCT') || g(dlInfo, 'firstName', 'First Name', 'DAC', 'DCT');
-  fields.last_name = g(src, 'lastName', 'Last Name', 'DCS') || g(dlInfo, 'lastName', 'Last Name', 'DCS');
-  fields.middle_name = g(src, 'middleName', 'Middle Name', 'DAD') || g(dlInfo, 'middleName', 'Middle Name', 'DAD');
-  fields.dl_number = g(src, 'licenseNumber', 'License Number', 'DAQ') || g(dlInfo, 'licenseNumber', 'License Number', 'DAQ');
-  fields.date_of_birth = g(src, 'dateOfBirth', 'Date of Birth', 'DBB') || g(dlInfo, 'dateOfBirth', 'Date of Birth', 'DBB');
-  fields.expiration_date = g(src, 'expirationDate', 'Expiration Date', 'DBA') || g(dlInfo, 'expirationDate', 'Expiration Date', 'DBA');
-  fields.address_street = g(src, 'street', 'Street', 'DAG') || g(dlInfo, 'street', 'Street', 'DAG');
-  fields.address_city = g(src, 'city', 'City', 'DAI') || g(dlInfo, 'city', 'City', 'DAI');
-  fields.address_state = g(src, 'state', 'Jurisdiction', 'DAJ') || g(dlInfo, 'state', 'Jurisdiction', 'DAJ');
-  fields.address_zip = g(src, 'zipCode', 'Postal Code', 'DAK') || g(dlInfo, 'zipCode', 'Postal Code', 'DAK');
-  fields.gender = g(src, 'sex', 'Sex', 'DBC') || g(dlInfo, 'sex', 'Sex', 'DBC');
-  fields.eye_color = g(src, 'eyeColor', 'Eye Color', 'DAY') || g(dlInfo, 'eyeColor', 'Eye Color', 'DAY');
-  fields.height = g(src, 'height', 'Height', 'DAU') || g(dlInfo, 'height', 'Height', 'DAU');
+  fields.first_name = g(src, 'firstName', 'givenName') || g(dlInfo, 'firstName', 'givenName');
+  fields.last_name = g(src, 'lastName') || g(dlInfo, 'lastName');
+  fields.middle_name = g(src, 'middleName') || g(dlInfo, 'middleName');
+  fields.dl_number = g(src, 'licenseNumber', 'customerIdentifier') || g(dlInfo, 'licenseNumber', 'customerIdentifier');
+  fields.date_of_birth = g(src, 'birthDate') || g(dlInfo, 'birthDate');
+  fields.expiration_date = g(src, 'expirationDate') || g(dlInfo, 'expirationDate');
+  fields.address_street = g(src, 'street_1', 'street_2') || g(dlInfo, 'street_1', 'street_2');
+  fields.address_city = g(src, 'city') || g(dlInfo, 'city');
+  fields.address_state = g(src, 'jurisdictionCode') || g(dlInfo, 'jurisdictionCode');
+  fields.address_zip = g(src, 'postalCode') || g(dlInfo, 'postalCode');
+  fields.gender = g(src, 'sex') || g(dlInfo, 'sex');
+  fields.eye_color = g(src, 'eyeColor') || g(dlInfo, 'eyeColor');
+  fields.height = g(src, 'height') || g(dlInfo, 'height');
   return fields;
 }
 </script>
