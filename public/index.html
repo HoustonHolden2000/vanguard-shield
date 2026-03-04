@@ -174,14 +174,9 @@ body {
     <div id="tabScan" class="tab-content active">
       <div class="scan-section">
         <button class="scan-btn" onclick="startScan()">&#x1f4f7; SCAN LICENSE</button>
-        <div class="scan-hint">Photograph the BACK of the driver's license</div>
-        <div style="display:flex;gap:8px;margin-top:12px;">
-          <button onclick="manualEntry()" style="flex:1;padding:12px;background:#222;border:1px solid #333;border-radius:8px;color:#999;font-size:13px;font-weight:600;cursor:pointer;letter-spacing:1px;">MANUAL ENTRY</button>
-          <button onclick="dumpLastDecode()" style="flex:1;padding:12px;background:#111;border:1px solid #333;border-radius:8px;color:#555;font-size:11px;font-family:monospace;cursor:pointer;">DUMP LAST DECODE</button>
-        </div>
+        <div class="scan-hint">Photograph the BACK of the license - hold steady, good lighting</div>
       </div>
       <div class="status-bar" id="statusBar"></div>
-      <div id="debugLine" style="margin:0 16px;padding:8px 12px;font-size:11px;font-family:monospace;color:#666;background:#111;border:1px solid #222;border-radius:6px;word-break:break-all;">DEBUG: waiting for scan</div>
       <div class="result-card" id="resultCard">
         <div class="result-header">
           <div style="font-size:14px;font-weight:600;color:#fff">SCAN RESULT</div>
@@ -330,60 +325,12 @@ function preprocessCanvas(img,contrastLevel,invert){
   ctx.putImageData(imageData,0,0);return canvas;
 }
 
-let debugLog=[];
-let lastDecodeData={items:null,barcodeText:null,parserJSON:null,passResults:[]};
-
-function dbg(msg){debugLog.push(msg);console.log('[Halo] '+msg);}
-
-function showDebug(msg){
-  const el=document.getElementById('debugLine');
-  el.textContent='DEBUG: '+msg;
-  el.style.display='block';
-}
-
-function dumpLastDecode(){
-  console.log('=== IRON HALO DEBUG DUMP ===');
-  console.log('sdkReady:',sdkReady,'cvRouter:',!!cvRouter,'parser:',!!parser);
-  console.log('debugLog:',debugLog);
-  if(lastDecodeData.passResults.length>0){
-    lastDecodeData.passResults.forEach((pr,i)=>{
-      console.log('Pass '+(i+1)+': '+pr.label+' => '+pr.itemCount+' items, '+pr.ms+'ms');
-      if(pr.types)console.log('  types: '+pr.types);
-    });
-  }else{console.log('No pass results recorded');}
-  if(lastDecodeData.barcodeText)console.log('Raw barcode text:',lastDecodeData.barcodeText);
-  if(lastDecodeData.parserJSON)console.log('Parser JSON:',JSON.stringify(lastDecodeData.parserJSON,null,2));
-  // Also show on screen
-  let summary='sdkReady='+sdkReady+' cvRouter='+!!cvRouter+' parser='+!!parser;
-  if(lastDecodeData.passResults.length>0){
-    summary+='\n'+lastDecodeData.passResults.map((pr,i)=>'P'+(i+1)+':'+pr.itemCount+'items/'+pr.ms+'ms').join(' | ');
-  }
-  if(lastDecodeData.barcodeText)summary+='\nBarcode: '+lastDecodeData.barcodeText.substring(0,100)+'...';
-  showDebug(summary);
-  console.log('=== END DUMP ===');
-}
-
-function manualEntry(){
-  alert('Manual Entry: not yet wired in this debug build. Use SCAN LICENSE for now.');
-}
-
 async function processImage(img){
-  debugLog=[];
-  lastDecodeData={items:null,barcodeText:null,parserJSON:null,passResults:[]};
-  document.getElementById('debugLine').textContent='DEBUG: scanning...';
-
-  const w=img.naturalWidth||img.width;
-  const h=img.naturalHeight||img.height;
-  dbg('Photo: '+w+'x'+h);
-
   if(!sdkReady||!cvRouter){
     showLoading('Initializing scanner...','First scan takes a moment');
-    dbg('SDK not ready, calling initSDK...');
     await initSDK();
-    if(!sdkReady){hideLoading();showStatus('fail','Scanner engine failed to load.');showDebug('ENGINE INIT FAILED. sdkReady='+sdkReady);showRetryBtn();return;}
-    dbg('SDK init complete. sdkReady='+sdkReady+' cvRouter='+!!cvRouter+' parser='+!!parser);
+    if(!sdkReady){hideLoading();showStatus('fail','Scanner engine failed to load.');showRetryBtn();return;}
   }
-
   const passes=[
     {label:'Reading barcode...',contrast:0,invert:false,template:'ReadBarcodes_Balance'},
     {label:'Trying high-res...',contrast:0,invert:false,template:'ReadBarcodes_ReadRateFirst'},
@@ -392,74 +339,24 @@ async function processImage(img){
     {label:'Deep scan...',contrast:2.2,invert:false,template:'ReadBarcodes_ReadRateFirst'},
     {label:'Trying inverted...',contrast:1.5,invert:true,template:'ReadBarcodes_ReadRateFirst'},
   ];
-
   let barcodeItem=null;
-  let totalMs=0;
-  const t0=performance.now();
-
   for(let p=0;p<passes.length;p++){
     showLoading(passes[p].label,'Attempt '+(p+1)+' of '+passes.length);
-    const pt0=performance.now();
     try{
       const canvas=(passes[p].contrast===0)?getRawCanvas(img):preprocessCanvas(img,passes[p].contrast,passes[p].invert);
-      dbg('Pass '+(p+1)+': '+passes[p].template+' (contrast='+passes[p].contrast+', invert='+passes[p].invert+') canvas='+canvas.width+'x'+canvas.height);
       const result=await cvRouter.capture(canvas,passes[p].template);
-      const pt1=performance.now();
-      const pms=Math.round(pt1-pt0);
-      const itemCount=(result&&result.items)?result.items.length:0;
-      const types=(result&&result.items)?result.items.map(it=>'type='+it.type+(it.formatString?('/'+it.formatString):'')).join(', '):'none';
-      dbg('Pass '+(p+1)+': '+itemCount+' items in '+pms+'ms ['+types+']');
-      lastDecodeData.passResults.push({label:passes[p].label,itemCount:itemCount,ms:pms,types:types});
-
       if(result&&result.items){
-        for(let i=0;i<result.items.length;i++){
-          const it=result.items[i];
-          try{
-            const txt=it.text||new TextDecoder().decode(new Uint8Array(it.bytes||[]));
-            dbg('  item['+i+'] type='+it.type+' bytes='+(it.bytes?it.bytes.length:0)+' text='+txt.substring(0,80));
-          }catch(e){dbg('  item['+i+'] type='+it.type+' (could not read text)');}
-        }
         barcodeItem=result.items.find(item=>item.type===2||item.type===Dynamsoft.Core.EnumCapturedResultItemType.CRIT_BARCODE);
-        if(barcodeItem){dbg('BARCODE FOUND on pass '+(p+1));break;}
+        if(barcodeItem)break;
       }
-    }catch(e){
-      const pt1=performance.now();
-      dbg('Pass '+(p+1)+' THREW: '+e.message+' ('+Math.round(pt1-pt0)+'ms)');
-      lastDecodeData.passResults.push({label:passes[p].label,itemCount:0,ms:Math.round(pt1-pt0),types:'ERROR: '+e.message});
-    }
+    }catch(e){console.warn("Pass "+(p+1)+" failed:",e.message);}
   }
-
-  totalMs=Math.round(performance.now()-t0);
-  dbg('All passes done. totalMs='+totalMs+' barcodeFound='+!!barcodeItem);
-
-  if(!barcodeItem){
-    hideLoading();
-    const passSum=lastDecodeData.passResults.map((pr,i)=>'P'+(i+1)+':'+pr.itemCount).join(' ');
-    showStatus('fail','No barcode detected. Make sure the BACK of the license is visible and well-lit.');
-    showDebug('0 barcodes found. '+passes.length+' passes, '+totalMs+'ms. Photo='+w+'x'+h+'. '+passSum);
-    showRetryBtn();
-    return;
-  }
-
-  // Extract raw barcode text for debug
-  try{
-    lastDecodeData.barcodeText=barcodeItem.text||new TextDecoder().decode(new Uint8Array(barcodeItem.bytes||[]));
-    dbg('Raw barcode text ('+lastDecodeData.barcodeText.length+' chars): '+lastDecodeData.barcodeText.substring(0,200));
-  }catch(e){dbg('Could not extract barcode text: '+e.message);}
-
+  if(!barcodeItem){hideLoading();showStatus('fail','No barcode detected. Make sure the BACK of the license is visible and well-lit.');showRetryBtn();return;}
   showLoading('Extracting license data...','');
   const fields=await parseLicense(barcodeItem);
   hideLoading();
-  if(fields&&Object.keys(fields).length>0){
-    dbg('SUCCESS: fields='+JSON.stringify(fields));
-    showDebug('DECODED OK. '+Object.keys(fields).length+' fields in '+totalMs+'ms');
-    displayResult(fields);
-  }else{
-    dbg('FAIL: barcode found but no fields extracted');
-    showStatus('fail','Barcode found but parser failed. Keys: ' + Object.keys(barcodeItem).join(','));
-    showDebug('Barcode found but 0 fields extracted. '+totalMs+'ms. Tap DUMP for raw data.');
-    showRetryBtn();
-  }
+  if(fields&&Object.keys(fields).length>0){displayResult(fields);}
+  else{showStatus('fail','Barcode found but could not extract data. Try a clearer photo.');showRetryBtn();}
 }
 
 async function parseLicense(barcodeItem){
@@ -479,8 +376,6 @@ async function parseLicense(barcodeItem){
     }catch(e){console.warn('Byte decode failed:',e);}
   }
 
-  console.log('RAW TEXT LENGTH:',rawText.length);
-  console.log('RAW TEXT PREVIEW:',rawText.substring(0,200));
 
   // Try CodeParser first if available
   if(parser&&barcodeItem.bytes){
@@ -496,7 +391,6 @@ async function parseLicense(barcodeItem){
         }
         // Try getting fields directly from parsed object
         const parsedKeys=Object.keys(parsed);
-        console.log('PARSER KEYS:',parsedKeys.join(','));
       }
     }catch(e){console.warn('CodeParser error:',e.message);}
   }
