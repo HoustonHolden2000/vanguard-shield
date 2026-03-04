@@ -235,6 +235,15 @@ async function initSDK(){
     await Dynamsoft.DCP.CodeParserModule.loadSpec("AAMVA_DL_ID");
     await Dynamsoft.DCP.CodeParserModule.loadSpec("AAMVA_DL_ID_WITH_MAG_STRIPE");
     cvRouter=await Dynamsoft.CVR.CaptureVisionRouter.createInstance();
+    try{
+      let settings=await cvRouter.getSimplifiedSettings("ReadBarcodes_Balance");
+      settings.barcodeSettings.barcodeFormatIds=Dynamsoft.DBR.EnumBarcodeFormat.BF_PDF417;
+      await cvRouter.updateSettings("ReadBarcodes_Balance",settings);
+      let settings2=await cvRouter.getSimplifiedSettings("ReadBarcodes_ReadRateFirst");
+      settings2.barcodeSettings.barcodeFormatIds=Dynamsoft.DBR.EnumBarcodeFormat.BF_PDF417;
+      await cvRouter.updateSettings("ReadBarcodes_ReadRateFirst",settings2);
+      console.log("PDF417-only mode set");
+    }catch(e){console.warn("Could not restrict to PDF417:",e);}
     parser=await Dynamsoft.DCP.CodeParser.createInstance();
     sdkReady=true;
     console.log("Iron Halo: SDK ready");
