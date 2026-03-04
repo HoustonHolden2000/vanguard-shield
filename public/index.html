@@ -151,7 +151,10 @@ body {
     <div class="logo-text"><span class="iron">IRON</span> <span class="halo">HALO</span></div>
     <div class="logo-sub">VERIFY</div>
     <input type="text" id="loginUser" placeholder="Username" autocomplete="username" autocapitalize="none">
-    <input type="password" id="loginPass" placeholder="Password" autocomplete="current-password">
+    <div style="position:relative;">
+      <input type="password" id="loginPass" placeholder="Password" autocomplete="current-password" style="padding-right:44px;">
+      <button type="button" onclick="togglePass()" id="eyeBtn" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:#555;font-size:20px;cursor:pointer;padding:4px;">&#x1f441;</button>
+    </div>
     <button class="login-btn" onclick="doLogin()">ENTER</button>
     <div class="login-error" id="loginError"></div>
   </div>
@@ -217,6 +220,13 @@ body {
 <input type="file" id="cameraInput" accept="image/*" capture="environment">
 <script>
 let currentUser=null,lastScanData=null,sdkReady=false,cvRouter=null,parser=null;
+
+function togglePass(){
+  const p=document.getElementById('loginPass');
+  const b=document.getElementById('eyeBtn');
+  if(p.type==='password'){p.type='text';b.style.color='#0056A0';}
+  else{p.type='password';b.style.color='#555';}
+}
 
 async function initSDK(){
   try{
@@ -351,7 +361,7 @@ function manualEntry(){
 async function processImage(img){
   debugLog=[];
   lastDecodeData={items:null,barcodeText:null,parserJSON:null,passResults:[]};
-  document.getElementById('debugLine').style.display='none';
+  document.getElementById('debugLine').textContent='DEBUG: scanning...';
 
   const w=img.naturalWidth||img.width;
   const h=img.naturalHeight||img.height;
