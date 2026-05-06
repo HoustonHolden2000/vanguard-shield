@@ -1,42 +1,79 @@
+// server.js — Iron Halo Verify v4.1
+// Operational verification layer for logistics handoffs with tamper-evident
+// audit receipts. Stateless verification gatekeeper, not data warehouse.
+
+require('dotenv').config();
+
 const express = require('express');
+const helmet = require('helmet');
+const cors = require('cors');
+
+const { initialize: initDb } = require('./db/init');
+const { generalLimiter } = require('./middleware/ratelimit');
+
+// Initialize DB on cold-start (idempotent).
+try {
+  initDb();
+} catch (err) {
+  console.error('[startup] DB init failed:', err);
+  process.exit(1);
+}
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(express.json({ limit: '50mb' }));
+// Trust the Render reverse proxy so req.ip is correct.
+app.set('trust proxy', 1);
+
+// Security headers
+app.use(helmet({
+  contentSecurityPolicy: false // index.html loads Dynamsoft from CDN
+}));
+
+// CORS: allowlist comma-separated origins from env, default to same-origin only.
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
+  .split(',').map(s => s.trim()).filter(Boolean);
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true); // allow same-origin / mobile webview
+    if (allowedOrigins.length === 0) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error('cors_origin_rejected'));
+  },
+  credentials: false
+}));
+
+app.use(express.json({ limit: '6mb' }));
 app.use(express.static('public'));
 
-const USERS = {
-  admin: { password: 'vanguard2026', role: 'admin', name: 'Admin' },
-  guard: { password: 'guard123', role: 'guard', name: 'Guard' },
-  demo:  { password: 'demo', role: 'demo', name: 'Demo User' }
-};
+// General rate limit on everything below.
+app.use('/api/', generalLimiter);
 
-let scans = [];
+// Routes
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/scans', require('./routes/scans'));
+app.use('/api/dashboard', require('./routes/dashboard'));
 
-app.post('/api/login', (req, res) => {
-  const { username, password } = req.body;
-  const user = USERS[username];
-  if (user && user.password === password) {
-    return res.json({ success: true, role: user.role, name: user.name });
-  }
-  res.status(401).json({ success: false, message: 'Invalid credentials' });
-});
-
-app.post('/api/scans', (req, res) => {
-  const scan = { id: Date.now(), timestamp: new Date().toISOString(), ...req.body };
-  scans.unshift(scan);
-  if (scans.length > 500) scans = scans.slice(0, 500);
-  res.json({ success: true, scan });
-});
-
-app.get('/api/scans', (req, res) => {
-  res.json({ scans: scans.slice(0, 50) });
-});
-
+// Health
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', version: '4.0.0', engine: 'dynamsoft-v11' });
+  res.json({
+    status: 'ok',
+    version: '4.1.0',
+    engine: 'dynamsoft-v11',
+    server_time: new Date().toISOString()
+  });
+});
+
+// Error handler
+app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
+  console.error('[error]', err.message);
+  if (err.message === 'cors_origin_rejected') {
+    return res.status(403).json({ error: 'cors_origin_rejected' });
+  }
+  return res.status(500).json({ error: 'internal_error' });
 });
 
 app.listen(PORT, () => {
-  console.log('Iron Halo Verify v4.0 running on port ' + PORT);
+  console.log(`Iron Halo Verify v4.1 running on port ${PORT}`);
 });
