@@ -236,6 +236,42 @@ body {
 <input type="file" id="cameraInput" accept="image/*" capture="environment">
 <script>
 let currentUser=null,lastScanData=null,sdkReady=false,cvRouter=null,parser=null;
+let lastGpsPosition=null;
+
+// === v4.1 auth helpers (JWT) ===
+function tokenGet(name){try{return localStorage.getItem(name);}catch(e){return null;}}
+function tokenSet(name,val){try{localStorage.setItem(name,val);}catch(e){}}
+function tokenClear(){try{localStorage.removeItem('ihv_access');localStorage.removeItem('ihv_refresh');localStorage.removeItem('ihv_user');}catch(e){}}
+function authHeader(){const t=tokenGet('ihv_access');return t?{'Authorization':'Bearer '+t}:{};}
+async function authFetch(url,opts){
+  opts=opts||{};opts.headers=Object.assign({},opts.headers||{},authHeader());
+  let res=await fetch(url,opts);
+  if(res.status===401){
+    const refreshed=await tryRefresh();
+    if(refreshed){opts.headers=Object.assign({},opts.headers,authHeader());res=await fetch(url,opts);}
+  }
+  return res;
+}
+async function tryRefresh(){
+  const rt=tokenGet('ihv_refresh');if(!rt)return false;
+  try{
+    const res=await fetch('/api/auth/refresh',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({refresh_token:rt})});
+    if(!res.ok){tokenClear();return false;}
+    const data=await res.json();
+    tokenSet('ihv_access',data.access_token);if(data.refresh_token)tokenSet('ihv_refresh',data.refresh_token);
+    return true;
+  }catch(e){return false;}
+}
+function captureGps(){
+  return new Promise(resolve=>{
+    if(!navigator.geolocation){resolve(null);return;}
+    navigator.geolocation.getCurrentPosition(
+      pos=>{lastGpsPosition={lat:pos.coords.latitude,lon:pos.coords.longitude};resolve(lastGpsPosition);},
+      err=>{console.warn('GPS unavailable:',err.message);resolve(null);},
+      {timeout:5000,maximumAge:60000,enableHighAccuracy:false}
+    );
+  });
+}
 
 function togglePass(){
   const p=document.getElementById('loginPass');
@@ -275,25 +311,50 @@ async function doLogin(){
   const errEl=document.getElementById('loginError');
   errEl.textContent='';
   try{
-    const res=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:user,password:pass})});
+    const res=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:user,password:pass})});
+    if(!res.ok){
+      const errData=await res.json().catch(()=>({}));
+      errEl.textContent=(res.status===429)?'Too many attempts - wait 15 min':(errData.error||'Invalid credentials');
+      return;
+    }
     const data=await res.json();
-    if(data.success){
-      currentUser={username:user,role:data.role,name:data.name};
-      document.getElementById('loginScreen').style.display='none';
-      document.getElementById('appScreen').classList.add('active');
-      document.getElementById('userDisplay').textContent=data.name+' ('+data.role+')';
-      if(!sdkReady)initSDK();
-    }else{errEl.textContent='Invalid credentials';}
+    tokenSet('ihv_access',data.access_token);
+    tokenSet('ihv_refresh',data.refresh_token);
+    tokenSet('ihv_user',JSON.stringify(data.user));
+    currentUser=data.user;
+    document.getElementById('loginScreen').style.display='none';
+    document.getElementById('appScreen').classList.add('active');
+    document.getElementById('userDisplay').textContent=data.user.name+' ('+data.user.role+')';
+    if(!sdkReady)initSDK();
+    captureGps(); // pre-warm location permission
   }catch(e){errEl.textContent='Connection error';}
 }
 
-function doLogout(){
+async function doLogout(){
+  try{
+    const rt=tokenGet('ihv_refresh');
+    await authFetch('/api/auth/logout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({refresh_token:rt})});
+  }catch(e){/* ignore */}
+  tokenClear();
   currentUser=null;
   document.getElementById('appScreen').classList.remove('active');
   document.getElementById('loginScreen').style.display='flex';
   document.getElementById('loginUser').value='';
   document.getElementById('loginPass').value='';
   resetScanUI();
+}
+
+// Restore session on reload if refresh token still valid.
+async function tryAutoLogin(){
+  const u=tokenGet('ihv_user');const at=tokenGet('ihv_access');
+  if(!u||!at)return;
+  try{
+    currentUser=JSON.parse(u);
+    document.getElementById('loginScreen').style.display='none';
+    document.getElementById('appScreen').classList.add('active');
+    document.getElementById('userDisplay').textContent=currentUser.name+' ('+currentUser.role+')';
+    if(!sdkReady)initSDK();
+  }catch(e){tokenClear();}
 }
 
 document.getElementById('loginPass').addEventListener('keyup',function(e){if(e.key==='Enter')doLogin();});
@@ -519,29 +580,95 @@ async function saveScan(){
     loadDescription:document.getElementById('bolLoad').value.trim(),
     dock:document.getElementById('bolDock').value.trim()
   };
+  // Capture GPS (best-effort, non-blocking).
+  const gps=lastGpsPosition||(await captureGps());
+  // v4.1 API expects: site_id, scan_type, payload string, identifier_short, gps, metadata.
+  // Default site is 'demo_site' (bootstrapped on server). Future: site selector UI.
+  const siteId=tokenGet('ihv_site')||'demo_site';
+  const payload={license:lastScanData,bol:bolData,scanned_by:currentUser?currentUser.username:'unknown'};
+  const identifierShort=(lastScanData.dlNumber||'').slice(-4)||(bolData.bolNumber||null);
+  const body={
+    site_id:siteId,
+    scan_type:'driver_license',
+    payload:JSON.stringify(payload),
+    identifier_short:identifierShort,
+    gps_lat:gps?gps.lat:null,
+    gps_lon:gps?gps.lon:null,
+    metadata:{bol_number:bolData.bolNumber||null,carrier:bolData.carrier||null,load:bolData.loadDescription||null,dock:bolData.dock||null}
+  };
   try{
-    await fetch('/api/scans',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...lastScanData,...bolData,scannedBy:currentUser?currentUser.username:'unknown'})});
-    showStatus('success','Scan + BOL saved');setTimeout(()=>resetScanUI(),1500);
-  }catch(e){showStatus('fail','Failed to save');}
+    const res=await authFetch('/api/scans',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    if(res.ok){
+      const r=await res.json();
+      showStatus('success','Scan + BOL saved ('+r.result+')');
+      setTimeout(()=>resetScanUI(),1500);
+    }else if(res.status===401){
+      tokenClear();showStatus('fail','Session expired - please login again');setTimeout(()=>doLogout(),1500);
+    }else{
+      // Offline / failed - queue locally
+      queueOfflineScan(body);
+      showStatus('partial','Saved offline - will sync when reconnected');
+      setTimeout(()=>resetScanUI(),1800);
+    }
+  }catch(e){
+    // Network failure - queue offline
+    queueOfflineScan(body);
+    showStatus('partial','Offline - scan queued, will sync');
+    setTimeout(()=>resetScanUI(),1800);
+  }
 }
+
+// Offline queue using localStorage (simple and reliable across mobile browsers).
+function queueOfflineScan(body){
+  try{
+    const q=JSON.parse(localStorage.getItem('ihv_offline_queue')||'[]');
+    q.push({body,queued_at:new Date().toISOString()});
+    localStorage.setItem('ihv_offline_queue',JSON.stringify(q));
+  }catch(e){console.warn('Queue failed:',e);}
+}
+async function flushOfflineQueue(){
+  try{
+    const q=JSON.parse(localStorage.getItem('ihv_offline_queue')||'[]');
+    if(q.length===0)return;
+    const remaining=[];
+    for(const item of q){
+      try{
+        const res=await authFetch('/api/scans',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(item.body)});
+        if(!res.ok)remaining.push(item);
+      }catch(e){remaining.push(item);}
+    }
+    localStorage.setItem('ihv_offline_queue',JSON.stringify(remaining));
+    if(q.length>remaining.length){console.log('Synced '+(q.length-remaining.length)+' queued scans');}
+  }catch(e){console.warn('Flush failed:',e);}
+}
+window.addEventListener('online',()=>{console.log('Online - flushing queue');flushOfflineQueue();});
+setInterval(()=>{if(navigator.onLine&&currentUser)flushOfflineQueue();},30000);
 
 async function loadHistory(){
   try{
-    const res=await fetch('/api/scans');const data=await res.json();
+    const res=await authFetch('/api/scans/recent');
+    if(!res.ok){
+      document.getElementById('historyList').innerHTML='<div class="empty-history">Could not load history</div>';
+      return;
+    }
+    const data=await res.json();
     const el=document.getElementById('historyList');
     if(!data.scans||data.scans.length===0){el.innerHTML='<div class="empty-history">No scans yet</div>';return;}
     el.innerHTML=data.scans.map(s=>{
-      const name=[s.firstName,s.lastName].filter(Boolean).join(' ')||'Unknown';
-      const bol=s.bolNumber?' | BOL: '+s.bolNumber:'';
-      const carrier=s.carrier?' | '+s.carrier:'';
+      // v4.1 returns flattened scan record. Decode metadata for display.
+      let meta={};try{meta=s.metadata_json?JSON.parse(s.metadata_json):{};}catch(e){}
+      const name=s.identifier_short?'ID ending '+s.identifier_short:'Scan';
+      const bol=meta.bol_number?' | BOL: '+meta.bol_number:'';
+      const carrier=meta.carrier?' | '+meta.carrier:'';
       const time=new Date(s.timestamp).toLocaleString();
-      const filled=[s.firstName,s.lastName,s.dob,s.dlNumber,s.expiration,s.state,s.street].filter(Boolean).length;
-      const color=filled>=5?'#2D8C3C':filled>=3?'#D4A017':'#CC3333';
-      const label=filled>=5?'VERIFIED':filled>=3?'PARTIAL':'INCOMPLETE';
-      return '<div class="history-item"><div><div class="history-name">'+name+bol+'</div><div class="history-time">'+time+carrier+'</div></div><div class="history-badge" style="background:'+color+'22;color:'+color+';border:1px solid '+color+'">'+label+'</div></div>';
+      const color=s.result==='PASS'?'#2D8C3C':s.result==='PARTIAL'?'#D4A017':'#CC3333';
+      return '<div class="history-item"><div><div class="history-name">'+name+bol+'</div><div class="history-time">'+time+carrier+'</div></div><div class="history-badge" style="background:'+color+'22;color:'+color+';border:1px solid '+color+'">'+s.result+'</div></div>';
     }).join('');
   }catch(e){console.error("History load failed:",e);}
 }
+
+// Run auto-login on page load.
+window.addEventListener('DOMContentLoaded',()=>{tryAutoLogin();flushOfflineQueue();});
 
 function showStatus(type,msg){const el=document.getElementById('statusBar');el.className='status-bar '+type;el.textContent=msg;}
 function showRetryBtn(){document.getElementById('retryBtn').style.display='block';document.getElementById('actionRow').style.display='none';}

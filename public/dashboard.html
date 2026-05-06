@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Iron Halo Dashboard</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+  background: #0C0C0C; color: #E0E0E0; min-height: 100vh;
+}
+.header {
+  background: #111; border-bottom: 2px solid #0056A0;
+  padding: 14px 20px; display: flex; justify-content: space-between; align-items: center;
+}
+.header h1 { font-size: 18px; font-weight: 700; letter-spacing: 2px; }
+.header h1 .iron { color: #0056A0; } .header h1 .halo { color: #fff; }
+.header .subtitle { font-size: 10px; color: #666; letter-spacing: 1px; margin-top: 2px; }
+.header-right { display: flex; align-items: center; gap: 14px; font-size: 12px; }
+.header-right .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #2D8C3C; box-shadow: 0 0 8px #2D8C3C; }
+.header-right .live-dot.stale { background: #CC3333; box-shadow: 0 0 8px #CC3333; }
+.logout-btn { background: none; border: 1px solid #333; color: #999; padding: 6px 12px; border-radius: 4px; font-size: 11px; cursor: pointer; }
+
+.login-screen {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 20px;
+}
+.login-box {
+  background: #151515; border: 1px solid #222; border-radius: 12px;
+  padding: 40px 30px; width: 100%; max-width: 360px; text-align: center;
+}
+.logo-text { font-size: 26px; font-weight: 700; letter-spacing: 3px; margin-bottom: 4px; }
+.logo-text .iron { color: #0056A0; } .logo-text .halo { color: #fff; }
+.logo-sub { font-size: 11px; color: #555; letter-spacing: 2px; margin-bottom: 24px; }
+.login-box input {
+  width: 100%; padding: 12px 14px; margin-bottom: 12px;
+  background: #0C0C0C; border: 1px solid #333; border-radius: 6px; color: #fff; font-size: 16px; outline: none;
+}
+.login-box input:focus { border-color: #0056A0; }
+.login-btn {
+  width: 100%; padding: 14px; margin-top: 8px;
+  background: #0056A0; border: none; border-radius: 6px; color: #fff; font-size: 16px; font-weight: 600; cursor: pointer; letter-spacing: 1px;
+}
+.login-error { color: #CC3333; font-size: 13px; margin-top: 10px; min-height: 20px; }
+
+.dashboard { display: none; }
+.dashboard.active { display: block; }
+.controls { padding: 16px 20px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; border-bottom: 1px solid #1a1a1a; }
+.controls label { font-size: 11px; color: #666; letter-spacing: 1px; text-transform: uppercase; margin-right: 6px; }
+.controls select {
+  background: #151515; border: 1px solid #333; color: #fff; padding: 6px 10px; border-radius: 4px; font-size: 13px; outline: none;
+}
+.controls .stat { font-size: 12px; color: #888; margin-left: auto; }
+
+.scan-list { padding: 12px 20px 60px; }
+.scan-row {
+  background: #151515; border: 1px solid #222; border-radius: 8px;
+  padding: 14px 16px; margin-bottom: 8px;
+  display: grid; grid-template-columns: auto 1fr auto auto; gap: 14px; align-items: center;
+}
+.scan-result { font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 12px; letter-spacing: 1px; min-width: 64px; text-align: center; }
+.scan-result.PASS { background: #0d2618; color: #2D8C3C; border: 1px solid #2D8C3C; }
+.scan-result.PARTIAL { background: #261a0d; color: #D4A017; border: 1px solid #D4A017; }
+.scan-result.FAIL { background: #260d0d; color: #CC3333; border: 1px solid #CC3333; }
+.scan-meta { font-size: 13px; color: #fff; }
+.scan-meta .small { font-size: 11px; color: #666; margin-top: 2px; }
+.scan-time { font-size: 11px; color: #555; text-align: right; }
+.scan-id { font-family: ui-monospace, monospace; font-size: 10px; color: #444; text-align: right; }
+.empty-state { text-align: center; padding: 60px 20px; color: #444; font-size: 14px; }
+</style>
+</head>
+<body>
+
+<div id="loginScreen" class="login-screen">
+  <div class="login-box">
+    <div class="logo-text"><span class="iron">IRON</span> <span class="halo">HALO</span></div>
+    <div class="logo-sub">CLIENT DASHBOARD</div>
+    <input type="text" id="loginUser" placeholder="Username" autocapitalize="none">
+    <input type="password" id="loginPass" placeholder="Password">
+    <button class="login-btn" onclick="doLogin()">SIGN IN</button>
+    <div class="login-error" id="loginError"></div>
+  </div>
+</div>
+
+<div id="dashboardScreen" class="dashboard">
+  <div class="header">
+    <div>
+      <h1><span class="iron">IRON</span> <span class="halo">HALO</span></h1>
+      <div class="subtitle">CLIENT DASHBOARD</div>
+    </div>
+    <div class="header-right">
+      <span class="live-dot" id="liveDot"></span>
+      <span id="liveLabel">LIVE</span>
+      <span id="userLabel" style="color:#0056A0"></span>
+      <button class="logout-btn" onclick="doLogout()">LOGOUT</button>
+    </div>
+  </div>
+  <div class="controls">
+    <label>Site:</label>
+    <select id="siteSelect" onchange="onSiteChange()"></select>
+    <span class="stat" id="lastUpdate"></span>
+  </div>
+  <div class="scan-list" id="scanList"></div>
+</div>
+
+<script>
+let pollTimer=null,lastSinceTs=null,knownIds=new Set();
+
+function tokenGet(name){try{return localStorage.getItem(name);}catch(e){return null;}}
+function tokenSet(name,val){try{localStorage.setItem(name,val);}catch(e){}}
+function tokenClear(){try{['ihv_access','ihv_refresh','ihv_user','ihv_dashboard_site'].forEach(k=>localStorage.removeItem(k));}catch(e){}}
+function authHeader(){const t=tokenGet('ihv_access');return t?{'Authorization':'Bearer '+t}:{};}
+
+async function authFetch(url,opts){
+  opts=opts||{};opts.headers=Object.assign({},opts.headers||{},authHeader());
+  let res=await fetch(url,opts);
+  if(res.status===401){
+    const refreshed=await tryRefresh();
+    if(refreshed){opts.headers=Object.assign({},opts.headers,authHeader());res=await fetch(url,opts);}
+  }
+  return res;
+}
+async function tryRefresh(){
+  const rt=tokenGet('ihv_refresh');if(!rt)return false;
+  try{
+    const res=await fetch('/api/auth/refresh',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({refresh_token:rt})});
+    if(!res.ok){tokenClear();return false;}
+    const data=await res.json();
+    tokenSet('ihv_access',data.access_token);if(data.refresh_token)tokenSet('ihv_refresh',data.refresh_token);
+    return true;
+  }catch(e){return false;}
+}
+
+async function doLogin(){
+  const user=document.getElementById('loginUser').value.trim();
+  const pass=document.getElementById('loginPass').value;
+  const errEl=document.getElementById('loginError');errEl.textContent='';
+  try{
+    const res=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:user,password:pass})});
+    if(!res.ok){const e=await res.json().catch(()=>({}));errEl.textContent=e.error||'Invalid credentials';return;}
+    const data=await res.json();
+    tokenSet('ihv_access',data.access_token);tokenSet('ihv_refresh',data.refresh_token);tokenSet('ihv_user',JSON.stringify(data.user));
+    enterDashboard();
+  }catch(e){errEl.textContent='Connection error';}
+}
+
+async function doLogout(){
+  if(pollTimer)clearInterval(pollTimer);
+  try{const rt=tokenGet('ihv_refresh');await authFetch('/api/auth/logout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({refresh_token:rt})});}catch(e){}
+  tokenClear();
+  document.getElementById('dashboardScreen').classList.remove('active');
+  document.getElementById('loginScreen').style.display='flex';
+}
+
+async function enterDashboard(){
+  const u=tokenGet('ihv_user');if(!u){document.getElementById('loginScreen').style.display='flex';return;}
+  const user=JSON.parse(u);
+  document.getElementById('loginScreen').style.display='none';
+  document.getElementById('dashboardScreen').classList.add('active');
+  document.getElementById('userLabel').textContent=user.name+' ('+user.role+')';
+  await loadSites(user);
+  startPolling();
+}
+
+async function loadSites(user){
+  // For admin: try to fetch all sites. For client/guard: try /api/sites/mine (if endpoint exists later) or fall back to demo_site.
+  // v4.1 Phase 2 minimum: admin sees demo_site by default; if more sites exist they would be added by admin endpoint.
+  const select=document.getElementById('siteSelect');select.innerHTML='';
+  // For now, hard-code demo_site as the only known site. Admin endpoint to enumerate sites is Phase 3.
+  const sites=[{id:'demo_site',name:'Demo Site'}];
+  // Restore last selected
+  const saved=tokenGet('ihv_dashboard_site')||sites[0].id;
+  for(const s of sites){
+    const opt=document.createElement('option');opt.value=s.id;opt.textContent=s.name+' ('+s.id+')';
+    if(s.id===saved)opt.selected=true;
+    select.appendChild(opt);
+  }
+}
+
+function onSiteChange(){
+  tokenSet('ihv_dashboard_site',document.getElementById('siteSelect').value);
+  knownIds.clear();lastSinceTs=null;
+  document.getElementById('scanList').innerHTML='';
+  fetchScans();
+}
+
+function startPolling(){
+  fetchScans();
+  if(pollTimer)clearInterval(pollTimer);
+  pollTimer=setInterval(fetchScans,5000);
+}
+
+async function fetchScans(){
+  const siteId=document.getElementById('siteSelect').value;
+  if(!siteId)return;
+  let url='/api/dashboard/scans/'+encodeURIComponent(siteId);
+  if(lastSinceTs)url+='?since='+encodeURIComponent(lastSinceTs);
+  try{
+    const res=await authFetch(url);
+    if(!res.ok){
+      setLive(false);
+      if(res.status===403){document.getElementById('scanList').innerHTML='<div class="empty-state">You do not have access to this site.</div>';}
+      return;
+    }
+    const data=await res.json();
+    setLive(true);
+    document.getElementById('lastUpdate').textContent='Last update: '+new Date(data.server_time).toLocaleTimeString();
+    if(data.scans&&data.scans.length>0){
+      // Prepend new scans
+      const newOnes=data.scans.filter(s=>!knownIds.has(s.id));
+      newOnes.forEach(s=>knownIds.add(s.id));
+      if(newOnes.length>0){
+        const list=document.getElementById('scanList');
+        // Render full list (newest first) instead of trying to merge - simpler.
+        const allScansArray=Array.from(knownIds).map(id=>data.scans.find(s=>s.id===id)).filter(Boolean);
+        // Actually just re-render from data.scans for simplicity, accepting that we lose history beyond 50.
+        list.innerHTML=data.scans.map(renderScan).join('');
+        if(data.scans[0])lastSinceTs=data.scans[0].timestamp;
+      }
+    }else if(!lastSinceTs){
+      document.getElementById('scanList').innerHTML='<div class="empty-state">No scans yet. Waiting for first scan from a guard at this site...</div>';
+    }
+  }catch(e){setLive(false);console.warn('Poll failed:',e.message);}
+}
+
+function setLive(ok){
+  const dot=document.getElementById('liveDot');
+  if(ok){dot.classList.remove('stale');document.getElementById('liveLabel').textContent='LIVE';}
+  else{dot.classList.add('stale');document.getElementById('liveLabel').textContent='OFFLINE';}
+}
+
+function renderScan(s){
+  const time=new Date(s.timestamp).toLocaleString();
+  const idTail=s.id?s.id.slice(-8):'';
+  const ident=s.identifier_short||'(no id)';
+  const reason=s.reason?' &middot; '+s.reason:'';
+  const type=s.scan_type==='driver_license'?'License':(s.scan_type==='bill_of_lading'?'BoL':'BoL/manual');
+  return '<div class="scan-row">'+
+    '<div class="scan-result '+s.result+'">'+s.result+'</div>'+
+    '<div class="scan-meta">'+type+' &middot; ID '+ident+reason+'<div class="small">chain: '+(s.this_chain_hash||'').slice(0,12)+'…</div></div>'+
+    '<div class="scan-time">'+time+'</div>'+
+    '<div class="scan-id">'+idTail+'</div>'+
+    '</div>';
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  if(tokenGet('ihv_access')&&tokenGet('ihv_user'))enterDashboard();
+});
+document.getElementById('loginPass').addEventListener('keyup',function(e){if(e.key==='Enter')doLogin();});
+</script>
+</body>
+</html>

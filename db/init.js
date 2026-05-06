@@ -44,6 +44,29 @@ function bootstrapAdmin(db) {
   console.log('[init-db] WARNING: change admin password via admin UI, then remove ADMIN_BOOTSTRAP_PASSWORD from env');
 }
 
+function bootstrapDefaultSite(db) {
+  // v4.1 Phase 2: ensure at least one site + a guard user + a demo client exist
+  // so the frontend can scan against /api/scans without admin pre-provisioning.
+  // Idempotent. Uses INSERT OR IGNORE.
+  const existingSite = db.prepare('SELECT id FROM sites WHERE id = ?').get('demo_site');
+  if (!existingSite) {
+    db.prepare('INSERT INTO sites (id, client_id, name) VALUES (?, ?, ?)').run('demo_site', 'vanguard', 'Demo Site (default)');
+    console.log('[init-db] default site bootstrapped: demo_site (client=vanguard)');
+  }
+  // Bootstrap a default guard if env present.
+  const guardUser = process.env.GUARD_BOOTSTRAP_USERNAME;
+  const guardPass = process.env.GUARD_BOOTSTRAP_PASSWORD;
+  if (guardUser && guardPass) {
+    const existingGuard = db.prepare('SELECT id FROM users WHERE username = ?').get(guardUser);
+    if (!existingGuard) {
+      const hash = bcrypt.hashSync(guardPass, 12);
+      db.prepare('INSERT INTO users (username, password_hash, role, name, active) VALUES (?, ?, ?, ?, 1)')
+        .run(guardUser, hash, 'guard', 'Guard (bootstrap)');
+      console.log('[init-db] guard user bootstrapped:', guardUser);
+    }
+  }
+}
+
 function initialize() {
   ensureDataDir();
   const db = new Database(DB_PATH);
@@ -52,6 +75,7 @@ function initialize() {
   db.pragma('foreign_keys = ON');
   applySchema(db);
   bootstrapAdmin(db);
+  bootstrapDefaultSite(db);
   db.close();
   console.log('[init-db] complete:', DB_PATH);
 }
