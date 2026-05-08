@@ -45,15 +45,11 @@ function bootstrapAdmin(db) {
 }
 
 function bootstrapDefaultSite(db) {
-  // v4.1 Phase 2: ensure at least one site + a guard user + a demo client exist
-  // so the frontend can scan against /api/scans without admin pre-provisioning.
-  // Idempotent. Uses INSERT OR IGNORE.
   const existingSite = db.prepare('SELECT id FROM sites WHERE id = ?').get('demo_site');
   if (!existingSite) {
     db.prepare('INSERT INTO sites (id, client_id, name) VALUES (?, ?, ?)').run('demo_site', 'vanguard', 'Demo Site (default)');
     console.log('[init-db] default site bootstrapped: demo_site (client=vanguard)');
   }
-  // Bootstrap a default guard if env present.
   const guardUser = process.env.GUARD_BOOTSTRAP_USERNAME;
   const guardPass = process.env.GUARD_BOOTSTRAP_PASSWORD;
   if (guardUser && guardPass) {
@@ -68,35 +64,28 @@ function bootstrapDefaultSite(db) {
 }
 
 function bootstrapTeamUsers(db) {
-  // v4.3: bootstrap named team-member admin accounts on first deploy.
-  // Idempotent — only inserts if username does not already exist.
-  // Each user receives a temporary password they should change on first login.
-  // Brad-ratified 2026-05-08 to onboard Matt + Chris quickly into Vanguard Shield.
+  // v4.4: UPSERT named admin accounts so credentials always match canonical values.
+  // If user exists, update password to canonical bootstrap value. If not, insert.
+  // Brad-ratified 2026-05-08 to onboard Brad/Matt/Chris into Vanguard Shield.
   const teamUsers = [
-    {
-      username: 'Matt',
-      password: 'Vanguard123',
-      role: 'admin',
-      name: 'Matthew Lambert'
-    },
-    {
-      username: 'Chris',
-      password: 'Vanguard123',
-      role: 'admin',
-      name: 'Chris Pelt'
-    }
+    { username: 'admin', password: 'vanguard123', role: 'admin', name: 'Brad Pate' },
+    { username: 'Matt',  password: 'Vanguard123', role: 'admin', name: 'Matthew Lambert' },
+    { username: 'Chris', password: 'Vanguard123', role: 'admin', name: 'Chris Pelt' }
   ];
   for (const u of teamUsers) {
+    const hash = bcrypt.hashSync(u.password, 12);
     const existing = db.prepare('SELECT id FROM users WHERE username = ?').get(u.username);
     if (existing) {
-      console.log('[init-db] team user already exists: ' + u.username);
-      continue;
+      db.prepare(
+        'UPDATE users SET password_hash = ?, role = ?, name = ?, active = 1 WHERE username = ?'
+      ).run(hash, u.role, u.name, u.username);
+      console.log('[init-db] team user updated: ' + u.username + ' (role=' + u.role + ')');
+    } else {
+      db.prepare(
+        'INSERT INTO users (username, password_hash, role, name, active) VALUES (?, ?, ?, ?, 1)'
+      ).run(u.username, hash, u.role, u.name);
+      console.log('[init-db] team user bootstrapped: ' + u.username + ' (role=' + u.role + ')');
     }
-    const hash = bcrypt.hashSync(u.password, 12);
-    db.prepare(
-      'INSERT INTO users (username, password_hash, role, name, active) VALUES (?, ?, ?, ?, 1)'
-    ).run(u.username, hash, u.role, u.name);
-    console.log('[init-db] team user bootstrapped: ' + u.username + ' (role=' + u.role + ')');
   }
 }
 
@@ -115,7 +104,6 @@ function initialize() {
 }
 
 if (require.main === module) {
-  // Run from CLI: `npm run init-db`
   require('dotenv').config();
   initialize();
 }
