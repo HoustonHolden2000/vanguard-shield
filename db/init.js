@@ -67,6 +67,39 @@ function bootstrapDefaultSite(db) {
   }
 }
 
+function bootstrapTeamUsers(db) {
+  // v4.3: bootstrap named team-member admin accounts on first deploy.
+  // Idempotent — only inserts if username does not already exist.
+  // Each user receives a temporary password they should change on first login.
+  // Brad-ratified 2026-05-08 to onboard Matt + Chris quickly into Vanguard Shield.
+  const teamUsers = [
+    {
+      username: 'Matt',
+      password: 'Vanguard123',
+      role: 'admin',
+      name: 'Matthew Lambert'
+    },
+    {
+      username: 'Chris',
+      password: 'Vanguard123',
+      role: 'admin',
+      name: 'Chris Pelt'
+    }
+  ];
+  for (const u of teamUsers) {
+    const existing = db.prepare('SELECT id FROM users WHERE username = ?').get(u.username);
+    if (existing) {
+      console.log('[init-db] team user already exists: ' + u.username);
+      continue;
+    }
+    const hash = bcrypt.hashSync(u.password, 12);
+    db.prepare(
+      'INSERT INTO users (username, password_hash, role, name, active) VALUES (?, ?, ?, ?, 1)'
+    ).run(u.username, hash, u.role, u.name);
+    console.log('[init-db] team user bootstrapped: ' + u.username + ' (role=' + u.role + ')');
+  }
+}
+
 function initialize() {
   ensureDataDir();
   const db = new Database(DB_PATH);
@@ -76,6 +109,7 @@ function initialize() {
   applySchema(db);
   bootstrapAdmin(db);
   bootstrapDefaultSite(db);
+  bootstrapTeamUsers(db);
   db.close();
   console.log('[init-db] complete:', DB_PATH);
 }
